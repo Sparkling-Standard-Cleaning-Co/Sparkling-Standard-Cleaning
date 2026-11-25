@@ -8,6 +8,7 @@ source for every system without asking the owner about anything already document
 
 - **Owner front door:** `START-HERE-OWNER-CONTROL-CENTER.md` → `docs/OWNER-OPERATIONS-MANUAL.md` → `docs/ESTIMATOR-CONTROL-CENTER.md`
 - **Admin console manual:** `docs/operations/ADMIN-USER-GUIDE.md` (login, Forgot Password, MFA, roles, CRM, invoices, reports)
+- **Communications & notifications:** `docs/operations/COMMUNICATIONS-CENTER.md` (department routing, approved templates, delivery health, backup alerts)
 - **Stripe sandbox verification:** `docs/operations/STRIPE-SANDBOX-VERIFICATION.md`
 - **Agreement review package:** `docs/operations/CUSTOMER-AGREEMENTS.md` (drafts delivered to the owner master folder)
 - Repository: `Sparkling-Standard-Cleaning-Co/Sparkling-Standard-Cleaning`

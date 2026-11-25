@@ -15,6 +15,7 @@ import {
 import {
   cancelManualBooking,
   confirmManualBooking,
+  createCompletedService,
   createManualBooking,
   manualAvailability,
   quoteManualBooking,
@@ -29,6 +30,7 @@ import {
   markBookingCommitment,
 } from '../../../src/lib/booking/commitments.ts';
 import { getCalendarEvent } from '../../../src/lib/booking/google-calendar.ts';
+import { listChangeOrders } from '../../../src/lib/change-orders/service.ts';
 
 interface Env extends AdminDbEnv, ManualBookingEnv, StripeBillingEnv {}
 
@@ -67,6 +69,7 @@ async function contextFor(
     .bind(customerId, ...branch.bind)
     .first<Record<string, unknown>>();
   if (!customer) throw new AdminAuthError(404, 'customer_not_found');
+  if (String(customer.status ?? '') !== 'active') throw new AdminAuthError(409, 'customer_archived');
   const properties = await db
     .prepare(
       `SELECT id, label, line1, line2, city, state, postal_code, latitude, longitude, precision,
@@ -103,6 +106,175 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         .all();
       return json({ ok: true, commitments: rows.results ?? [] });
     }
+    if (view === 'job') {
+      const actor = await requireActor(db, context.request, 'job.read');
+      const appointmentId = text(url.searchParams.get('appointmentId'), 120);
+      if (!appointmentId) return json({ ok: false, error: 'appointment_required' }, 400);
+      const branch = scope(actor, 'a.branch_id');
+      const job = await db
+        .prepare(
+          `SELECT a.id, a.status, a.source, a.reference, a.start_at, a.end_at, a.timezone,
+                  a.duration_minutes, a.crew_size, a.notes, a.customer_id, a.property_id,
+                  a.estimate_id, a.booking_request_id,
+                  c.first_name, c.last_name, c.company_name,
+                  p.label AS property_label, p.line1, p.city, p.state, p.postal_code,
+                  e.total_cents, e.service_code, e.discount_cents, e.subtotal_cents, e.input_snapshot_json,
+                  s.name AS service_name,
+                  i.id AS invoice_id, i.number AS invoice_number, i.status AS invoice_status,
+                  i.total_cents AS invoice_total_cents, i.balance_cents AS invoice_balance_cents,
+                  (SELECT GROUP_CONCAT(tm.display_name, ', ')
+                     FROM appointment_resources ar JOIN team_members tm ON tm.id = ar.team_member_id
+                    WHERE ar.appointment_id = a.id) AS assigned_names
+           FROM appointments a
+           JOIN customers c ON c.id = a.customer_id
+           LEFT JOIN properties p ON p.id = a.property_id
+           LEFT JOIN estimates e ON e.id = a.estimate_id
+           LEFT JOIN services s ON s.code = e.service_code
+           LEFT JOIN invoices i ON i.appointment_id = a.id AND i.invoice_role = 'primary'
+           WHERE a.id = ?${branch.sql} LIMIT 1`,
+        )
+        .bind(appointmentId, ...branch.bind)
+        .first<Record<string, unknown>>();
+      if (!job) return json({ ok: false, error: 'appointment_not_found' }, 404);
+      const documents = await db
+        .prepare(
+          `SELECT id, packet_name, bundle_code, status, executed_at, created_at
+           FROM signing_requests
+           WHERE appointment_id = ? OR (customer_id = ? AND property_id = ?)
+           ORDER BY created_at DESC LIMIT 10`,
+        )
+        .bind(appointmentId, String(job.customer_id ?? ''), String(job.property_id ?? ''))
+        .all<Record<string, unknown>>();
+      const [invoices, payments, photos, communications, crew, changeOrders] = await Promise.all([
+        db
+          .prepare(
+            `SELECT id, number, status, invoice_role, related_invoice_id, total_cents, balance_cents, due_date, created_at
+             FROM invoices WHERE appointment_id = ? ORDER BY created_at`,
+          )
+          .bind(appointmentId)
+          .all<Record<string, unknown>>(),
+        db
+          .prepare(
+            `SELECT p.id, p.invoice_id, p.provider, p.status, p.amount_cents, p.service_cents,
+                    p.tip_cents, p.tip_refunded_cents, p.received_at, p.created_at
+             FROM payments p
+             WHERE p.appointment_id = ?
+                OR p.invoice_id IN (SELECT id FROM invoices WHERE appointment_id = ?)
+             ORDER BY COALESCE(p.received_at, p.created_at) DESC`,
+          )
+          .bind(appointmentId, appointmentId)
+          .all<Record<string, unknown>>(),
+        db
+          .prepare(
+            `SELECT id, kind, content_type, created_at FROM job_media
+             WHERE appointment_id = ? ORDER BY created_at DESC LIMIT 100`,
+          )
+          .bind(appointmentId)
+          .all<Record<string, unknown>>(),
+        db
+          .prepare(
+            `SELECT id, channel, direction, status, subject, template, created_at
+             FROM communications
+             WHERE appointment_id = ? OR customer_id = ?
+             ORDER BY created_at DESC LIMIT 50`,
+          )
+          .bind(appointmentId, String(job.customer_id ?? ''))
+          .all<Record<string, unknown>>(),
+        db
+          .prepare(
+            `SELECT tm.id, tm.display_name
+             FROM appointment_resources ar JOIN team_members tm ON tm.id = ar.team_member_id
+             WHERE ar.appointment_id = ? ORDER BY tm.display_name`,
+          )
+          .bind(appointmentId)
+          .all<Record<string, unknown>>(),
+        listChangeOrders(db, { appointmentId }).catch(() => []),
+      ]);
+      const invoiceRows = invoices.results ?? [];
+      const paymentRows = payments.results ?? [];
+      const photoRows = photos.results ?? [];
+      const communicationRows = communications.results ?? [];
+      const moneyText = (value: unknown): string => {
+        const cents = Number(value);
+        return Number.isFinite(cents) ? `$${(cents / 100).toFixed(2)}` : '$0.00';
+      };
+      const label = (value: unknown): string => {
+        const raw = String(value ?? '').replaceAll('_', ' ').trim();
+        return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
+      };
+      const timeline = [
+        {
+          at: String(job.start_at ?? ''),
+          kind: 'job',
+          title: `Service ${label(job.status)}`,
+          detail: `Job ${String(job.reference ?? '')}`,
+        },
+        ...invoiceRows.map((row) => ({
+          at: String(row.created_at ?? ''),
+          kind: 'invoice',
+          title: `${row.invoice_role === 'supplemental' ? 'Supplemental invoice' : 'Invoice'} ${String(row.number ?? '')}`.trim(),
+          detail: `${moneyText(row.total_cents)} · ${label(row.status)}`,
+        })),
+        ...paymentRows.map((row) => {
+          const tip = Number(row.tip_cents ?? 0);
+          return {
+            at: String(row.received_at || row.created_at || ''),
+            kind: 'payment',
+            title: `Payment ${label(row.status)}`,
+            detail: `${moneyText(row.amount_cents)}${tip > 0 ? ` including ${moneyText(tip)} gratuity` : ''} via ${label(row.provider)}`,
+          };
+        }),
+        ...(documents.results ?? []).map((row) => ({
+          at: String(row.executed_at || row.created_at || ''),
+          kind: 'agreement',
+          title: row.executed_at ? 'Agreement executed' : 'Agreement request',
+          detail: `${String(row.packet_name || row.bundle_code || 'Agreement')} · ${label(row.status)}`,
+        })),
+        ...photoRows.map((row) => ({
+          at: String(row.created_at ?? ''),
+          kind: 'photo',
+          title: 'Photo added',
+          detail: label(row.kind),
+        })),
+        ...communicationRows.map((row) => ({
+          at: String(row.created_at ?? ''),
+          kind: 'communication',
+          title: `${label(row.channel)} ${label(row.direction)}`,
+          detail: `${label(row.status)}${row.subject ? ` · ${String(row.subject)}` : row.template ? ` · ${String(row.template)}` : ''}`,
+        })),
+      ]
+        .filter((event) => event.at)
+        .sort((left, right) => right.at.localeCompare(left.at));
+      return json({
+        ok: true,
+        job,
+        invoice: job.invoice_id
+          ? {
+              id: job.invoice_id,
+              number: job.invoice_number,
+              status: job.invoice_status,
+              totalCents: job.invoice_total_cents,
+              balanceCents: job.invoice_balance_cents,
+            }
+          : null,
+        documents: documents.results ?? [],
+        invoices: invoiceRows,
+        payments: paymentRows,
+        photos: photoRows,
+        communications: communicationRows,
+        crew: crew.results ?? [],
+        changeOrders,
+        timeline: [
+          ...changeOrders.map((changeOrder) => ({
+            at: String(changeOrder.created_at ?? ''),
+            kind: 'change_order',
+            title: `Change order ${String(changeOrder.reference ?? '')}`,
+            detail: `${moneyText(changeOrder.adjustment_cents)} · ${label(changeOrder.effective_status)}`,
+          })),
+          ...timeline,
+        ].sort((left, right) => right.at.localeCompare(left.at)),
+      });
+    }
     if (view === 'availability') {
       const actor = await requireActor(db, context.request, 'booking.write');
       const availability = await manualAvailability(context.env, db, actor, {
@@ -136,10 +308,12 @@ async function invoiceForRequest(
 ): Promise<Record<string, unknown>> {
   const row = await db
     .prepare(
-      `SELECT r.*, a.id AS appointment_id, e.total_cents, e.service_code, e.labor_hours
+      `SELECT r.*, a.id AS appointment_id, e.total_cents, e.service_code, e.labor_hours,
+              s.name AS service_name
        FROM booking_requests r
        LEFT JOIN appointments a ON a.booking_request_id = r.id
        LEFT JOIN estimates e ON e.quote_reference = r.quote_reference
+       LEFT JOIN services s ON s.code = e.service_code
        WHERE r.id = ? LIMIT 1`,
     )
     .bind(requestId)
@@ -148,21 +322,23 @@ async function invoiceForRequest(
   if (!row.customer_id) throw new AdminAuthError(400, 'request_customer_incomplete');
   const total = Number(row.total_cents);
   if (!Number.isFinite(total) || total <= 0) throw new AdminAuthError(409, 'request_not_priced');
-  const existing = row.appointment_id
-    ? await db.prepare('SELECT id, number FROM invoices WHERE appointment_id = ? LIMIT 1').bind(String(row.appointment_id)).first<{ id: string; number: string }>()
-    : null;
+  const existing = await db
+    .prepare('SELECT id, number FROM invoices WHERE booking_request_id = ? OR (booking_request_id IS NULL AND appointment_id = ?) LIMIT 1')
+    .bind(requestId, String(row.appointment_id ?? ''))
+    .first<{ id: string; number: string }>();
   const invoice = existing
     ? { id: existing.id, number: existing.number, totalCents: total }
       : await createInvoice(db, actor, {
         customerId: String(row.customer_id),
         propertyId: row.property_id ?? undefined,
         appointmentId: row.appointment_id ?? undefined,
+        bookingRequestId: requestId,
         serviceCode: String(row.service_code ?? ''),
         issueDate: new Date().toISOString().slice(0, 10),
         lines: [
           {
             kind: 'service',
-            description: `Cleaning service — ${String(row.quote_reference ?? requestId)}`,
+            description: `${String(row.service_name ?? 'Cleaning service')} — ${String(row.quote_reference ?? requestId)}`,
             quantity: 1,
             unitAmountCents: total,
             totalCents: total,
@@ -189,16 +365,99 @@ async function invoiceForRequest(
   return { invoice, ...(paymentLink ? { paymentLink } : {}), ...(paymentLinkError ? { paymentLinkError } : {}) };
 }
 
+async function invoiceForAppointment(
+  env: Env,
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  actor: AdminActor,
+  appointmentId: string,
+  paymentLinkRequested: boolean,
+): Promise<Record<string, unknown>> {
+  const row = await db
+    .prepare(
+      `SELECT a.*, e.total_cents, e.service_code, e.subtotal_cents, e.discount_cents, e.input_snapshot_json,
+              s.name AS service_name
+       FROM appointments a
+       LEFT JOIN estimates e ON e.id = a.estimate_id
+       LEFT JOIN services s ON s.code = e.service_code
+       WHERE a.id = ? LIMIT 1`,
+    )
+    .bind(appointmentId)
+    .first<Record<string, unknown>>();
+  if (!row) throw new AdminAuthError(404, 'appointment_not_found');
+  if (String(row.status) !== 'completed') throw new AdminAuthError(409, 'appointment_not_completed');
+  const total = Number(row.total_cents);
+  if (!Number.isFinite(total) || total <= 0) throw new AdminAuthError(409, 'appointment_not_priced');
+  const existing = await db
+    .prepare('SELECT id, number FROM invoices WHERE appointment_id = ? LIMIT 1')
+    .bind(appointmentId)
+    .first<{ id: string; number: string }>();
+  let invoice: { id: string; number: string; totalCents: number };
+  if (existing) {
+    invoice = { id: existing.id, number: existing.number, totalCents: total };
+  } else {
+    const timeZone = String(row.timezone ?? 'America/Chicago');
+    const serviceDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(String(row.start_at)));
+    let estimateFields: Record<string, unknown> = {};
+    try {
+      estimateFields = JSON.parse(String(row.input_snapshot_json ?? '{}')) as Record<string, unknown>;
+    } catch {
+      estimateFields = {};
+    }
+    const serviceName = String(estimateFields.service_label ?? row.service_name ?? 'Cleaning service');
+    invoice = await createInvoice(db, actor, {
+      customerId: String(row.customer_id),
+      propertyId: row.property_id ?? undefined,
+      appointmentId,
+      serviceCode: String(row.service_code ?? ''),
+      serviceLabel: serviceName,
+      serviceDate,
+      issueDate: new Date().toISOString().slice(0, 10),
+      lines: [
+        {
+          kind: 'service',
+          description: `${serviceName} — ${serviceDate} — ${String(row.reference ?? appointmentId)}`,
+          quantity: 1,
+          unitAmountCents: total,
+          totalCents: total,
+        },
+      ],
+      notes: 'Invoice generated from a recorded completed service at the agreed price. Tax and any final adjustment are confirmed on the final invoice.',
+    });
+  }
+  let paymentLink: Record<string, unknown> | null = null;
+  let paymentLinkError = '';
+  if (paymentLinkRequested) {
+    try {
+      paymentLink = { ...(await createInvoicePaymentLink(db, actor, invoice.id, env)) };
+    } catch (error) {
+      paymentLinkError = error instanceof AdminAuthError ? error.code : 'payment_link_failed';
+    }
+  }
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'booking.completed_invoice_created',
+    entityType: 'invoice',
+    entityId: invoice.id,
+    detail: `${appointmentId}:${paymentLinkRequested ? 'link' : 'no_link'}:${paymentLinkError}`,
+  });
+  return { invoice, ...(paymentLink ? { paymentLink } : {}), ...(paymentLinkError ? { paymentLinkError } : {}) };
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
   try {
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = text(body.action, 40);
-    if (!['quote', 'create', 'confirm', 'cancel', 'reschedule', 'invoice', 'reconcile'].includes(action)) {
+    if (!['quote', 'create', 'create_completed', 'confirm', 'cancel', 'reschedule', 'invoice', 'invoice_job', 'reconcile'].includes(action)) {
       return json({ ok: false, error: 'invalid_action' }, 400);
     }
-    const permission = action === 'invoice' ? 'finance.write' : 'booking.write';
+    const permission = action === 'invoice' || action === 'invoice_job' ? 'finance.write' : 'booking.write';
     const actor = await requireActor(db, context.request, permission);
     requireCsrf(context.request, actor);
 
@@ -271,6 +530,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'create') {
       const created = await createManualBooking(context.env, db, actor, body);
       return json({ ok: true, ...created }, 201);
+    }
+    if (action === 'create_completed') {
+      const created = await createCompletedService(context.env, db, actor, body);
+      return json({ ok: true, ...created }, 201);
+    }
+    if (action === 'invoice_job') {
+      return json({
+        ok: true,
+        ...(await invoiceForAppointment(
+          context.env,
+          db,
+          actor,
+          text(body.appointmentId, 120),
+          body.paymentLink === true,
+        )),
+      });
     }
     if (action === 'confirm') {
       const teamMemberIds = Array.isArray(body.teamMemberIds)

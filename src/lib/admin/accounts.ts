@@ -333,20 +333,42 @@ export async function changePassword(
 export async function listAudit(
   db: D1Database,
   actor: AdminActor,
-  limit = 100,
+  limit = 50,
+  offset = 0,
+  q = '',
 ): Promise<Array<Record<string, unknown>>> {
-  const bounded = Math.min(Math.max(Number(limit) || 100, 1), 300);
+  const bounded = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const start = Math.max(Number(offset) || 0, 0);
+  const query = text(q, 120);
   const result = await db
     .prepare(
       `SELECT a.id, a.action, a.entity_type, a.entity_id, a.success, a.detail_json,
               a.created_at, u.display_name
        FROM admin_audit a LEFT JOIN admin_users u ON u.id = a.actor_user_id
        WHERE (? = 'owner' OR a.branch_id = ? OR a.branch_id IS NULL)
-       ORDER BY a.created_at DESC LIMIT ?`,
+         AND (? = '' OR a.action LIKE ? OR a.entity_type LIKE ? OR a.entity_id LIKE ?)
+       ORDER BY a.created_at DESC, a.id DESC LIMIT ? OFFSET ?`,
     )
-    .bind(actor.role, actor.branchId, bounded)
+    .bind(actor.role, actor.branchId, query, `%${query}%`, `%${query}%`, `%${query}%`, bounded, start)
     .all();
   return result.results ?? [];
+}
+
+export async function countAudit(
+  db: D1Database,
+  actor: AdminActor,
+  q = '',
+): Promise<number> {
+  const query = text(q, 120);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM admin_audit a
+       WHERE (? = 'owner' OR a.branch_id = ? OR a.branch_id IS NULL)
+         AND (? = '' OR a.action LIKE ? OR a.entity_type LIKE ? OR a.entity_id LIKE ?)`,
+    )
+    .bind(actor.role, actor.branchId, query, `%${query}%`, `%${query}%`, `%${query}%`)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
 }
 
 export async function listSessions(

@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bookingConfig } from '../src/config/booking.ts';
+import { bookingConfig, isPublicBookingStartMinutes } from '../src/config/booking.ts';
+import { localMinutesOfDay } from '../src/lib/booking/time.ts';
 import {
   calendarJobsForDate,
   calendarStatus,
@@ -67,7 +68,7 @@ function googleStub(events: unknown[] = []) {
       return jsonResponse({ items: events });
     }
     if (url.includes('/calendar/v3/calendars/')) {
-      return jsonResponse({ summary: 'Sparkling Standard â€” Bookings', timeZone: 'America/Chicago' });
+      return jsonResponse({ summary: 'Sparkling Standard — Bookings', timeZone: 'America/Chicago' });
     }
     if (url.includes('api.mapmap.ai/route/v1/')) {
       return jsonResponse({ routes: [{ distance: 16093, duration: 1200 }] });
@@ -102,7 +103,7 @@ test('calendar status and jobs use the dedicated calendar, not any other calenda
   ]), async () => {
     const status = await calendarStatus(env as never);
     assert.equal(status.connected, true);
-    assert.equal(status.calendarName, 'Sparkling Standard â€” Bookings');
+    assert.equal(status.calendarName, 'Sparkling Standard — Bookings');
     const jobs = await calendarJobsForDate(env as never, '2026-11-10', 'America/Chicago');
     assert.equal(jobs.ok, true);
     assert.equal(jobs.jobs.length, 1);
@@ -168,7 +169,7 @@ test('creating a confirmed calendar event sends the exact held interval', async 
     },
     async () => {
       const created = await createCalendarEvent(env as never, {
-        summary: 'Cleaning â€” SS-20261027-ABC123',
+        summary: 'Cleaning — SS-20261027-ABC123',
         description: 'Customer request',
         location: '100 S Baylen St, Pensacola, FL 32502',
         start: '2026-11-10T15:00:00Z',
@@ -229,6 +230,19 @@ test('enabled availability returns real slots and never includes customer detail
       assert.equal(data.timeZone, 'America/Chicago');
       assert.equal(data.available, true);
       assert.ok((data.slots?.length ?? 0) > 0);
+      assert.equal(data.slots?.[0]?.startLabel, '7:00 AM', 'a free day starts at 7:00 AM');
+      assert.equal(
+        data.slots?.some((slot) => slot.startLabel === '7:15 AM'),
+        true,
+        '7:15 AM is offered when free',
+      );
+      for (const slot of data.slots ?? []) {
+        assert.equal(
+          isPublicBookingStartMinutes(localMinutesOfDay(new Date(slot.start), data.timeZone ?? 'America/Chicago')),
+          true,
+          `slot ${slot.startLabel} is outside the public start windows`,
+        );
+      }
       const serialized = JSON.stringify(data);
       assert.doesNotMatch(serialized, /customer|recipient|address/i);
     });
@@ -265,7 +279,7 @@ test('owner confirmation revalidates the slot and writes one calendar event', as
           return jsonResponse({ id: 'evt-confirmed' });
         }
         if (url.includes('/calendar/v3/calendars/') && url.includes('/events')) return jsonResponse({ items: [] });
-        if (url.includes('/calendar/v3/calendars/')) return jsonResponse({ summary: 'Sparkling Standard â€” Bookings', timeZone: 'America/Chicago' });
+        if (url.includes('/calendar/v3/calendars/')) return jsonResponse({ summary: 'Sparkling Standard — Bookings', timeZone: 'America/Chicago' });
         if (url.includes('api.mapmap.ai/route/v1/')) return jsonResponse({ routes: [{ distance: 16093, duration: 900 }] });
         throw new Error(`unexpected fetch: ${url}`);
       },

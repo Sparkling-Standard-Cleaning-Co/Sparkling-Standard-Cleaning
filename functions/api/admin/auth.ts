@@ -6,6 +6,7 @@ import {
   enrollOwner,
   expiredSessionCookie,
   auditFromRequest,
+  markSessionStepUp,
   rateLimit,
   readOpsActor,
   requireCsrf,
@@ -14,7 +15,17 @@ import {
   setupRequired,
 } from '../../../src/lib/admin/operations.ts';
 import { constantTimeEqual, hashToken } from '../../../src/lib/admin/auth.ts';
-import { createMfaChallenge, verifyMfaChallenge } from '../../../src/lib/admin/mfa.ts';
+import { branchViewCookie, requestedBranchView } from '../../../src/lib/admin/branch-view.ts';
+import { branchConfig } from '../../../src/config/branches.ts';
+import {
+  createEmailMfaChallenge,
+  createMfaChallenge,
+  emailMfaChallengeExists,
+  generateEmailCode,
+  prepareEmailMfaResend,
+  verifyEmailMfaChallenge,
+  verifyMfaChallenge,
+} from '../../../src/lib/admin/mfa.ts';
 import {
   acceptInvite,
   passwordResetStatus,
@@ -22,6 +33,7 @@ import {
   resetPassword,
 } from '../../../src/lib/admin/accounts.ts';
 import {
+  buildOpsMfaCodeEmail,
   buildOpsPasswordChangedEmail,
   buildOpsPasswordResetEmail,
   sendAdminEmail,
@@ -91,8 +103,11 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
             name: actor.name,
             role: actor.role,
             branchId: actor.branchId,
+            canSelectBranch: actor.role === 'owner',
+            branchView: requestedBranchView(context.request),
             permissions: actor.permissions,
             mfaEnabled: actor.mfaEnabled,
+            mfaMethod: actor.mfaMethod ?? 'totp',
           }
         : null,
       csrf: actor?.csrf ?? null,
@@ -105,14 +120,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
 async function actorPayload(
   db: D1Database,
   userId: string,
-): Promise<{ id: string; email: string; name: string; role: string; branchId: string | null; permissions: string[]; mfaEnabled: boolean } | null> {
+): Promise<{ id: string; email: string; name: string; role: string; branchId: string | null; permissions: string[]; mfaEnabled: boolean; mfaMethod: 'totp' | 'email' } | null> {
   const row = await db
     .prepare(
-      `SELECT id, email, display_name, role_id, branch_id, mfa_enabled FROM admin_users
+      `SELECT id, email, display_name, role_id, branch_id, mfa_enabled, mfa_method FROM admin_users
        WHERE id = ? AND status = 'active' LIMIT 1`,
     )
     .bind(userId)
-    .first<{ id: string; email: string; display_name: string; role_id: string; branch_id: string | null; mfa_enabled: number }>();
+    .first<{ id: string; email: string; display_name: string; role_id: string; branch_id: string | null; mfa_enabled: number; mfa_method: string | null }>();
   if (!row) return null;
   const perms = await db
     .prepare('SELECT permission FROM admin_role_permissions WHERE role_id = ?')
@@ -125,6 +140,7 @@ async function actorPayload(
     role: row.role_id,
     branchId: row.branch_id ?? null,
     mfaEnabled: Number(row.mfa_enabled) === 1,
+    mfaMethod: row.mfa_method === 'email' ? 'email' : 'totp',
     permissions: (perms.results ?? []).map((entry) => entry.permission),
   };
 }
@@ -149,10 +165,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const action = safeText(payload.action, 30);
   const ip = context.request.headers.get('CF-Connecting-IP') ?? 'local';
   const ipKey = `ops:ip:${await hashToken(ip)}`;
-  const sessionFor = async (userId: string): Promise<Response | null> => {
+  const sessionFor = async (userId: string, stepUp = false): Promise<Response | null> => {
     const actor = await actorPayload(db, userId);
     if (!actor) return null;
-    const session = await createOpsSession(db, actor.id, context.request);
+    const session = await createOpsSession(db, actor.id, context.request, stepUp ? { stepUpAt: new Date().toISOString() } : {});
     return json(
       { ok: true, actor, csrf: session.csrf },
       200,
@@ -250,15 +266,63 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
   }
 
+  if (action === 'mfa_resend') {
+    if (!(await rateLimit(db, `ops:mfa-resend:${ipKey}`, 10, 15, 15))) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+    const challengeToken = safeText(payload.challengeToken, 300);
+    const code = generateEmailCode();
+    const prepared = await prepareEmailMfaResend(db, challengeToken, code);
+    if (!prepared.ok) {
+      if (prepared.reason === 'cooldown') {
+        return json(
+          { ok: false, error: 'mfa_resend_cooldown', retryAfterSeconds: prepared.retryAfterSeconds },
+          429,
+        );
+      }
+      return json({ ok: false, error: 'mfa_challenge_invalid' }, 401);
+    }
+    const recipient = await actorPayload(db, prepared.userId);
+    if (!recipient) return json({ ok: false, error: 'mfa_challenge_invalid' }, 401);
+    const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+    const delivered = await sendAdminEmail(
+      {
+        ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+        ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+        PUBLIC_SITE_URL: site,
+      },
+      recipient.email,
+      buildOpsMfaCodeEmail({ PUBLIC_SITE_URL: site }, code, recipient.name),
+      `ops-mfa-code-${crypto.randomUUID()}`,
+    );
+    if (!delivered) {
+      await auditFromRequest(db, context.request, null, 'admin.mfa_email_failed');
+      return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+    }
+    await auditFromRequest(db, context.request, null, 'admin.mfa_email_resent');
+    return json({
+      ok: true,
+      expiresAt: prepared.expiresAt,
+      resendAfterSeconds: prepared.resendAfterSeconds,
+    });
+  }
+
   if (action === 'mfa_verify') {
     if (!(await rateLimit(db, `ops:mfa:${ipKey}`, 20, 15, 15))) {
       return json({ ok: false, error: 'rate_limited' }, 429);
     }
-    const verified = await verifyMfaChallenge(db, safeText(payload.challengeToken, 300), {
-      code: safeText(payload.code, 20),
-      recoveryCode: safeText(payload.recoveryCode, 40),
-      ...(context.env.MFA_ENCRYPTION_KEY ? { encryptionKey: context.env.MFA_ENCRYPTION_KEY } : {}),
-    });
+    const challengeToken = safeText(payload.challengeToken, 300);
+    const emailChallenge = await emailMfaChallengeExists(db, challengeToken);
+    const verified = emailChallenge
+      ? await verifyEmailMfaChallenge(db, challengeToken, {
+          code: safeText(payload.code, 20),
+          recoveryCode: safeText(payload.recoveryCode, 40),
+        })
+      : await verifyMfaChallenge(db, challengeToken, {
+          code: safeText(payload.code, 20),
+          recoveryCode: safeText(payload.recoveryCode, 40),
+          ...(context.env.MFA_ENCRYPTION_KEY ? { encryptionKey: context.env.MFA_ENCRYPTION_KEY } : {}),
+        });
     if (!verified) {
       await auditFromRequest(db, context.request, null, 'admin.mfa_failed');
       return json({ ok: false, error: 'mfa_invalid' }, 401);
@@ -267,9 +331,78 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (verifiedActor) {
       await auditFromRequest(db, context.request, { ...verifiedActor, csrf: '', permissions: [], mfaEnabled: true }, 'admin.mfa_verified');
     }
-    return (await sessionFor(verified.userId)) ?? json({ ok: false, error: 'mfa_failed' }, 401);
+    return (await sessionFor(verified.userId, true)) ?? json({ ok: false, error: 'mfa_failed' }, 401);
   }
 
+  if (action === 'step_up_start') {
+    const actor = await readOpsActor(db, context.request);
+    if (!actor) return json({ ok: false, error: 'unauthorized' }, 401);
+    requireCsrf(context.request, actor);
+    if (!actor.mfaEnabled) return json({ ok: false, error: 'mfa_not_enabled' }, 400);
+    if (!(await rateLimit(db, `ops:stepup:${actor.id}`, 10, 15, 15))) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+    if (actor.mfaMethod === 'email') {
+      const key = context.env.RESEND_API_KEY?.trim();
+      if (!key) return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+      const code = generateEmailCode();
+      const challenge = await createEmailMfaChallenge(db, actor.id, code);
+      const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+      const delivered = await sendAdminEmail(
+        {
+          RESEND_API_KEY: key,
+          ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+          PUBLIC_SITE_URL: site,
+        },
+        actor.email,
+        buildOpsMfaCodeEmail({ PUBLIC_SITE_URL: site }, code, actor.name),
+        `ops-stepup-code-${crypto.randomUUID()}`,
+      );
+      if (!delivered) {
+        await auditFromRequest(db, context.request, actor, 'admin.step_up_email_failed');
+        return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+      }
+      await auditFromRequest(db, context.request, actor, 'admin.step_up_started');
+      return json({
+        ok: true,
+        mfaMethod: 'email',
+        challengeToken: challenge.token,
+        expiresAt: challenge.expiresAt,
+      });
+    }
+    const challenge = await createMfaChallenge(db, actor.id);
+    await auditFromRequest(db, context.request, actor, 'admin.step_up_started');
+    return json({ ok: true, mfaMethod: 'totp', challengeToken: challenge.token, expiresAt: challenge.expiresAt });
+  }
+
+  if (action === 'step_up_verify') {
+    const actor = await readOpsActor(db, context.request);
+    if (!actor) return json({ ok: false, error: 'unauthorized' }, 401);
+    requireCsrf(context.request, actor);
+    if (!actor.mfaEnabled) return json({ ok: false, error: 'mfa_not_enabled' }, 400);
+    if (!(await rateLimit(db, `ops:stepup-verify:${actor.id}`, 20, 15, 15))) {
+      return json({ ok: false, error: 'rate_limited' }, 429);
+    }
+    const challengeToken = safeText(payload.challengeToken, 300);
+    const emailChallenge = await emailMfaChallengeExists(db, challengeToken);
+    const verified = emailChallenge
+      ? await verifyEmailMfaChallenge(db, challengeToken, {
+          code: safeText(payload.code, 20),
+          recoveryCode: safeText(payload.recoveryCode, 40),
+        })
+      : await verifyMfaChallenge(db, challengeToken, {
+          code: safeText(payload.code, 20),
+          recoveryCode: safeText(payload.recoveryCode, 40),
+          ...(context.env.MFA_ENCRYPTION_KEY ? { encryptionKey: context.env.MFA_ENCRYPTION_KEY } : {}),
+        });
+    if (!verified || verified.userId !== actor.id || !actor.sessionId) {
+      await auditFromRequest(db, context.request, actor, 'admin.step_up_failed');
+      return json({ ok: false, error: 'mfa_invalid' }, 401);
+    }
+    await markSessionStepUp(db, actor.sessionId, actor.id);
+    await auditFromRequest(db, context.request, actor, 'admin.step_up_verified');
+    return json({ ok: true });
+  }
   if (action === 'setup') {
     const required = await setupRequired(db);
     if (!required) return json({ ok: false, error: 'already_configured' }, 409);
@@ -317,12 +450,41 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       await auditFromRequest(db, context.request, null, 'admin.login_failed');
       return json({ ok: false, error: 'credentials_invalid' }, 401);
     }
+    if (actor.mfaEnabled && actor.mfaMethod === 'email') {
+      const code = generateEmailCode();
+      const challenge = await createEmailMfaChallenge(db, actor.id, code);
+      const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+      const delivered = await sendAdminEmail(
+        {
+          ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
+          ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+          PUBLIC_SITE_URL: site,
+        },
+        actor.email,
+        buildOpsMfaCodeEmail({ PUBLIC_SITE_URL: site }, code, actor.name),
+        `ops-mfa-code-${crypto.randomUUID()}`,
+      );
+      if (!delivered) {
+        await auditFromRequest(db, context.request, null, 'admin.mfa_email_failed');
+        return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+      }
+      await auditFromRequest(db, context.request, { ...actor, csrf: '', permissions: [], mfaEnabled: true }, 'admin.mfa_challenge');
+      return json({
+        ok: true,
+        mfaRequired: true,
+        mfaMethod: 'email',
+        challengeToken: challenge.token,
+        expiresAt: challenge.expiresAt,
+        resendAfterSeconds: challenge.resendAfterSeconds,
+      });
+    }
     if (actor.mfaEnabled) {
       const challenge = await createMfaChallenge(db, actor.id);
       await auditFromRequest(db, context.request, { ...actor, csrf: '', permissions: [], mfaEnabled: true }, 'admin.mfa_challenge');
       return json({
         ok: true,
         mfaRequired: true,
+        mfaMethod: 'totp',
         challengeToken: challenge.token,
         expiresAt: challenge.expiresAt,
       });
@@ -331,6 +493,27 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return (await sessionFor(actor.id)) ?? json({ ok: false, error: 'login_failed' }, 500);
   }
 
+
+  if (action === 'branch_view') {
+    const actor = await readOpsActor(db, context.request);
+    if (!actor || actor.role !== 'owner') return json({ ok: false, error: 'forbidden' }, 403);
+    try {
+      requireCsrf(context.request, actor);
+    } catch (error) {
+      return json({ ok: false, error: (error as AdminAuthError).code }, 403);
+    }
+    const requested = safeText(payload.branchView, 80);
+    if (requested !== 'all' && !branchConfig(requested)) {
+      return json({ ok: false, error: 'branch_invalid' }, 400);
+    }
+    const value = requested === 'all' ? null : requested;
+    await auditFromRequest(db, context.request, actor, 'admin.branch_view_changed');
+    return json(
+      { ok: true, branchView: value },
+      200,
+      { 'Set-Cookie': branchViewCookie(value, context.request) },
+    );
+  }
   if (action === 'logout') {
     const actor = await readOpsActor(db, context.request);
     if (!actor) return json({ ok: true }, 200, { 'Set-Cookie': expiredSessionCookie(context.request) });

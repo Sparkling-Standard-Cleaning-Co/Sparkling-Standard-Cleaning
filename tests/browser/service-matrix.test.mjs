@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { checkEstimateTerms } from './terms-ready.mjs';
+import { chooseAppointment } from '../helpers/estimator-step-one.mjs';
 
 const PORT = 4417;
 const BASE = `http://localhost:${PORT}`;
@@ -135,16 +136,14 @@ async function addressAndHome(page, { service = 'standard', beds } = {}) {
     () => document.querySelector('[data-address-finder]')?.getAttribute('data-state') === 'confirmed',
   );
   await page.locator('[data-schedule-section]').waitFor({ state: 'visible' });
-  await page.fill('#est-date', bookingDate);
-  await page.waitForSelector('[data-period="first"]:not([disabled])', { state: 'visible' });
-  await page.click('[data-period="first"]');
+  await chooseAppointment(page, bookingDate, 'first');
   await page.click('[data-next]');
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
   );
   const serviceFieldset = page.locator('[data-service-fieldset]');
-  if (await serviceFieldset.isVisible()) {
-    await page.click(`label.option:has(input[name="serviceType"][value="${service}"])`);
+  if (await serviceFieldset.isVisible() && service === 'move_in_out') {
+    await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="move_in_out"])');
   }
   await page.selectOption('#est-property', service === 'str_turnover' ? 'condo' : 'house');
   await page.fill('#est-sqft', service === 'str_turnover' ? '900' : '1600');
@@ -156,6 +155,17 @@ async function addressAndHome(page, { service = 'standard', beds } = {}) {
     if (await bedsInput.isVisible()) await bedsInput.fill(String(beds));
   }
   await page.click('[data-next]');
+  assert.equal(
+    await page.locator('[data-deep-cleaning-input]').isHidden(),
+    true,
+    'the optional deep reset waits for an explicit frequency choice',
+  );
+  if (service === 'deep') {
+    await page.selectOption('#est-frequency', 'one_time');
+    await page.locator('[data-deep-cleaning-input]').waitFor({ state: 'visible' });
+    await page.check('[data-deep-cleaning-input]');
+    await page.locator('[data-frequency-field]').waitFor({ state: 'hidden' });
+  }
 }
 
 async function finishAndSubmit(page, captured, { deepAck = false } = {}) {
@@ -221,6 +231,23 @@ test('deep cleaning is one-time: no rhythm question, one_time in the payload', a
   }
 });
 
+test('the optional deep reset appears only after a one-time residential choice', async () => {
+  const { context, page } = await openEstimate(1440, 900);
+  try {
+    await addressAndHome(page);
+    const optionalReset = page.locator('[data-deep-cleaning]');
+    assert.equal(await optionalReset.isHidden(), true, 'no optional reset before a rhythm is chosen');
+    await page.selectOption('#est-frequency', 'one_time');
+    assert.equal(await optionalReset.isVisible(), true, 'one-time residential can add a deep reset');
+    assert.equal(await page.locator('[data-recurring-deep]').isHidden(), true, 'one-time does not show the recurring notice');
+    await page.selectOption('#est-frequency', 'monthly');
+    assert.equal(await optionalReset.isHidden(), true, 'recurring hides the optional reset');
+    assert.equal(await page.locator('[data-recurring-deep]').isVisible(), true, 'recurring shows the required first-clean notice');
+  } finally {
+    await context.close();
+  }
+});
+
 test('STR turnover: beds are asked, the rhythm is not, and the payload is per-turnover', async () => {
   const { context, page, captured } = await openEstimate(1440, 900, '/estimate/str/');
   try {
@@ -242,7 +269,22 @@ test('residential recurring: the rhythm matrix drives the two-price first-visit 
     await addressAndHome(page);
     // Step 3: the rhythm question IS present for residential cleaning.
     assert.equal(await page.locator('[data-frequency-field]').isVisible(), true, 'the rhythm question shows');
+    assert.equal(await page.locator('[data-deep-cleaning]').isHidden(), true, 'the optional reset waits for a one-time choice');
     await page.selectOption('#est-frequency', 'weekly');
+    assert.equal(await page.locator('[data-deep-cleaning]').isHidden(), true, 'recurring service never offers a second optional deep clean');
+    const pricing = page.locator('[data-recurring-deep-pricing]');
+    await pricing.waitFor({ state: 'visible' });
+    assert.match((await pricing.innerText()).replace(/\s+/g, ' '), /Following Visits: Weekly/);
+    await page.click('label.option:has(input[name="condition"][value="maintained"])');
+    await page.selectOption('#est-last-clean', 'within_month');
+    await page.selectOption('#est-pets', 'none');
+    await page.waitForFunction(() => {
+      const text = document.querySelector('[data-recurring-deep-pricing]')?.textContent ?? '';
+      return /First Visit: Deep Cleaning [—-] \$[\d,.]+/.test(text) && /per visit/.test(text);
+    });
+    const pricingText = (await pricing.innerText()).replace(/\s+/g, ' ');
+    assert.match(pricingText, /First Visit: Deep Cleaning [—-] \$[\d,.]+/);
+    assert.match(pricingText, /Following Visits: Weekly [—-] \$[\d,.]+ per visit/);
     const fields = await finishAndSubmit(page, captured, { deepAck: true });
     assert.equal(fields.service_type, 'standard');
     assert.equal(fields.frequency, 'weekly');
@@ -266,7 +308,7 @@ test('switching services mid-wizard clears stale rhythm and STR values', async (
     await page.waitForSelector('input[name="initialDeepCleanAcknowledged"]', { state: 'visible' });
     // …then walk back to Service & Home and switch to move-in/out.
     await page.click('[data-step-jump="2"]');
-    await page.click('label.option:has(input[name="serviceType"][value="move_in_out"])');
+    await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="move_in_out"])');
     await page.click('[data-next]'); // condition step
     // Step 3: the rhythm control is hidden AND normalized — the stale weekly
     // value must never survive into the quote or the submission.
@@ -324,6 +366,29 @@ test('commercial cleaning routes into the dedicated facility estimate engine', a
     );
     const cta = page.locator('a[href="/estimate/commercial/"]').first();
     assert.equal((await cta.count()) >= 1, true, 'the facility estimate CTA renders');
+  } finally {
+    await context.close();
+  }
+});
+
+test('Step 2 defaults to regular home cleaning and Step 3 offers the residential rhythm', async () => {
+  const { context, page } = await openEstimate(390, 844);
+  try {
+    await addressAndHome(page);
+    const regular = page.locator('input[name="serviceType"][value="standard"]');
+    const move = page.locator('input[name="serviceType"][value="move_in_out"]');
+    assert.equal(await regular.isChecked(), true, 'regular cleaning is selected by default');
+    assert.equal(await move.isChecked(), false);
+    assert.equal(await page.locator('[data-deep-cleaning-input]').count(), 1, 'deep-cleaning reset remains available');
+    const labels = await page.locator('label.segmented-choice__option').allTextContents();
+    assert.match(labels[0] ?? '', /No - Regular home cleaning/);
+    assert.match(labels[1] ?? '', /Yes - Move-in or move-out cleaning/);
+    assert.equal(await page.locator('[data-frequency-field]').isVisible(), true);
+    const optionLabels = await page.locator('#est-frequency option').allTextContents();
+    assert.deepEqual(
+      optionLabels.slice(1).map((label) => label.trim()),
+      ['One-Time', 'Weekly', 'Biweekly (Every 2 Weeks)', 'Monthly'],
+    );
   } finally {
     await context.close();
   }

@@ -1,14 +1,15 @@
 import { formatInvoiceDate, formatMoney, type InvoiceData, type InvoiceTotals } from './invoice.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
 export const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-export const DEFAULT_INVOICE_EMAIL_FROM =
-  'Sparkling Standard <notifications@sparkling-standard.com>';
-export const DEFAULT_INVOICE_EMAIL_REPLY_TO = 'owner@sparkling-standard.com';
+export const DEFAULT_INVOICE_EMAIL_FROM = EMAIL_ROUTING.notificationsSender;
+export const DEFAULT_INVOICE_EMAIL_REPLY_TO = EMAIL_ROUTING.billing;
 
 export interface InvoiceEmailEnv {
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_REPLY_TO?: string;
+  RESEND_BILLING_REPLY_TO?: string;
 }
 
 export type InvoiceEmailStatus = 'sent' | 'skipped_not_configured' | 'failed';
@@ -38,6 +39,11 @@ export function buildInvoiceEmail(
       ? `<p style="margin:0 0 18px;"><a href="${escapeHtml(data.paymentUrl)}" style="display:inline-block;background:#b15a6f;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600;">Pay Invoice Securely</a></p>
          <p style="margin:0 0 18px;font-size:13px;color:#6f5f57;">Or copy this secure link: <a href="${escapeHtml(data.paymentUrl)}" style="color:#93475b;">${escapeHtml(data.paymentUrl)}</a></p>`
       : '';
+  const review =
+    data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)
+      ? `<p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#4a3b40;">Thank you for choosing Sparkling Standard${data.review.branchName ? ` ${escapeHtml(data.review.branchName)}` : ''}. If you would like to share your experience, a Google review helps other neighbors find us. There is no obligation.</p>
+         <p style="margin:0 0 18px;"><a href="${escapeHtml(data.review.url)}" style="color:#93475b;">Leave a Google review</a></p>`
+      : '';
   const html = `<!doctype html>
 <html lang="en"><body style="margin:0;padding:0;background:#f9f3ed;font-family:'Helvetica Neue',Arial,sans-serif;color:#302429;">
   <div style="padding:28px 12px;">
@@ -46,9 +52,11 @@ export function buildInvoiceEmail(
       <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-size:21px;font-weight:700;">Sparkling Standard Cleaning Co.</p>
       <p style="margin:0 0 24px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6d5426;">Standards That Sparkle.</p>
       <p style="margin:0 0 14px;font-size:15px;">Hello ${escapeHtml(data.billedTo.contact || data.billedTo.company)},</p>
-      <p style="margin:0 0 18px;font-size:15px;line-height:1.65;">Your invoice <strong>${escapeHtml(data.invoiceNumber)}</strong> is attached as a PDF. The balance due is <strong>${escapeHtml(balance)}</strong>, due ${escapeHtml(due)}.</p>
+      <p style="margin:0 0 18px;font-size:15px;line-height:1.65;">Your invoice <strong>${escapeHtml(data.invoiceNumber)}</strong> is attached as a PDF.${data.serviceName ? ` Service: <strong>${escapeHtml(data.serviceName)}</strong>.` : ''}${data.serviceDate ? ` Service date: <strong>${escapeHtml(formatInvoiceDate(data.serviceDate))}</strong>.` : ''} The balance due is <strong>${escapeHtml(balance)}</strong>, due ${escapeHtml(due)}.</p>
       ${payLink}
+      ${payLink ? '<p style="margin:0 0 18px;font-size:13px;line-height:1.65;color:#6f5f57;">The secure payment page also offers a completely optional gratuity for your cleaning team. It defaults to $0.00 and never affects your service, review or receipt.</p>' : ''}
       <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#4a3b40;">${escapeHtml(data.paymentTerms || 'Please reply to this email with any questions.')}</p>
+      ${review}
       <p style="margin:0;font-size:14px;line-height:1.65;color:#4a3b40;">Thank you for choosing Sparkling Standard Cleaning Co.! We appreciate the opportunity to care for your home and look forward to delivering Standards That Sparkle.</p>
       <p style="margin:22px 0 0;padding-top:14px;border-top:1px solid #e4d5c7;font-size:12px;line-height:1.6;color:#8c7a70;">${escapeHtml(data.contact.phone)} · ${escapeHtml(data.contact.email)} · ${escapeHtml(data.contact.website)}</p>
     </div>
@@ -58,11 +66,20 @@ export function buildInvoiceEmail(
     `Hello ${data.billedTo.contact || data.billedTo.company},`,
     '',
     `Your invoice ${data.invoiceNumber} is attached as a PDF.`,
+    ...(data.serviceName ? [`Service: ${data.serviceName}`] : []),
+    ...(data.serviceDate ? [`Service date: ${formatInvoiceDate(data.serviceDate)}`] : []),
     `Balance due: ${balance}`,
     `Due: ${due}`,
-    ...(data.paymentUrl && /^https:\/\//i.test(data.paymentUrl) ? ['', `Pay online: ${data.paymentUrl}`] : []),
+    ...(data.paymentUrl && /^https:\/\//i.test(data.paymentUrl) ? ['', `Pay online: ${data.paymentUrl}`, 'The secure payment page offers a completely optional gratuity; it defaults to $0.00.'] : []),
     '',
     data.paymentTerms || 'Please reply to this email with any questions.',
+    ...(data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)
+      ? [
+          '',
+          `Thank you for choosing Sparkling Standard${data.review.branchName ? ` ${data.review.branchName}` : ''}. If you would like to share your experience, a Google review helps other neighbors find us. There is no obligation.`,
+          data.review.url,
+        ]
+      : []),
     '',
     'Thank you for choosing Sparkling Standard Cleaning Co.! We appreciate the opportunity to care for your home and look forward to delivering Standards That Sparkle.',
     data.contact.name,
@@ -105,7 +122,7 @@ export async function sendInvoiceEmail(input: {
       body: JSON.stringify({
         from: input.env.RESEND_FROM_EMAIL?.trim() || DEFAULT_INVOICE_EMAIL_FROM,
         to: [input.to],
-        reply_to: input.env.RESEND_REPLY_TO?.trim() || DEFAULT_INVOICE_EMAIL_REPLY_TO,
+        reply_to: input.env.RESEND_BILLING_REPLY_TO?.trim() || input.env.RESEND_REPLY_TO?.trim() || DEFAULT_INVOICE_EMAIL_REPLY_TO,
         subject: email.subject,
         html: email.html,
         text: email.text,

@@ -55,3 +55,7 @@ indexnow-out/
 # python bytecode (route/print scripts)
 __pycache__/
 *.pyc
+# encrypted backup archives and generated legal PDFs (private business data)
+backup-out/
+legal-out/
+r2-archive/

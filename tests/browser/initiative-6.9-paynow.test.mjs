@@ -136,7 +136,7 @@ async function reachFinal(page) {
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
   );
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="standard"])');
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');

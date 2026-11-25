@@ -1,4 +1,4 @@
-// POST /api/estimate-checkout â€” starts a Stripe-hosted Checkout Session for
+// POST /api/estimate-checkout — starts a Stripe-hosted Checkout Session for
 // an exact, server-verified residential/STR quote or an exact Tier A facility
 // quote.
 //
@@ -16,6 +16,12 @@
 //    double sessions from repeated clicks/retries.
 //  - No card data ever touches this site.
 
+import { legalPolicyConfig } from '../../src/config/legal-policy.ts';
+import { commercialTierConfig } from '../../src/config/estimators/commercial.ts';
+import {
+  resolveStripeSecret,
+  resolveStripeWebhookSecret,
+} from '../../src/lib/payments/stripe-secret.ts';
 import { estimatePaymentConfig } from '../../src/config/payments.ts';
 import {
   QUOTE_MATCH_TOLERANCE,
@@ -87,13 +93,24 @@ import {
 import {
   createSigningRequest,
   evaluateDocumentGate,
+  findReusableSigningRequest,
   rotateSigningRequestToken,
+  sendSigningEmail,
+  updatePendingSigningRequestPricing,
 } from '../../src/lib/documents/service.ts';
+import { createCheckoutIntent, readCheckoutIntent } from '../../src/lib/documents/checkout-intent.ts';
+import {
+  createPricingSnapshot,
+  pricingServiceLabel,
+  type PricingSnapshot,
+} from '../../src/lib/documents/pricing-snapshot.ts';
 
 interface Env extends QuoteVerificationEnv, PaymentStorageEnv {
   DB?: import('../../src/lib/admin/d1.ts').D1Database;
   STRIPE_SECRET_KEY?: string;
+  STRIPE_TEST_SECRET?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_TEST_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
   PUBLIC_SITE_URL?: string;
@@ -162,6 +179,8 @@ interface CheckoutRecord {
   chargeAmountCents?: number;
   /** Idempotency fingerprint used to return a gift-only order result. */
   attempt?: string;
+  /** Safe reason retained so a retry advances the Stripe idempotency key. */
+  failureReason?: string;
   /** Whether the customer still owes required photos before confirmation. */
   photosOutstanding?: boolean;
   /** Result of automatic confirmation for a paid, complete booking. */
@@ -191,10 +210,19 @@ interface VerifiedCandidate {
   reference: string;
   serviceType: string;
   tax: ServiceTaxResult;
+  verifiedState: string | null;
+  verifiedZip: string | null;
   /** Automatic quote discount already included in cleaningAmountCents. */
   automaticDiscountCents?: number;
   automaticDiscountLabel?: string;
   automaticDiscountSource?: string;
+  recurring?: {
+    frequency: string;
+    regularPerVisitCents: number;
+    discountCents: number;
+    discountLabel: string;
+    perVisitCents: number;
+  };
   receipt: {
     service: string;
     serviceLocation: string;
@@ -269,13 +297,13 @@ async function authoritativePhotosOutstanding(
 type CheckoutExpiry = 'expired' | 'completed' | 'failed';
 
 async function expireCheckoutSession(env: Env, sessionId: string): Promise<CheckoutExpiry> {
-  if (!env.STRIPE_SECRET_KEY?.trim() || !sessionId) return 'failed';
+  if (!stripeSecret(env) || !sessionId) return 'failed';
   try {
     const response = await fetch(
       `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`,
       {
         method: 'POST',
-        headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+        headers: { Authorization: `Bearer ${stripeSecret(env)}` },
         signal: AbortSignal.timeout(10_000),
       },
     );
@@ -324,11 +352,13 @@ async function authoritativeHoldId(
   await writeLedgerJson(store, holdKey(hold.id), { ...hold, expiresAt }).catch(() => undefined);
   return { ok: true, holdId, expiresAt, start: hold.start, end: hold.end };
 }
-async function documentGateForCheckout(
+export async function documentGateForCheckout(
   env: Env,
   fields: Record<string, string>,
   returnPath = '',
-): Promise<{ satisfied: boolean; signingUrl?: string }> {
+  pricingSnapshot?: PricingSnapshot,
+): Promise<{ satisfied: boolean; signingUrl?: string; error?: string }> {
+  if (!legalPolicyConfig.activation.electronicSigning) return { satisfied: true };
   if (!env.DB) return { satisfied: true };
   const reference = (fields.quote_reference ?? '').trim();
   const holdId = (fields.booking_hold_id ?? '').trim();
@@ -347,32 +377,138 @@ async function documentGateForCheckout(
     frequency: fields.frequency ?? fields.ongoing_frequency ?? '',
     bookingReference: requestRow?.quote_reference ?? reference,
     ...(requestRow?.id ? { bookingRequestId: requestRow.id } : {}),
+    ...(fields.name ? { customerLegalName: fields.name } : {}),
     ...(fields.email ? { email: fields.email } : {}),
     accessAuthorization: fields.access_authorization === 'yes',
     customerProducts: fields.customer_products === 'yes',
   };
   const gate = await evaluateDocumentGate(env.DB, context, 'before_payment');
   if (gate.satisfied) return { satisfied: true };
-  const pending = await env.DB
-    .prepare(
-      `SELECT id FROM signing_requests
-       WHERE status IN ('pending','partially_signed') AND subject_type = 'customer'
-         AND (customer_id = ? OR (customer_id IS NULL AND booking_reference = ?))
-       ORDER BY created_at DESC LIMIT 1`,
-    )
-    .bind(context.customerId ?? '', context.bookingReference ?? '')
-    .first<{ id: string }>();
-  if (pending) {
-    const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
-    return { satisfied: false, signingUrl: `/document-sign/?token=${encodeURIComponent(rotated.token)}${returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''}` };
-  }
-  const created = await createSigningRequest(env.DB, context);
-  return {
-    satisfied: false,
-    ...(created.token
-      ? { signingUrl: `/document-sign/?token=${encodeURIComponent(created.token)}${returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''}` }
-      : {}),
+  const store = paymentLedger(env);
+  const signingUrlFor = async (requestId: string, token: string): Promise<string> => {
+    let url = `/document-sign/?token=${encodeURIComponent(token)}${
+      returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''
+    }`;
+    if (store) {
+      const intent = await createCheckoutIntent(store, {
+        signingRequestId: requestId,
+        fields,
+        returnPath,
+      }).catch(() => null);
+      if (intent) url += `&resume=${encodeURIComponent(intent.token)}`;
+    }
+    return url;
   };
+  const pending = await findReusableSigningRequest(env.DB, context, gate);
+  if (pending) {
+    if (pricingSnapshot) {
+      await updatePendingSigningRequestPricing(env.DB, pending.id, pricingSnapshot).catch(() => undefined);
+    }
+    const rotated = await rotateSigningRequestToken(env.DB, null, pending.id);
+    return {
+      satisfied: false,
+      signingUrl: await signingUrlFor(pending.id, rotated.token),
+    };
+  }
+  try {
+    const created = await createSigningRequest(env.DB, context, {
+      ...(pricingSnapshot ? { pricingSnapshot } : {}),
+    });
+    if (!created.token || !created.requestId) {
+      return { satisfied: false, error: 'document_packet_unavailable' };
+    }
+    if (fields.email) {
+      await sendSigningEmail(
+        env,
+        fields.email,
+        created.token,
+        created.bundleName || created.bundleCode || 'Cleaning agreement',
+        `documents-before-payment-${created.requestId}`,
+      ).catch(() => false);
+    }
+    return {
+      satisfied: false,
+      signingUrl: await signingUrlFor(created.requestId, created.token),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('document_variables_missing')) {
+      console.error('[estimate-checkout] document_template_incomplete', { message });
+      return { satisfied: false, error: 'document_template_incomplete' };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Builds the exact pricing the customer is asked to sign before payment.
+ * The candidate is the same server-verified amount that will be sent to
+ * Stripe, so the agreement, the payment screen and the admin record agree.
+ */
+export function buildCheckoutPricingSnapshot(
+  fields: Record<string, string>,
+  candidate: VerifiedCandidate,
+): PricingSnapshot {
+  const lines = candidate.receipt.lines.map((line) => ({
+    label: line.label,
+    amountCents: line.kind === 'discount' ? -Math.abs(line.amountCents) : line.amountCents,
+    kind:
+      line.kind === 'discount'
+        ? ('discount' as const)
+        : line.kind === 'tax'
+          ? ('tax' as const)
+          : ('charge' as const),
+  }));
+  const charges = lines.filter((line) => line.kind === 'charge');
+  const discounts = lines.filter((line) => line.kind === 'discount');
+  const travelLine = candidate.receipt.lines.find((line) => line.kind === 'travel');
+  return createPricingSnapshot({
+    version: 1,
+    currency: 'USD',
+    source: 'checkout_verified',
+    capturedAt: new Date().toISOString(),
+    serviceCode: candidate.serviceType,
+    serviceLabel: pricingServiceLabel(candidate.serviceType, fields.frequency ?? ''),
+    frequency: fields.frequency ?? fields.ongoing_frequency ?? '',
+    propertyAddress:
+      candidate.receipt.serviceLocation ||
+      [fields.service_address, fields.address_city, fields.address_state, fields.zip]
+        .filter(Boolean)
+        .join(', '),
+    serviceDate: fields.preferred_date ?? fields.booking_slot_start?.slice(0, 10) ?? '',
+    arrivalWindow: fields.preferred_time ?? '',
+    scope: fields.service_scope ?? fields.service_details ?? '',
+    addOns: fields.addons ?? fields.extras_detail ?? '',
+    basePriceCents: charges.reduce((total, line) => total + line.amountCents, 0),
+    travelCents: travelLine ? travelLine.amountCents : null,
+    discountCents: Math.abs(discounts.reduce((total, line) => total + line.amountCents, 0)),
+    discountLabel: discounts.map((line) => line.label).join(', '),
+    taxCents: candidate.receipt.taxCents,
+    taxLabel:
+      candidate.receipt.taxCents > 0 && candidate.receipt.taxRatePercent
+        ? `Sales tax (${candidate.receipt.taxRatePercent}%${
+            candidate.receipt.taxJurisdiction ? ` - ${candidate.receipt.taxJurisdiction}` : ''
+          })`
+        : fields.tax_note || 'No sales tax applies to this service.',
+    totalCents: candidate.amountCents,
+    amountDueNowCents: candidate.amountCents,
+    remainingBalanceCents: 0,
+    paymentTerms:
+      'Payment is completed through the secure payment page. A signed copy is provided before payment.',
+    ...(candidate.recurring
+      ? {
+          recurring: {
+            frequency: candidate.recurring.frequency,
+            regularPerVisitCents: candidate.recurring.regularPerVisitCents,
+            discountCents: candidate.recurring.discountCents,
+            discountLabel: candidate.recurring.discountLabel,
+            perVisitCents: candidate.recurring.perVisitCents,
+          },
+        }
+      : {}),
+    lines,
+    note: 'Verified by the Sparkling Standard checkout engine.',
+  });
 }
 
 function sanitizeFields(value: unknown): Record<string, string> {
@@ -418,6 +554,14 @@ async function notifyOwnerGiftOrder(
 
 function siteOrigin(env: Env): string {
   return (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
+}
+
+function productionSite(env: Env): boolean {
+  return siteOrigin(env) === 'https://sparkling-standard.com';
+}
+
+function stripeSecret(env: Env): string {
+  return resolveStripeSecret(env, productionSite(env));
 }
 
 function keyMode(secret: string | undefined): 'live' | 'test' | 'unknown' {
@@ -471,11 +615,11 @@ function residentialReceiptLines(
 ): ReceiptLine[] {
   const breakdown = verification.breakdown;
   if (!breakdown) {
-    return [{ label: `Cleaning service â€” ${service}`, amountCents: totalCents, kind: 'charge' }];
+    return [{ label: `Cleaning service — ${service}`, amountCents: totalCents, kind: 'charge' }];
   }
   const lines: ReceiptLine[] = [
     {
-      label: `Cleaning service â€” ${service}`,
+      label: `Cleaning service — ${service}`,
       amountCents: cents(breakdown.basePrice) + cents(breakdown.roundingAdjustment),
       kind: 'charge',
     },
@@ -516,7 +660,7 @@ function facilityReceiptLines(
   const discount = cents(verification.discountAmount ?? 0);
   const lines: ReceiptLine[] = [
     {
-      label: `Cleaning service â€” ${service}`,
+      label: `Cleaning service — ${service}`,
       amountCents: cleaningAfterDiscount + discount,
       kind: 'charge',
     },
@@ -544,12 +688,12 @@ function needsExplicitAcceptance(quotedCents: number, amountCents: number): bool
 }
 
 async function stripeSession(env: Env, sessionId: string): Promise<StripeSession | null> {
-  if (!env.STRIPE_SECRET_KEY?.trim()) return null;
+  if (!stripeSecret(env)) return null;
   try {
     const response = await fetch(
       `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
       {
-        headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY.trim()}` },
+        headers: { Authorization: `Bearer ${stripeSecret(env)}` },
         signal: AbortSignal.timeout(10_000),
       },
     );
@@ -561,7 +705,7 @@ async function stripeSession(env: Env, sessionId: string): Promise<StripeSession
 }
 
 async function webhookEndpointConfigured(env: Env): Promise<boolean | null> {
-  const secret = env.STRIPE_SECRET_KEY?.trim();
+  const secret = stripeSecret(env);
   if (!secret) return false;
   const fingerprint = await paymentHash(secret).catch(() => 'unknown');
   const now = Date.now();
@@ -619,13 +763,14 @@ export async function paymentReadiness(env: Env): Promise<{
     mode_allowed: boolean;
   };
 }> {
-  const secret = env.STRIPE_SECRET_KEY?.trim();
+  const secret = stripeSecret(env);
   const mode = keyMode(secret);
   const production = siteOrigin(env) === 'https://sparkling-standard.com';
   const modeAllowed = mode === 'live' || (mode === 'test' && !production);
+  const webhookSecret = resolveStripeWebhookSecret(env, production);
   const checks = {
     stripe_key: Boolean(secret),
-    webhook_secret: Boolean(env.STRIPE_WEBHOOK_SECRET?.trim()),
+    webhook_secret: Boolean(webhookSecret),
     webhook_endpoint: null as boolean | null,
     ledger: Boolean(paymentLedger(env)),
     notification: Boolean(env.WEB3FORMS_ACCESS_KEY?.trim()),
@@ -748,6 +893,8 @@ async function verifyFacilityPayment(
     reference,
     serviceType,
     tax,
+    verifiedState: destination.state ?? null,
+    verifiedZip: destination.zip ?? null,
     ...(verification.discountAmount && verification.discountAmount > 0
       ? {
           automaticDiscountCents: cents(verification.discountAmount),
@@ -808,6 +955,30 @@ async function verifyResidentialPayment(
   const serviceType = fields.service_type ?? 'standard';
   const cleaningAmountCents = cents(verification.verifiedPrice);
   const quotedCents = cents(quoted);
+  let recurring: CandidateSuccess['recurring'];
+  if (verification.ongoing) {
+    const allocation = verification.ongoing.discounts.find(
+      (discount) => discount.source === 'supportive',
+    );
+    const regularPerVisitCents = cents(verification.ongoing.regularPerVisitPrice);
+    const perVisitCents = cents(verification.ongoing.perVisitPrice);
+    recurring = {
+      frequency: verification.ongoing.frequency,
+      regularPerVisitCents,
+      discountCents: Math.max(0, regularPerVisitCents - perVisitCents),
+      discountLabel: allocation?.label ?? '',
+      perVisitCents,
+    };
+    // The recurring plan and every later surface use the server's verified
+    // ongoing rate, never the browser's assertion.
+    fields.ongoing_regular_price_per_visit = verification.ongoing.regularPerVisitPrice.toFixed(2);
+    fields.ongoing_price_per_visit = verification.ongoing.perVisitPrice.toFixed(2);
+    fields.ongoing_frequency = verification.ongoing.frequency;
+    if (allocation) {
+      fields.ongoing_discount_label = allocation.label;
+      fields.ongoing_discount_amount = allocation.amount.toFixed(2);
+    }
+  }
   if (!withinAcceptance(quotedCents, cleaningAmountCents)) {
     return { ok: false, reason: 'price_mismatch' };
   }
@@ -832,6 +1003,9 @@ async function verifyResidentialPayment(
     reference: await residentialReference(verification, fields, amountCents),
     serviceType,
     tax,
+    verifiedState: verification.travel.destinationState ?? null,
+    verifiedZip: verification.travel.destinationZip ?? null,
+    ...(recurring ? { recurring } : {}),
     ...(verification.breakdown?.discount
       ? {
           automaticDiscountCents: cents(verification.breakdown.discount.amount),
@@ -1095,7 +1269,7 @@ async function fulfillGiftOnlyOrder(
   }
   const notified = await notifyOwnerGiftOrder(
     env,
-    `PAID BY GIFT â€” ${input.candidate.reference}`,
+    `PAID BY GIFT — ${input.candidate.reference}`,
     {
       'Payment status': 'PAID IN FULL BY GIFT CERTIFICATE',
       'Gift code': input.giftCode,
@@ -1104,7 +1278,7 @@ async function fulfillGiftOnlyOrder(
       Service: serviceLabel({ service_type: input.candidate.serviceType }),
       Customer: snapshot?.customerName ?? 'name unavailable',
       Email: input.email,
-      'Photos outstanding': input.record.photosOutstanding ? 'yes â€” confirm after photos' : 'no',
+      'Photos outstanding': input.record.photosOutstanding ? 'yes — confirm after photos' : 'no',
       ...(bookingStatus
         ? {
             'Booking status':
@@ -1128,6 +1302,31 @@ async function fulfillGiftOnlyOrder(
     url: `${siteOrigin(env)}/estimate/payment-success/?gift_order=${encodeURIComponent(input.attempt)}`,
   });
 }
+async function recordCheckoutFailure(
+  env: Env,
+  fields: Record<string, string>,
+  code: string,
+  reason: string,
+): Promise<void> {
+  const quote = (fields.quote_reference ?? '').trim();
+  if (!env.DB || !quote) return;
+  try {
+    await env.DB.prepare(
+      `UPDATE booking_requests
+       SET payload_json = json_set(payload_json,
+             '$.checkout_failure_code', ?,
+             '$.checkout_failure_reason', ?,
+             '$.checkout_failure_at', ?),
+           updated_at = ?
+       WHERE quote_reference = ?`,
+    )
+      .bind(code, reason.slice(0, 500), new Date().toISOString(), new Date().toISOString(), quote)
+      .run();
+  } catch {
+    // Diagnostics must never replace the real checkout error.
+  }
+}
+
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
   if (throttled(request)) return json({ ok: false, error: 'rate_limited' }, 429);
@@ -1143,6 +1342,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     returnPath?: unknown;
     acceptRecalculated?: unknown;
     acceptedAmount?: unknown;
+    resume_token?: unknown;
   };
   try {
     payload = (await request.json()) as typeof payload;
@@ -1150,15 +1350,49 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'invalid_request' }, 400);
   }
 
-  const fields = sanitizeFields(payload.fields);
+  const resumeToken = typeof payload.resume_token === 'string' ? payload.resume_token.trim() : '';
+  let fields: Record<string, string> = {};
+  let resumedReturnPath = '';
+  if (resumeToken) {
+    const store = paymentLedger(env);
+    if (!store) return json({ ok: false, error: 'resume_unavailable' }, 503);
+    const intent = await readCheckoutIntent(store, resumeToken).catch(() => null);
+    if (!intent) return json({ ok: false, error: 'resume_expired' }, 400);
+    fields = sanitizeFields(intent.record.fields);
+    resumedReturnPath = intent.record.returnPath;
+  } else {
+    fields = sanitizeFields(payload.fields);
+  }
   if (Object.keys(fields).length === 0) return json({ ok: false, error: 'invalid_request' }, 400);
   if (fields.terms_accepted !== 'yes' || fields.terms_version !== legalTerms.termsVersion) {
     return json({ ok: false, error: 'terms_required' }, 400);
   }
+  if (
+    fields.request_type === 'facility_estimate' &&
+    !commercialTierConfig.facilityOnlinePaymentEnabled
+  ) {
+    await recordCheckoutFailure(
+      env,
+      fields,
+      'facility_payment_not_activated',
+      'Facility online payment is not activated until its document and payment workflow passes acceptance.',
+    );
+    return json(
+      {
+        ok: false,
+        error: 'facility_payment_not_activated',
+        reason:
+          'Facility visits are scheduled after personal review. Request the visit and Sparkling Standard will confirm the scope, time and payment options with you.',
+      },
+      409,
+    );
+  }
   const returnPath =
     typeof payload.returnPath === 'string' && RETURN_PATHS.has(payload.returnPath)
       ? payload.returnPath
-      : '/estimate/';
+      : RETURN_PATHS.has(resumedReturnPath)
+        ? resumedReturnPath
+        : '/estimate/';
 
   const photosOutstanding = await authoritativePhotosOutstanding(fields, env);
   fields.photos_outstanding = photosOutstanding ? 'yes' : 'no';
@@ -1168,6 +1402,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       mode: ready.mode,
       checks: ready.checks,
     });
+    await recordCheckoutFailure(env, fields, 'payment_not_ready', 'Payment configuration is not ready.');
     return json({ ok: false, error: 'payment_not_ready', reason: 'configuration' }, 503);
   }
   const recurringFrequency = (fields.frequency ?? fields.ongoing_frequency ?? '').trim().toLowerCase();
@@ -1176,6 +1411,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     ['weekly', 'biweekly', 'monthly'].includes(recurringFrequency) &&
     !recurringSchedulingEnabled(env)
   ) {
+    await recordCheckoutFailure(env, fields, 'recurring_scheduling_gated', 'Recurring scheduling is disabled in this deployment.');
     return json(
       {
         ok: false,
@@ -1186,24 +1422,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     );
   }
   const hold = await authoritativeHoldId(fields, env);
-  if (!hold.ok) return json({ ok: false, error: hold.error }, 400);
+  if (!hold.ok) {
+    await recordCheckoutFailure(
+      env,
+      fields,
+      hold.error,
+      'The selected arrival time could not be held for secure checkout.',
+    );
+    return json({ ok: false, error: hold.error }, 400);
+  }
   fields.booking_hold_id = hold.holdId;
   fields.booking_slot_start = hold.start;
   fields.booking_slot_end = hold.end;
   fields.booking_hold_expires_at = hold.expiresAt;
-
-  const documentGate = await documentGateForCheckout(env, fields, returnPath);
-  if (!documentGate.satisfied) {
-    return json(
-      {
-        ok: false,
-        error: 'documents_required',
-        reason: 'Complete the required signed documents before payment.',
-        ...(documentGate.signingUrl ? { signingUrl: documentGate.signingUrl } : {}),
-      },
-      409,
-    );
-  }
 
   const pricingConfig = await requestPricingConfig(env.DB);
   let candidate =
@@ -1212,51 +1443,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       : await verifyResidentialPayment(fields, env, pricingConfig);
 
   if (!candidate.ok) {
+    await recordCheckoutFailure(
+      env,
+      fields,
+      'quote_not_payable',
+      `Quote could not be verified: ${candidate.reason}`,
+    );
     return json(
       { ok: false, error: 'quote_not_payable', reason: candidate.reason },
       400,
     );
-  }
-
-  const acceptedAmount =
-    typeof payload.acceptedAmount === 'number' ? payload.acceptedAmount : Number(payload.acceptedAmount);
-  const explicitAcceptance =
-    payload.acceptRecalculated === true &&
-    Number.isFinite(acceptedAmount) &&
-    cents(acceptedAmount) === candidate.amountCents;
-  if (candidate.priceChanged && !explicitAcceptance) {
-    return json(
-      {
-        ok: false,
-        error: 'quote_changed',
-        amount: candidate.amountCents / 100,
-        quotedAmount: candidate.quotedCents / 100,
-        cleaningAmount: candidate.cleaningAmountCents / 100,
-        tax: candidate.tax,
-        reference: candidate.reference,
-        serviceType: candidate.serviceType,
-      },
-      409,
-    );
-  }
-
-  const emailProblem = customerEmailProblem(fields.email);
-  if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
-  const email = normalizeCustomerEmail(fields.email);
-
-  const stripeCustomer = await resolveCheckoutStripeCustomer(env.DB ?? null, env, {
-    reference: candidate.reference,
-    holdId: fields.booking_hold_id ?? '',
-    email,
-    name: fields.name ?? fields.organization ?? '',
-  }).catch((error) => {
-    console.error('[estimate-checkout] stripe_customer_failed', {
-      name: error instanceof Error ? error.name : 'unknown',
-    });
-    return null;
-  });
-  if (!stripeCustomer) {
-    return json({ ok: false, error: 'stripe_customer_unavailable' }, 502);
   }
 
   let dynamicPromotion: { id: string; code: string; discountCents: number; customerId: string | null; redemptionId?: string } | null = null;
@@ -1281,16 +1477,17 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!evaluation.ok || !evaluation.promotion || !evaluation.discountCents) {
       return json({ ok: false, error: 'promotion_invalid', reason: evaluation.reason }, 409);
     }
-    const stacksWithSupportive =
-      candidate.automaticDiscountSource === 'supportive' && evaluation.promotion.supportiveStackable === true;
-    if (stacksWithSupportive || evaluation.discountCents > automaticDiscountCents) {
+    // Benefits are allocated to charge lines and never compounded on the same
+    // line. A new recurring first visit carries only this promotion; Community
+    // Support is preserved on the separately priced ongoing visits.
+    if (evaluation.discountCents > automaticDiscountCents) {
       const discount = evaluation.discountCents;
-      const combinedDiscount = stacksWithSupportive ? automaticDiscountCents + discount : discount;
+      const combinedDiscount = discount;
       const cleaningAfter = Math.max(0, promotionBaseCents - combinedDiscount);
       const taxAfter = calculateServiceTax({
         serviceType: candidate.serviceType,
-        state: fields.address_state ?? null,
-        zip: fields.zip ?? null,
+        state: candidate.verifiedState,
+        zip: candidate.verifiedZip,
         taxableBase: cleaningAfter / 100,
       });
       if (!taxAfter.canCharge) {
@@ -1298,16 +1495,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       const amountAfter = cents(cleaningAfter / 100 + (taxAfter.taxAmount ?? 0));
       const receiptLines = [
-        ...(stacksWithSupportive
-          ? candidate.receipt.lines
-          : candidate.receipt.lines.filter(
-              (line) =>
-                !(
-                  line.kind === 'discount' &&
-                  automaticDiscountLabel &&
-                  line.label === automaticDiscountLabel
-                ),
-            )),
+        ...candidate.receipt.lines.filter(
+          (line) =>
+            !(
+              line.kind === 'discount' &&
+              automaticDiscountLabel &&
+              line.label === automaticDiscountLabel
+            ),
+        ),
         {
           label: `Promotion - ${evaluation.promotion.name}`,
           amountCents: -discount,
@@ -1327,10 +1522,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         amountCents: amountAfter,
         tax: taxAfter,
         automaticDiscountCents: combinedDiscount,
-        automaticDiscountLabel: stacksWithSupportive
-          ? automaticDiscountLabel
-          : `Promotion - ${evaluation.promotion.name}`,
-        ...(stacksWithSupportive ? { automaticDiscountSource: 'supportive+promotion' } : {}),
+        automaticDiscountLabel: `Promotion - ${evaluation.promotion.name}`,
+        automaticDiscountSource: 'promotion',
         receipt: {
           ...candidate.receipt,
           lines: reconciled,
@@ -1348,6 +1541,82 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         customerId: (evaluation as { customerId?: string }).customerId ?? null,
       };
     }
+  }
+
+  const acceptedAmount =
+    typeof payload.acceptedAmount === 'number' ? payload.acceptedAmount : Number(payload.acceptedAmount);
+  const explicitAcceptance =
+    payload.acceptRecalculated === true &&
+    Number.isFinite(acceptedAmount) &&
+    cents(acceptedAmount) === candidate.amountCents;
+  if (candidate.priceChanged && !explicitAcceptance) {
+    return json(
+      {
+        ok: false,
+        error: 'quote_changed',
+        amount: candidate.amountCents / 100,
+        quotedAmount: candidate.quotedCents / 100,
+        cleaningAmount: candidate.cleaningAmountCents / 100,
+        tax: candidate.tax,
+        reference: candidate.reference,
+        serviceType: candidate.serviceType,
+      },
+      409,
+    );
+  }
+
+  const documentGate = await documentGateForCheckout(
+    env,
+    fields,
+    returnPath,
+    buildCheckoutPricingSnapshot(fields, candidate),
+  );
+  if (!documentGate.satisfied) {
+    if (documentGate.error) {
+      return json(
+        {
+          ok: false,
+          error: documentGate.error,
+          reason:
+            'A required agreement is not fully configured. Sparkling Standard must complete the document setup before payment can be accepted.',
+        },
+        409,
+      );
+    }
+    return json(
+      {
+        ok: false,
+        error: 'documents_required',
+        reason: 'Complete the required signed documents before payment.',
+        ...(documentGate.signingUrl ? { signingUrl: documentGate.signingUrl } : {}),
+      },
+      409,
+    );
+  }
+
+  const emailProblem = customerEmailProblem(fields.email);
+  if (emailProblem) return json({ ok: false, error: emailProblem }, 400);
+  const email = normalizeCustomerEmail(fields.email);
+
+  const stripeCustomer = await resolveCheckoutStripeCustomer(env.DB ?? null, env, {
+    reference: candidate.reference,
+    holdId: fields.booking_hold_id ?? '',
+    email,
+    name: fields.name ?? fields.organization ?? '',
+  }).catch((error) => {
+    console.error('[estimate-checkout] stripe_customer_failed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  });
+  if (!stripeCustomer) {
+    await recordCheckoutFailure(
+      env,
+      fields,
+      'stripe_customer_unavailable',
+      'Stripe customer setup failed before checkout could start.',
+    );
+    return json({ ok: false, error: 'stripe_customer_unavailable' }, 502);
   }
 
   const totalCents = candidate.amountCents;
@@ -1399,8 +1668,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   const bucket = paymentLedger(env);
   if (!bucket) return json({ ok: false, error: 'payment_not_ready' }, 503);
   const key = ledgerKey('checkouts', attemptFingerprint);
+  const failureKey = ledgerKey('checkout-failures', attemptFingerprint);
 
-  const existing = await readLedgerJson<CheckoutRecord>(bucket, key).catch(() => null);
+  const [existing, priorFailure] = await Promise.all([
+    readLedgerJson<CheckoutRecord>(bucket, key).catch(() => null),
+    readLedgerJson<{ generation: number }>(bucket, failureKey).catch(() => null),
+  ]);
   if (existing) {
     const response = await existingCheckoutResponse(env, bucket, key, existing.value);
     if (response) return response;
@@ -1448,7 +1721,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!checkoutSlotId) return json({ ok: false, error: 'checkout_in_progress' }, 409);
   }
 
-  const generation = (existing?.value.generation ?? 0) + 1;
+  const generation = Math.max(existing?.value.generation ?? 0, priorFailure?.value.generation ?? 0) + 1;
   const now = new Date().toISOString();
   const claim: CheckoutRecord = {
     version: 1,
@@ -1575,7 +1848,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   body.set('line_items[0][price_data][unit_amount]', String(chargeAmountCents));
   body.set(
     'line_items[0][price_data][product_data][name]',
-    `${estimatePaymentConfig.productLabel} â€” ${serviceLabel(fields)}`,
+    `${estimatePaymentConfig.productLabel} — ${serviceLabel(fields)}`,
   );
   body.set('line_items[0][price_data][product_data][description]', estimatePaymentConfig.checkoutNote);
   body.set('metadata[checkout_kind]', 'estimate_payment');
@@ -1610,7 +1883,6 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
   if (stripeCustomer.stripeCustomerId) {
     body.set('customer', stripeCustomer.stripeCustomerId);
-    body.set('customer_update[email]', 'auto');
   } else {
     body.set('customer_email', email);
   }
@@ -1619,7 +1891,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${env.STRIPE_SECRET_KEY?.trim()}`,
+        Authorization: `Bearer ${stripeSecret(env)}`,
         'Content-Type': 'application/x-www-form-urlencoded',
         'Idempotency-Key': `ss-estimate-${attemptFingerprint}-${generation}`,
       },
@@ -1629,13 +1901,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const data = (await response.json().catch(() => ({}))) as {
       id?: string;
       url?: string;
-      error?: { code?: string; type?: string };
+      error?: { code?: string; type?: string; param?: string; message?: string };
     };
     if (!response.ok || !data.url || !data.id) {
       console.error('[estimate-checkout] stripe_session_failed', {
         status: response.status,
         code: data.error?.code ?? 'unknown',
         type: data.error?.type ?? 'unknown',
+        param: data.error?.param ?? 'unknown',
+        message: (data.error?.message ?? '').slice(0, 300),
       });
       if (gift && giftLedger) {
         await releaseGiftReservation(giftLedger, gift.code, gift.reservationId).catch(
@@ -1647,7 +1921,23 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
       await deleteLedgerKey(bucket, key).catch(() => undefined);
-      return json({ ok: false, error: 'stripe_unavailable' }, 502);
+      await writeLedgerJson(bucket, failureKey, {
+        generation,
+        failedAt: new Date().toISOString(),
+        reason: `stripe_${data.error?.code ?? 'unknown'}`,
+      }).catch(() => undefined);
+      await recordCheckoutFailure(
+        env,
+        fields,
+        'stripe_session_failed',
+        `Stripe rejected checkout: ${data.error?.code ?? 'unknown'}${data.error?.param ? ` (${data.error.param})` : ''}`,
+      );
+      return json({
+        ok: false,
+        error: 'stripe_unavailable',
+        reason: data.error?.code ?? 'unknown',
+        ...(data.error?.param ? { field: data.error.param } : {}),
+      }, 502);
     }
     const record: CheckoutRecord = {
       ...claim,
@@ -1683,6 +1973,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         await releasePromotionRedemption(env.DB, attemptFingerprint).catch(() => undefined);
       }
       console.error('[estimate-checkout] checkout_state_uncertain', { sessionId: data.id });
+      await recordCheckoutFailure(
+        env,
+        fields,
+        'checkout_state_uncertain',
+        'Stripe created a session but the local checkout state could not be persisted.',
+      );
       return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
     }
     if (env.DB && checkoutSlotId) {
@@ -1698,9 +1994,16 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           await releasePromotionRedemption(env.DB, attemptFingerprint).catch(() => undefined);
         }
         await deleteLedgerKey(bucket, key).catch(() => undefined);
+        await recordCheckoutFailure(
+          env,
+          fields,
+          'checkout_state_uncertain',
+          'Stripe created a session but the checkout slot could not be activated.',
+        );
         return json({ ok: false, error: 'checkout_state_uncertain' }, 502);
       }
     }
+    await deleteLedgerKey(bucket, failureKey).catch(() => undefined);
     return json({ ok: true, url: data.url });
   } catch (error) {
     if (gift && giftLedger) {
@@ -1713,10 +2016,21 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (env.DB && checkoutSlotId) await setCheckoutSlotStatus(env.DB, checkoutSlotId, 'failed');
     await deleteLedgerKey(bucket, key).catch(() => undefined);
+    await writeLedgerJson(bucket, failureKey, {
+      generation,
+      failedAt: new Date().toISOString(),
+      reason: 'stripe_transport_failed',
+    }).catch(() => undefined);
     console.error('[estimate-checkout] stripe_transport_failed', {
       name: error instanceof Error ? error.name : 'unknown',
     });
-    return json({ ok: false, error: 'stripe_unavailable' }, 502);
+    await recordCheckoutFailure(
+      env,
+      fields,
+      'stripe_transport_failed',
+      'The server could not reach Stripe to create the checkout session.',
+    );
+    return json({ ok: false, error: 'stripe_unavailable', reason: 'transport' }, 502);
   }
 }
 
@@ -1755,11 +2069,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     return json({
       ok: true,
       enabled: ready.enabled,
+      recurringScheduling: recurringSchedulingEnabled(env),
       mode: ready.mode,
       checks: ready.checks,
     });
   }
-  if (!env.STRIPE_SECRET_KEY?.trim()) return json({ ok: false, error: 'not_configured' }, 503);
+  if (!stripeSecret(env)) return json({ ok: false, error: 'not_configured' }, 503);
   if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId)) return json({ ok: false, error: 'invalid_request' }, 400);
 
   const session = await stripeSession(env, sessionId);

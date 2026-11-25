@@ -5,65 +5,20 @@ import {
   type InvoiceTotals,
 } from './invoice.ts';
 
-const PAGE_WIDTH = 612;
-const PAGE_HEIGHT = 792;
-const LEFT = 50;
-const RIGHT = PAGE_WIDTH - 50;
-const CONTENT_BOTTOM = 74;
-
-const INK = '0.19 0.14 0.16';
-const INK_SOFT = '0.29 0.23 0.25';
-const MUTED = '0.55 0.48 0.44';
-const BORDER = '0.85 0.80 0.76';
-const ROSE = '0.69 0.35 0.44';
-
-function ascii(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\u2013\u2014]/g, '-')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201c\u201d]/g, '"')
-    .replace(/[^\x20-\x7e]/g, '-');
-}
-
-function escapePdf(value: string): string {
-  return ascii(value).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-
-function textWidth(value: string, size: number, bold = false): number {
-  return ascii(value).length * size * (bold ? 0.56 : 0.5);
-}
-
-function wrap(value: string, maxWidth: number, size: number, bold = false): string[] {
-  const words = ascii(value).split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [''];
-  const lines: string[] = [];
-  let line = '';
-  for (const word of words) {
-    const next = line ? `${line} ${word}` : word;
-    if (textWidth(next, size, bold) <= maxWidth || !line) {
-      line = next;
-    } else {
-      lines.push(line);
-      line = word;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-function text(value: string, x: number, y: number, size: number, bold = false, color = INK): string {
-  return `BT ${color} rg ${bold ? '/F2' : '/F1'} ${size} Tf 1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm (${escapePdf(value)}) Tj ET\n`;
-}
-
-function rightText(value: string, xRight: number, y: number, size: number, bold = false, color = INK): string {
-  return text(value, xRight - textWidth(value, size, bold), y, size, bold, color);
-}
-
-function rule(y: number, color = BORDER): string {
-  return `${color} RG 0.6 w ${LEFT} ${y.toFixed(2)} m ${RIGHT} ${y.toFixed(2)} l S\n`;
-}
+import {
+  LEFT,
+  RIGHT,
+  CONTENT_BOTTOM,
+  INK,
+  INK_SOFT,
+  MUTED,
+  ROSE,
+  wrap,
+  text,
+  rightText,
+  rule,
+  assemblePdf,
+} from '../pdf/pdf-core.ts';
 
 function pageFooter(contact: InvoiceData['contact'], page: number, total: number): string {
   let content = rule(58);
@@ -214,6 +169,27 @@ export function buildInvoicePdf(data: InvoiceData, totals: InvoiceTotals): Uint8
     }
   }
 
+  if (data.review?.eligible && data.review.url && /^https:\/\//i.test(data.review.url)) {
+    ensure(60);
+    y -= 18;
+    content += text('SHARE YOUR EXPERIENCE', LEFT, y, 8, true, MUTED);
+    y -= 14;
+    for (const line of wrap(
+      `Thank you for choosing Sparkling Standard${data.review.branchName ? ` ${data.review.branchName}` : ''}. If you would like to share your experience, a Google review helps other neighbors find us. There is no obligation.`,
+      500,
+      9,
+    )) {
+      ensure(14);
+      content += text(line, LEFT, y, 9, false, INK_SOFT);
+      y -= 12;
+    }
+    for (const line of wrap(data.review.url, 500, 8)) {
+      ensure(14);
+      content += text(line, LEFT, y, 8, false, ROSE);
+      y -= 10;
+    }
+  }
+
   if (data.contact.legalName) {
     ensure(26);
     y -= 18;
@@ -224,35 +200,4 @@ export function buildInvoicePdf(data: InvoiceData, totals: InvoiceTotals): Uint8
 
   const withFooters = pages.map((page, index) => page + pageFooter(data.contact, index + 1, pages.length));
   return assemblePdf(withFooters);
-}
-
-function assemblePdf(pageContents: string[]): Uint8Array {
-  const objects: string[] = [];
-  const pageIds = pageContents.map((_, index) => 5 + index * 2);
-  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
-  objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageContents.length} >>`;
-  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
-  objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
-  pageContents.forEach((stream, index) => {
-    const pageId = 5 + index * 2;
-    const contentId = pageId + 1;
-    objects[pageId] =
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] ` +
-      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
-    objects[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}endstream`;
-  });
-
-  let body = '%PDF-1.4\n';
-  const offsets: number[] = [0];
-  for (let id = 1; id < objects.length; id += 1) {
-    offsets[id] = body.length;
-    body += `${id} 0 obj\n${objects[id]}\nendobj\n`;
-  }
-  const xref = body.length;
-  body += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
-  for (let id = 1; id < objects.length; id += 1) {
-    body += `${String(offsets[id]).padStart(10, '0')} 00000 n \n`;
-  }
-  body += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  return new TextEncoder().encode(body);
 }

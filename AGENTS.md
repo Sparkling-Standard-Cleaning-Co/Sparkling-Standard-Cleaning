@@ -65,7 +65,7 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
 
 ## Project identity and current verified status
 
-- **2026-10-21 owner decision implementation:** 46 decisions applied; public brand **Sparkling Standard**, legal entity **Sparkling Standard LLC**, slogan **Standards That Make Your Space Sparkle.** See `docs/verification/VERIFICATION.md` and the Business HQ workbook.
+- **2026-10-21 owner decision implementation:** 46 decisions applied; public brand **Sparkling Standard**, legal entity **Sparkling Standard LLC**, slogan **Standards That Sparkle.** See `docs/verification/VERIFICATION.md` and the Business HQ workbook.
 - Marketing, estimate and lead-capture website for **Sparkling Standard** (legal entity:
   **Sparkling Standard LLC**), an owner-operated residential and commercial cleaning company based
   in Cantonment, serving Pensacola, surrounding communities within about an hour of driving time
@@ -84,11 +84,439 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-19 invoice payment receipts):** application code **`85d5178`** is live
-  (Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`). Migration `0037` adds
-  idempotent invoice receipt delivery. The invoice-payment webhook now sends one branded itemized
-  receipt after verified payment, records Resend status and exposes an owner resend action. No live
-  receipt was sent during verification. Evidence:
+- **Current release (2026-11-25 urgent scheduling and HOLIDAY15 correction):** application code
+  `a0b94c8` (feature commit `bf2b81c`, display alignment `a0b94c8`) on `production-safe`,
+  Cloudflare Pages deployment `643d14b8-2b4b-457c-9221-e1cec3d158ba`, verified live on
+  2026-11-25. The compact hour/minute selector is restored; 7:00 and 7:15 AM are first-job
+  starts when free, not displaced by origin travel or auto-selection. The Android-level root
+  cause was `earliestStart = workdayStart + originTravel` for the first job of the day; travel
+  now applies only after a real previous appointment. Operating hours are 7:00 AM-7:00 PM;
+  migration `0061` updated the bookable resource end time. HOLIDAY15 and Community Support are
+  independently scoped: HOLIDAY15 reduces the first-visit Deep Cleaning, Community Support
+  reduces future recurring maintenance, and they never compound on one service line. The
+  recurring regular/discounted rates, checkout amount, signing snapshot and recurring-plan
+  price are server-derived and preserved. Verified: unit **1,124** (1,123 pass, 1 pre-existing
+  skip), browser **282/282**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI
+  `45672275769` green. Live availability for 2026-11-30 returned **7:00 AM and 7:15 AM** first;
+  a live recurring estimator showed HOLIDAY15 `-$50.25` on a `$284.75` first visit and
+  Community Support at `$220.00` per weekly visit vs `$245.00` regular. No live booking, hold,
+  charge, email, customer record or signed agreement was created. Evidence:
+  `docs/verification/2026-11-25-SCHEDULING-HOLIDAY15-CORRECTION.md`.
+- **Prior release (2026-11-25 P0 customer fixes):** application code `ae77ac4` on
+  `production-safe`, Cloudflare Pages deployment
+  `53b472e6-7819-4da2-942e-bc5a0e91cede`, verified live on 2026-11-25. Public booking now exposes
+  explicit 15-minute starts only inside the owner-defined Morning 7:00-8:30 AM and Afternoon
+  12:30-2:30 PM windows, with unavailable starts visibly disabled instead of auto-selected;
+  `/api/availability` and `/api/booking-hold` enforce the windows server-side. New recurring
+  residential arrangements show "Your First Cleaning" with the calculated first-visit Deep
+  Cleaning price and following-visit rhythm; the optional Deep Cleaning reset appears only after a
+  one-time residential choice and never for recurring service. The signing access step derives the
+  booking contact server-side and offers Same as my booking contact (verified name and phone,
+  nothing retyped) or a different day-of-service contact, which requires name and phone and never
+  overwrites the customer profile. A returning recurring customer whose first Deep Cleaning is
+  already complete still has no authenticated public-estimator identity; that exception remains an
+  owner policy decision. Verified: unit **1,121** (1,120 pass, 1 pre-existing skip), browser
+  **280/280**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45653891203` green.
+  Live availability for 2026-11-30 returned only 7:30-8:30 AM and 12:30-2:30 PM starts; a synthetic
+  9:00 AM hold was rejected with `slot_outside_public_window`. No migration, customer email, charge,
+  booking, hold or real signing request was created or modified. Evidence:
+  `docs/verification/2026-11-25-P0-CUSTOMER-FIXES.md`.
+- **Prior release (2026-11-24/25 platform completion, change orders and backup correction):**
+  application code `aaa4c83` on `production-safe`, Cloudflare Pages deployment
+  `9cea2813-c777-4dd6-97ab-f8e62c2ea845`, verified live on 2026-11-25 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.DLPf6bre.js`). Migrations `0059` and
+  `0060` add one-primary-invoice enforcement and signed service change orders. The Customer
+  File now has jobs, payments, communications and one chronological activity timeline; the Job
+  File adds crew, primary/supplemental invoices, payments, photos, communications, change orders
+  and timeline. Change orders use the approved Additional Service and Add-On Authorization
+  template, preserve the original agreement/invoice, require owner approval, support electronic
+  signature and create one explicit supplemental invoice. Signing requests can be revoked, default
+  to active, and no longer crash when a packet is missing or renamed. The master workspace was
+  reconciled: the stale unspaced Downloads tree is a dated legacy archive, two duplicate scheduled
+  tasks are disabled, the start page/README are corrected, and a retained-path duplicate manifest
+  exists; no files were deleted. Backup status was corrected: the local Windows daily and weekly
+  encrypted backups are verified (latest weekly: 2,595 files, D1 60 migrations/104 tables,
+  independent OneDrive download hash matched, isolated restore passed, heartbeat recorded and stale
+  incident resolved); the GitHub workflow is now visible on `main` but remains blocked by zero
+  repository secrets. Verified: unit **1,118** (1,117 pass, 1 pre-existing skip), browser
+  **279/279**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45518441282`
+  green; 60 production migrations and 0 foreign-key violations. No customer email, charge, review
+  invitation, production record or branch was mutated. Evidence:
+  `docs/verification/2026-11-24-PLATFORM-COMPLETION.md`, `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md`
+  and `docs/audit/2026-11-24/`.
+- **Prior release (2026-11-24 platform audit, document library and customer review suppression):**
+  application code `2a95955` on `production-safe`, Cloudflare Pages
+  deployment `103a481a-b6aa-4162-b2f1-e1654c964c55`, verified live on 2026-11-24 (served admin
+  asset `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js`). Migration `0058` adds
+  `document_family_state` and `customer_review_state`. The Document Library now shows one current
+  approved version per family (27 current documents; 3 draft revisions and 28 retired versions are
+  separated into drafts and History & archive), with guarded draft deletion, family archive/restore,
+  active-packet protection and transactional revision publish. Review eligibility is customer-level:
+  reviewed, do-not-ask, opted-out, unknown and recently invited customers are not solicited again;
+  invoice/PDF invitations are suppressed accordingly and failed deliveries can be retried. The
+  Customer File gains a review relationship card and quick actions for booking, completed service,
+  estimate, invoice, agreement, email and call. Production integrity is clean (0 foreign-key
+  violations, 0 orphans, 0 duplicate invoice numbers, 0 duplicate per-appointment invoices) and
+  record counts are unchanged. Verified: unit **1,114** (1,113 pass, 1 pre-existing skip), browser
+  **278/278**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45504337889`
+  green. The Leads workspace now defaults to active records and excludes archived, lost and
+  converted inquiries unless explicitly selected. No customer email, charge, review invitation or production record was mutated. The audit
+  also found the scheduled backup workflow absent from the default branch; that was resolved in the
+  next release, and the local scheduled backup was confirmed operational. Branch cutover and
+  permanent duplicate deletion still await owner approval. Evidence:
+  `docs/verification/2026-11-24-PLATFORM-CONSOLIDATION.md` and `docs/audit/2026-11-24/`.
+- **Prior release (2026-11-24 customer binding, review delivery and admin releases B/C):**
+  application code `0e6fbf9` on `production-safe`, Cloudflare Pages deployment
+  `451229c5-a69d-42c6-acc5-be0783f231bb`, verified live on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.TfTE3bRT.js`). Repairs Quick Estimate
+  customer switching so one context request loads canonical name/email/phone, only that
+  customer's properties and saved house characteristics, with stale-response guards and
+  server-side ownership checks. Adds owner **Send Review Invitation** for eligible completed
+  jobs even while automation is off, delivery-event recording and an optional non-deployed
+  review delivery worker. Completes admin Releases B/C: photo inventory/per-photo deletion,
+  per-record legal-hold protection, real retention subjects, honest backup state, structured
+  communications editor with labeled fields and readable errors, and removal of 240 mojibake
+  sequences from admin text. Production reconciliation found **0** persisted Quick Estimates
+  and **0** customer/property/job/invoice mismatches; the reported invoice is paid with a
+  sent receipt but has **0** review requests because Pensacola automation is off. Verified:
+  unit **1,106** (1,105 pass, 1 pre-existing skip), browser **277/277**, `astro check` 0 errors,
+  41 pages, 2,631 links, smoke 21 pages; CI `45332084055` green. No customer email, charge or
+  production record was mutated by verification. Evidence:
+  `docs/verification/2026-11-24-CUSTOMER-BINDING-REVIEW-DELIVERY.md` and
+  `docs/verification/2026-11-24-ADMIN-RELEASES-B-C.md`.
+- **Prior release (2026-11-24 admin operations Release A):** application code `e970ce0` on
+  `production-safe`, Cloudflare Pages deployment `b98bf961-091b-4d50-88b6-4d34f092b120`, verified live
+  on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.BoOU30tH.js`). Repairs alert affected-record
+  navigation (signing requests and invoices now open the correct detail), replaces the Google Reviews
+  manual appointment-ID form with a searchable completed-cleaning selector/status list/email preview
+  and owner-gated queue hooks, and adds lead detail, archive, restore, protected disposable deletion,
+  selection and bulk management. Verified: unit **1,101** (1,100 pass, 1 pre-existing skip), browser
+  **275/275**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45319043262` green.
+  No production lead, review email, document or customer record was mutated by verification. Evidence:
+  `docs/verification/2026-11-24-ADMIN-RELEASE-A.md`.
+- **Prior release (2026-11-24 invoice email step-up removal):** application code `c696c50` on
+  `production-safe`, Cloudflare Pages deployment `96fa5ca0-7be0-4ffe-86d8-f0c0c028768d`, verified live
+  on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.CdcMTGKU.js`). Removes only the unnecessary MFA
+  step-up from routine invoice email sending while preserving session, CSRF, permission, audit and all
+  high-risk step-up controls (payments, refunds, credits, invoice creation/mutation, payment links,
+  billing portal, receipt resend). Replaces the native email-code prompt with the branded confirmation
+  dialog showing customer, recipient, invoice number, amount and payment-link inclusion, with Cancel /
+  Confirm & Send, in-flight duplicate protection, retained retry idempotency keys and accurate success/
+  failure messages. Verified: unit **1,100** (1,099 pass, 1 pre-existing skip), browser **274/274**,
+  `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages; CI `45310443021` green. Live production
+  UI shows the branded dialog with zero native prompts. No live customer email, invoice mutation or
+  charge was performed. Evidence: `docs/verification/2026-11-24-INVOICE-SEND-STEPUP.md`.
+- **Prior release (2026-11-24 completed-job invoice repair):** application code `eb4d7a5` on
+  `production-safe`, Cloudflare Pages deployment `ec52ed7b-4f72-41d0-9cee-812485e5d5d9`, verified live
+  on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.BWs9qs_3.js`). Repairs the P0 completed-job
+  workflow: adds a branch-scoped `GET /api/admin/bookings?view=job`, a real completed-job detail view,
+  working Open/Customer/Docs/Invoice calendar actions for jobs without a booking request, direct
+  creation/opening of the $275 invoice from the existing completed job, and safe reuse of an existing
+  completed job instead of a duplicate dead-end. Completed jobs no longer show Move/Cancel. Invoice
+  creation remains idempotent and Finance opens the created invoice immediately. Verified: unit
+  **1,099** (1,098 pass, 1 pre-existing skip), browser **273/273**, `astro check` 0 errors, 41 pages,
+  2,631 links, smoke 21 pages; CI `45306250368` green. The existing production job
+  `HC-20261123-0F3495` had no invoice; verification did not create it or modify the job. Evidence:
+  `docs/verification/2026-11-24-JOB-INVOICE-REPAIR.md`.
+- **Prior release (2026-11-24 tipping and completed-service hotfix):** application code `ae6ac57` on
+  `production-safe`, Cloudflare Pages deployment `ef5ec9e2-47ba-4a6c-bf53-16381216835f`, verified live
+  on 2026-11-24 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.DAZVnrlk.js`). Adds optional customer tipping on
+  existing invoice payments and secure tip-only links for fully prepaid completed jobs, with default
+  $0.00, server-calculated service/gratuity Stripe lines, separate service/tip ledger fields, equal
+  deterministic allocation to actual timekeeping participants (unallocated until confirmed), admin
+  allocation review, refund reversals and tip receipts. Separately adds admin custom agreed pricing,
+  percentage/fixed customer discounts and a Record completed cleaning mode that records a historical
+  Completed job with actual crew, no availability lookup, no Google Calendar event, no automatic
+  signing packet, optional linking of executed evidence, and idempotent invoice creation at the agreed
+  price. Invoice forms now load the canonical service catalog (including Move-Out/Move-In Cleaning) and
+  support a service performed date; invoices/PDF/email/receipt/payment page retain the selected service
+  and date. Migrations `0056_optional_tips.sql` and `0057_invoice_service_date.sql` applied; production
+  is at **57** migrations with no foreign-key violations. Verified: unit **1,098** (1,097 pass, 1
+  pre-existing skip), browser **272/272**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21
+  pages; CI `45292489558` and `45299825684` green. Live invoice-payment links (existing invoices) return
+  default tip $0.00 and correct tip-only behavior; no live charge, customer email, calendar event or
+  destructive mutation was created. Evidence: `docs/verification/2026-11-23-OPTIONAL-TIPS-RELEASE.md`
+  and `docs/verification/2026-11-23-HOTFIX-COMPLETED-SERVICE.md`.
+- **Prior release (2026-11-23 operations and documents combined):** application code `038633e`
+  (release `274a5f5` plus the calendar layout polish) on
+  `production-safe`, deployed by the GitHub-connected Cloudflare Pages pipeline and verified live on
+  2026-11-23 (served admin asset
+  `/_astro/index.astro_astro_type_script_index_0_lang.BEl23KQm.js` matches the verified build;
+  Cloudflare deployment ID was not retrievable because the installed CLI session belongs to an
+  unrelated account). Adds the completed shared document-branding layer (branded editor frame,
+  admin/customer renderer, embedded executed-PDF logo, footer/page numbers and legacy table
+  rendering), fixes the production reservation-action defect (the real handler required a singular
+  `requestId` before reaching bulk actions, so every bulk POST returned `request_required`; browser
+  coverage had mocked the route), adds previewed eligibility and per-record outcomes, reversible
+  customer deletion as archiving with active-obligation warnings, Morning/Afternoon seven-day
+  calendar sections with `+N more`, branch-local CT/ET display, drag/drop proposals, occurrence-only
+  and future-series recurring changes, calendar cancellation and appointment actions, multi-cleaner
+  dispatch assignment, inline New Booking customer creation, combined save/send-agreements/invoice
+  booking actions, signing-request and booking duplicate suppression, and booking-detail invoice,
+  crew, branch and communication evidence. No migration was added or required; production remains
+  at 55 migrations. Verified: unit **1,081** (1,080 pass, 1 pre-existing skip), browser **267/267**,
+  `astro check` 0 errors, 40 pages, 2,569 links, smoke 21 pages. Pensacola availability returns live
+  slots; Tampa remains non-bookable with a 404 page; review automation remains disabled and
+  untouched. No production customer email, charge, calendar write or destructive customer mutation
+  was performed. Evidence: `docs/verification/2026-11-23-OPERATIONS-DOCUMENTS-RELEASE.md` and
+  `docs/verification/2026-11-23-DOCUMENT-BRANDING.md`.
+- **Prior release (2026-11-23 verified signing, admin operations, branch calendars and reviews):**
+  application code `1b6efba`, live Cloudflare Pages deployment
+  `0566590a-f5a8-4d6f-abff-5a26c06783dd` on `production-safe`. Production D1 is at 55 migrations;
+  `0051`-`0055` are applied (`0052` was already present and its tracking record was reconciled).
+  Adds signing pricing snapshots and executed-document presentation cleanup, the admin operations
+  redesign, branch-specific Pensacola/Tampa calendar routing and owner-gated Google review requests.
+  `GOOGLE_CALENDAR_ID_TAMPA` is configured; Pensacola availability returns live slots; Tampa remains
+  non-bookable; review automation is disabled and 0 review requests exist. Verified: unit 1,075
+  (1,074 pass, 1 pre-existing skip), browser 260/260, `astro check` 0 errors, 40 pages, validation,
+  smoke, production readiness, backup and migration checks. No live customer email, synthetic
+  calendar write, charge or refund was created. Evidence:
+  `docs/verification/2026-11-23-SIGNING-PRICING-EDITOR.md`,
+  `docs/verification/2026-11-23-ADMIN-OPERATIONS-REDESIGN.md`,
+  `docs/verification/2026-11-23-BRANCH-CALENDARS-REVIEWS.md`.
+- **Prior release (2026-11-23 signing, document correction, presentation cleanup, mobile and notifications):**
+  application code `4fe7a64`, live runtime deployment
+  **`05a8e6c3-e9bd-45ae-ad33-42aa821cae6b`**. Migration `0052` is applied to production D1
+  (`signing_requests.customer_fields_json`, default `'{}'`, supporting index); the existing 11
+  customers, 13 properties and 1 pending signing request were preserved. Customer signing is a wide,
+  mobile-first three-step ceremony with interactive access/instructions, one legal-name entry, one
+  adopted typed/drawn signature, executed PDF evidence and portal retrieval. Admin Documents &
+  Agreements is split into seven subviews with customer search, auto-populated service/property
+  context, packet readiness, a visual block editor with live print-ready preview, version comparison
+  and Approve & Publish. The 27 imported approved templates were corrected to
+  `2026-11-23.customer-release.v1` / `2026-11-23.employee-release.v1`: the internal
+  `OWNER REVIEW DRAFT — NOT EFFECTIVE UNTIL APPROVED` line was removed, every active packet now
+  points to a clean approved version, and 0 approved templates contain the draft notice. The
+  previous versions are retired but preserved. Customer/employee PDFs, executed copies, emails,
+  signing pages and portal document lists no longer print request IDs, template IDs, version
+  strings, SHA-256 hashes, consent-version codes or technical execution metadata; backend hashes,
+  versions, signatures and audit evidence remain intact. A presentation-clean 27-Word/27-PDF
+  library is at `FINAL-APPROVAL-PACKAGE-2026-11-22\10-APPROVED-LIBRARY-2026-11-23-PRESENTATION\`;
+  earlier libraries are preserved. Operational notifications route through Communications settings;
+  the Bookings address is **`booking@sparkling-standard.com`**. A production test to
+  `booking@sparkling-standard.com` was accepted by Resend
+  (`01a2067b-e5ef-725f-81ad-9ddc3f46ed53`). Unit **1,055** (1,054 pass, 1 pre-existing skip),
+  browser **258/258**, production mobile checks at 320/390/430 show no horizontal overflow or JS
+  errors. The live Move-In / Move-Out packet generated 19 clean pages, all checked at 390px with no
+  technical metadata or duplicate headings. No live charge, refund, customer message,
+  commercial/facility activation or Tampa activation.
+- **Release (2026-11-23 signing price, signature boxes, visual editor):** branch
+  `production-safe`; released in commit `1b6efba`, Cloudflare Pages deployment
+  `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Adds migration
+  `0053_signing_pricing_snapshot.sql` (applied to production), a persistent server-authoritative
+  pricing snapshot shown on the signing Details & price step, executed copies/PDFs and admin request
+  detail; visible per-document **X — Sign here** boxes with an adopt-once signature pad, progress and
+  next-signature navigation; direct post-signing transition to the payment page with signed-PDF
+  download, email status and portal access; the `Â€` mojibake repair; a Word-style WYSIWYG document
+  editor with sanitized rich HTML and PDF rendering; simplified Create a Document / Upload approved
+  PDF flows; conventional Version 1.0/1.1 labels; and a test-only Resend network guard. Tests never
+  send live email. Evidence: `docs/verification/2026-11-23-SIGNING-PRICING-EDITOR.md`.
+- **Release (2026-11-23 admin operations redesign):** branch `production-safe`; released in commit
+  `1b6efba`, Cloudflare Pages deployment `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Adds migration
+  `0054_admin_operations.sql` (applied):
+  human `EST-YYYY-NNNN` estimate numbers, test-request marking and durable `operational_alerts`.
+  Replaces the seven-day table with an interactive calendar; adds upcoming-appointment filters that
+  hide canceled occurrences by default; reservation bulk approve/archive/restore/deny/mark-test/delete
+  with server safety checks and no automatic customer email; actionable alert detail/lifecycle with
+  recheck, acknowledgement and resolution notes; active/archived/deleted customer views with restore
+  and anonymized-record protection; compact searchable extras; 15-minute friendly time formatting;
+  component-level campaign/Community Support allocation; recurring-plan cleanup; and a tabbed
+  Dispatch & Team workspace with direct click-to-assign for dispatch-ready employees. Verified:
+  unit 1,069 (1,068 pass, 1 pre-existing skip), browser 259/259, `astro check` 0 errors, 40 pages,
+  validation and 21-page smoke. Zero live Resend sends. Production counts verified at 14 pending
+  requests, 2 unsigned packets, 1 outstanding invoice, 0 active recurring failures (11 historical),
+  3 failed checkout sessions plus 8 abandoned sessions. Evidence:
+  `docs/verification/2026-11-23-ADMIN-OPERATIONS-REDESIGN.md`.
+- **Release (2026-11-23 branch calendars and review requests):** branch `production-safe`; released
+  in commit `1b6efba`, Cloudflare Pages deployment `0566590a-f5a8-4d6f-abff-5a26c06783dd`. Adds
+  migration `0055_branch_calendars_reviews.sql` (applied): branch `calendar_id`, `calendar_name`,
+  `review_url`, review delay/frequency settings and a private `review_requests` table. Branch
+  resolution now uses the service ZIP (plus reverse-geocoded ZIP and a conservative coordinate
+  fallback) and never silently defaults an unknown address to Pensacola; Tampa includes Spring
+  Hill `34609`. Branch-specific Google Calendar env values are
+  `GOOGLE_CALENDAR_ID_PENSACOLA` and `GOOGLE_CALENDAR_ID_TAMPA`; Tampa never borrows the
+  Pensacola calendar. Availability, holds, auto-confirm and commitment use the branch calendar
+  and timezone. Review requests are created only for verified completed appointments, require an
+  official branch review URL, deduplicate, respect a frequency cap and remain disabled by
+  default. Invoice/email/PDF review invitations appear only for completed services; Tampa has no
+  review URL and shows none. Admin gains branch calendar/review settings and a Google Reviews
+  queue. Verified: unit 1,075 (1,074 pass, 1 pre-existing skip), browser 260/260, `astro check`
+  0 errors, 40 pages, validation and migration-0055 integrity. Production D1 is at 55 migrations;
+  `GOOGLE_CALENDAR_ID_TAMPA` is configured; Pensacola availability returns live slots; Tampa
+  remains non-bookable; both review flags remain disabled and 0 review requests exist. Zero live
+  Resend sends, synthetic calendar writes, charges, refunds or customer messages. Evidence:
+  `docs/verification/2026-11-23-BRANCH-CALENDARS-REVIEWS.md`.
+- **Prior release (2026-11-23 booking address and release evidence):** application code `285c748`,
+  merged at `96a5b8f`, runtime deployment `bdd48b01-6a43-46bc-a56c-54e1e4ef4120`. Corrected the
+  Bookings address to `booking@sparkling-standard.com`, applied migration `0052`, and recorded the
+  controlled release evidence.
+- **Prior release (2026-11-22 Pensacola residential legal release):** `production-safe` at
+  **`5c4ac41`**, live production deployment **`344ad883-c87a-4baf-b0f4-f34eef27988c`**. The 27
+  owner-approved legal templates are imported into production D1 (27 approved, 0 draft, 10
+  non-system packets, 83 items, 37 import audit records) and the four verified residential packets
+  are active: `customer.deep`, `customer.residential`, `customer.recurring`,
+  `customer.move_in_out`. Required customer documents are enforced at `before_payment`;
+  booking-specific agreements are `per_booking = 1`. The checkout Terms/Privacy links now open an
+  accessible in-page modal that preserves estimator state. **Admin → Documents & Agreements →
+  Document Updates** provides revision impact analysis, owner acknowledgement, notification and a
+  re-signing queue that prefills the existing composer; no automated customer contact. Facility
+  online payment is **disabled** in the browser and server until its own acceptance run; Tier A/B
+  preliminary numbers and request/invoice paths remain. STR, commercial, church, property
+  management, specialty and employee packets are imported **inactive**. Migration `0051` remains
+  unapplied. Unit **1,036** (1,035 pass, 1 pre-existing skip), browser **252/252**, `astro check` 0
+  errors, 40 pages, validate 2,563 links, smoke 21 pages. No release-created live charge, refund or
+  customer message. One live owner-initiated recurring signing request exists and is pending; it
+  was not touched. Evidence: `docs/verification/2026-11-22-RESIDENTIAL-LEGAL-RELEASE.md`.
+- **Prior release (2026-11-22 isolated Preview end-to-end acceptance):** application code on
+  `release/2026-11-22-legal-signing-acceptance` completed a full isolated Preview acceptance run.
+  A Preview-only exact-host E2E gate (no global `*.pages.dev` bypass; production rejected; ordinary
+  Preview API calls remain `503 preview_read_only`) opened only the disposable E2E host. The
+  residential Deep Cleaning journey passed end to end: estimator, real geocode/route, verified
+  $335.00 quote, temporary hold, approved `customer.deep` packet, six required e-signatures,
+  executed-copy SHA-256, Stripe **test-mode** Checkout payment `pi_3UeirYArIaVXsguz0aWsOzmU`,
+  verified webhook `evt_1UeirZArIaVXsguzsY94yibO`, automatic booking confirmation, appointment
+  creation, and a Google Calendar event on a **dedicated test calendar** (production calendar never
+  written). The Move-In / Move-Out journey also passed end to end at $255.00. The Admin Document
+  Composer previewed, drafted, sent, signed and retained a `customer.move_in_out` request; nine
+  customer packet previews resolved every variable. Three defects were fixed: the signing page did
+  not forward the resume capability, Stripe Customer resolution used the wrong key in Preview, and
+  the webhook had no test-mode secret override. Failure tests passed (missing signature, tampered
+  price, repeated checkout idempotency, expired hold, expired signing link, cross-account document
+  access, duplicate/tampered/missing webhook signatures, abandoned Checkout). Unit **1,029**
+  (1,028 pass, 1 pre-existing skip), browser **249/249**, `astro check` 0 errors, 40 pages,
+  validate 2,558 links, smoke 21 pages. After testing the E2E token, exact-host allowlist, test
+  webhook and test calendar were removed/disabled and the Preview is read-only again. Production
+  was not merged, migrated, deployed or charged; no customer message was sent. Owner decisions
+  remain: authorize production template import/activation; set required customer documents to
+  `before_payment` and decide per-booking document scope; run the remaining facility/specialty
+  payment workflows. Evidence: `docs/verification/2026-11-22-E2E-PREVIEW-ACCEPTANCE.md`.
+- **Prior release (2026-11-21 checkout recovery):** application code **`84379cb`** is
+  live on `production-safe` (final Cloudflare Pages production deployment `edc50a01`; the
+  checkout fix was verified on `3f6ded04`). Live Pay Now failed because
+  `functions/api/estimate-checkout.ts` sent Stripe's unsupported
+  `customer_update[email]` parameter (`parameter_unknown`). It was removed; Google
+  routing now retries and falls back to MapMap before a straight-line estimate; and a
+  failed checkout retains its generation so **Try Secure Payment Again** uses a fresh
+  Stripe idempotency key. The owner-specified **the owner-approved Molino test address (redacted from public docs)**
+  journey reached live Stripe Checkout; a simulated failure showed the retry state and
+  the retry reached Checkout. No charge, refund, paid webhook event or duplicate booking
+  occurred. Unit **974** (973 pass, 1 pre-existing skip), browser **240** pass,
+  `astro check` 0 errors, 39 pages built, validation passed. Evidence:
+  `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md`.
+- **Prior release (2026-11-20 bookings department and secure careers applications):** application code
+  **`e7f18c6`** is live on `production-safe` (Cloudflare Pages production deployment
+  `e5b8331e-380f-44bc-b3a7-c310b4d90c50`). Migration `0043` adds private career applications and
+  resume metadata. `booking@sparkling-standard.com` is the sixth department address and is now the
+  booking-confirmation reply-to; billing remains invoice/receipt reply-to. The careers page now has
+  a secure application form for experienced and entry-level applicants, optional private PDF/DOCX
+  resume storage, applicant acknowledgment, hiring notification, status lookup and an owner-only
+  admin review/status workflow. Navigation is rate-limited; resumes are private and downloaded only
+  through an authorized owner session. CI passed; unit **947** (946 pass, 1 pre-existing skip),
+  browser **237** pass. Production has 0 applications and 43 migrations; Tampa stays 404. No live
+  message, charge or deletion. Evidence: `docs/verification/2026-11-20-BOOKINGS-CAREERS.md`.
+- **Prior release (2026-11-20 reviews and department email routing):** application code
+  **`061e167`** is live on `production-safe` (Cloudflare Pages production deployment
+  `46a8416a-5dd8-49dc-9748-6f65d03635b7`). The reviews carousel was rebuilt around readable excerpts,
+  no internal scrolling, equal-height cards and an accessible full-review dialog; live cards are
+  496 px at 1440 and photographs stay inside the card. Public contact now defaults to
+  `customer-service@sparkling-standard.com`; invoices and receipts reply to
+  `billing@sparkling-standard.com`; careers uses `hiring@sparkling-standard.com`; owner alerts
+  remain private. DNS shows Google Workspace MX, Google DKIM and DMARC p=none. CI passed; unit
+  **944** (943 pass, 1 pre-existing skip), browser **233** pass. No live message, charge or refund.
+  Evidence: `docs/verification/2026-11-20-REVIEWS-EMAIL-ROUTING.md`,
+  `docs/operations/EMAIL-ROUTING.md`.
+- **Prior release (2026-11-20 document library and Tampa visibility gate):** application code
+  **`397be7b`** is live on `production-safe` (Cloudflare Pages production deployment
+  `144f1239-5fbc-44a9-b83b-c89d761b150e`). An owner-review Word library was generated from 183
+  business documents; 176 contained the old gold-S logo and now use the approved Sparkling STANDARD
+  wordmark in review copies. Originals are untouched. `OPEN-DOCUMENT-LIBRARY.html` is the entry
+  point in `00 START HERE`; nothing is approved or uploaded. Production-host middleware now keeps
+  Tampa OFF unless `branch_tampa.lifecycle_status = live` and `status = active`; the Tampa page
+  returns 404/noindex and the service-area page removes the Tampa card. Live verification: Tampa page
+  404, service-area single-region heading, no Tampa on homepage. CI passed; unit **940** (939 pass,
+  1 pre-existing skip), browser **232** pass. No charge, message or deletion. Evidence:
+  `docs/verification/2026-11-20-DOCUMENT-LIBRARY-AND-TAMPA-VISIBILITY.md`.
+- **Prior release (2026-11-20 post-dispatch production closeout):** application code
+  **`6ea55d7`** is live on `production-safe` (Cloudflare Pages production deployment
+  `5a8e151b-a7fd-4eec-8622-231a197ebe0b`). Migration `0042` adds private branch operating origins
+  and travel limits. Branches & Launch now has a Google Places-enabled origin field, owner-only
+  readiness checklist and a live-advance gate. Dispatch readiness now reports each employee's exact
+  blockers; `team_hayli` has onboarding clearance but still needs service, equipment, transport and
+  origin configuration. Homepage metadata now carries equal residential/commercial Pensacola
+  positioning. Production verification: Pensacola is live with an origin warning; Tampa is setup and
+  blocked by missing public phone/service, pricing, public estimator, scheduling, payments and
+  fulfillment; dispatch remains analysis-only, disabled, paused, with 0 unassigned jobs and 0
+  dispatch-ready employees. CI `validate` and `browser` passed; unit **935** (934 pass, 1
+  pre-existing skip), browser **232** pass. No charge, customer message or data deletion was
+  performed. Evidence: `docs/verification/2026-11-20-POST-DISPATCH-CLOSEOUT.md`.
+- **Prior release (2026-11-20 workforce intelligence and intelligent dispatch):** application code
+  **`9c4b49a`** is live on `production-safe` (Cloudflare Pages production deployment
+  `5162c0c2-6e3e-4c75-b02d-1b80b1e5398a`). Migration `0041` adds owner-controlled intelligent
+  dispatch under **Admin -> Jobs & Team**: employee qualifications, equipment, independent/shared
+  transport, private dispatch origins, time off, availability and weekly-hour rules; a deterministic
+  feasibility/ranking engine; automatic assignment of eligible unassigned confirmed jobs; owner-only
+  reassignment recommendations; coverage exceptions; decision/audit history; calendar-status retry;
+  and employee lanes. Existing assignments and customer appointment times are never changed
+  automatically. Production defaults are analysis-only and paused; `team_hayli` still needs a
+  completed dispatch profile before candidates exist. CI `validate` and `browser` passed; unit
+  **935** (934 pass, 1 pre-existing skip), browser **232** pass. Migration applied to production D1;
+  live owner dashboard verified with 0 unassigned jobs and 0 dispatch-ready employees. No customer
+  charge or message was performed. Evidence:
+  `docs/verification/2026-11-20-WORKFORCE-DISPATCH.md`.
+- **Prior release (2026-11-20 execution reliability and checkout repair):** application code
+  **`cd612e7`** is live on `production-safe` (Cloudflare Pages production deployment
+  `dc7419a3-5cb0-4158-ab51-6c008e8b0b0d`). It fixes the displayed-total promotion acceptance path
+  that could reject a `HOLIDAY15` checkout (`quote_changed`), enables and reports recurring checkout
+  readiness, records failed checkout reasons on the request, uses branch-local admin time (Pensacola
+  Central; Tampa Eastern), renders recurring duration in hours/minutes, and bounds long admin tables.
+  Review cards keep the approved 35rem/33rem heights with internal quote scrolling and no top
+  clipping at 1440/1280/1024/390. Tampa coverage is registered as 132 Census ZCTAs for Pasco,
+  Pinellas and Hillsborough with a 20-mile default one-way limit; Tampa pricing version 1 is internal
+  at fingerprint `2026-10-25.engine-calibration-supportive-tax.v1.49705bdc08ec90b4`. CI `validate`
+  and `browser` passed; unit **908** (907 pass, 1 pre-existing skip), browser **228** pass. No live
+  charge, refund or customer message was performed. Evidence:
+  `docs/verification/2026-11-20-EXECUTION-RELIABILITY-FIXES.md`.
+- **Prior release (2026-11-20 data recovery, review design and backup closeout):** application code
+  **`e011105`** is live on `production-safe` (Cloudflare Pages production deployment
+  `df9fa304-c87c-4812-a5ad-47018356f999`). The pre-existing residential and commercial prospect
+  systems were recovered intact: **4,241 addresses / 3,892 owner-occupied / 66 routes / 20
+  neighborhoods**, and **800 commercial prospects / 16 sectors / 56 route groups / 192 Priority A**.
+  Protected recovery copies and checksum manifests now live in the master workspace; the full
+  master inventory indexes 1,932 files. The review carousel uses seven owner-approved reviews,
+  consistent 35rem cards with a controlled overflow/read-full-review dialog, Dennis's two real
+  couch photographs, Laura's real shower photograph and collapsed Laura paragraph spacing. Bob,
+  Amanda and Elizabeth remain excluded. Follow Us is twelve transparent 44px marks; the footer
+  service-area paragraph remains removed. Tampa pricing version 1 is internally published at the Pensacola/source parity fingerprint
+  `2026-10-25.engine-calibration-supportive-tax.v1.49705bdc08ec90b4`; Pensacola remains
+  unaffected. Pasco, Pinellas and Hillsborough are registered as the approved Tampa coverage area
+  (132 Census ZCTAs) with a 20-mile default one-way limit. A real Tampa origin and branch-aware
+  public estimator/travel/scheduling path are still required before booking activation. A new encrypted full backup covers D1, application R2
+  (88 objects) and the master workspace; parts were uploaded to private R2, downloaded, rejoined
+  and verified, and an independent OneDrive copy was created and checksum-verified locally.
+  CI `validate` and `browser` pass; local suite **907 tests (906 pass, 1 pre-existing skip)** and
+  **228 browser tests** pass. No live charge, refund, unsolicited customer email or legal
+  execution was performed. Evidence: `docs/operations/PROSPECT-DATA-RECOVERY.md`,
+  `docs/operations/OFFSITE-BACKUPS.md`, `docs/verification/2026-11-20-REVIEWS-FOOTER.md`.
+- **Prior release (2026-11-20 master directive: reviews, photos, footer and Tampa inquiries):**
+  application code `1d7c997` remains in production history (deployment
+  `c6469de6-bf79-407c-a2a4-3f54c4051d35`). It corrected the owner-approved review set, restored
+  Dennis/Laura photos, removed the summary and footer area paragraph, added the Tampa inquiry
+  page/form and deployed the branch foundation. Evidence:
+  `docs/verification/2026-11-20-REVIEWS-FOOTER.md`.
+- **Prior release (2026-11-19 production activation and admin address autocomplete):** application
+  code **`019fad6`** remains in production history (Cloudflare Pages deployment
+  `f890914f-32fc-4691-9557-009214a9e380`). It applied migrations `0038`/`0039`, added Google
+  Places admin address autocomplete, Quick Estimate PDF verification and encrypted D1/master
+  backups. Evidence: `docs/verification/2026-11-19-PRODUCTION-ACTIVATION.md`.
+- **Prior release (2026-11-19 invoice payment receipts):** application code **`85d5178`** remains in
+  production history (Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`).
+  Migration `0037` adds idempotent invoice receipt delivery. The invoice-payment webhook sends one
+  branded itemized receipt after verified payment, records Resend status and exposes an owner resend
+  action. No live receipt was sent during verification. Evidence:
   `docs/verification/2026-11-19-INVOICE-RECEIPTS.md`.
 - **Prior release (2026-11-19 invoice payment link):** application code **`e324f0b`** remains in production history
   (Cloudflare Pages production deployment `1c8ef822-9864-4cb7-b4ff-25711d3983bc`). Invoice billing gate
@@ -342,15 +770,28 @@ Never publish unapproved promotional promises or activate binding pricing withou
 | Owner Pricing & Estimator Control (draft/publish/rollback, four-engine simulator) | `src/lib/pricing/` (`catalog.ts`, `snapshot.ts`, `store.ts`, `simulate.ts`), `functions/api/admin/pricing.ts`, `functions/api/pricing.ts`, `src/scripts/pricing-admin.ts`, migration `0026` | `docs/operations/PRICING-CONTROL-CENTER.md` |
 | Lead notification formatting | `src/lib/forms/lead-notification.ts` + `functions/api/lead.ts` | `docs/operations/LEAD-NOTIFICATION-FORMAT.md` |
 | Customer confirmation + financial workflow + invoicing | `functions/api/lead.ts` (delivery), `src/lib/forms/customer-email.ts` (Resend), `src/lib/forms/customer-confirmation.ts`, `src/lib/forms/request-summary.ts`, `src/lib/forms/submission-receipt.ts`, `src/scripts/thank-you-summary.ts`, `src/lib/invoicing/invoice.ts`, `admin-invoice.ts`, `invoice-email.ts`, `pdf.ts`, `functions/api/admin/finance.ts`, `functions/api/admin/invoice-document.ts`, `scripts/customer-confirmation.mjs`, `scripts/commercial-invoice.mjs` | `docs/operations/CUSTOMER-CONFIRMATION-EMAIL.md`, `docs/operations/FINANCIAL-WORKFLOW.md`, `docs/operations/COMMERCIAL-INVOICING.md`, `docs/deployment/DEPLOYMENT.md` §4a |
+| Workforce intelligence and intelligent dispatch | `src/lib/dispatch/` (`engine.ts`, `repository.ts`, `service.ts`), `functions/api/admin/dispatch.ts`, `src/scripts/admin.ts`, `src/pages/admin/index.astro`, migration `0041` | `docs/operations/WORKFORCE-DISPATCH.md` |
 | Reservation window, statuses, ledger | `src/config/scheduling.ts` + `src/scripts/estimate-wizard.ts` | `docs/operations/RESERVATION-TRACKING.md` |
 | Gift certificates (sales live) | `src/config/gift-certificates.ts`, `src/lib/gift/`, `src/pages/gift-certificates/`, `src/pages/gift-admin.astro`, `functions/api/gift-checkout.ts`, `stripe-webhook.ts`, `gift-auth.ts`, `gift-admin.ts`, `gift-balance.ts`, `src/lib/gift/activation.ts`, `src/lib/admin/` | `docs/operations/GIFT-CERTIFICATES.md`, `docs/operations/R2-STORAGE-AND-BACKUP.md` |
 | Platform accounts, status, owner actions | `src/config/business.ts` `socials` + `src/components/SocialLinks.astro` | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md` |
 | Lead capture, notification fields, provider relay | `functions/api/lead.ts`, `src/lib/forms/` | `docs/verification/VERIFICATION.md` |
 | Services, FAQs, checklists, page copy | `src/content/`, `src/content/site/` | `docs/CONTENT-GUIDE.md` |
 | SEO, structured data, sitemap, robots, page ownership | `src/components/BaseHead.astro`, `src/lib/schema.ts`, page files | `docs/seo/SEO-STRATEGY.md`, `docs/operations/SEARCH-CONSOLE-SETUP.md` |
+| Department email routing | `src/config/email-routing.ts`, customer/invoice/receipt mailers, `src/pages/careers.astro` | `docs/operations/EMAIL-ROUTING.md` |
+| Communications & notifications center, backup alert escalation | `src/lib/admin/communications.ts`, `src/lib/admin/backup-monitor.ts`, `functions/api/admin/communications.ts`, `functions/api/internal/backup-status.ts`, migration `0044`, `workers/backup-monitor/` | `docs/operations/COMMUNICATIONS-CENTER.md` |
+| Google Reviews queue, owner send and optional delivery worker | `src/lib/reviews/service.ts`, `src/lib/reviews/email.ts`, `src/lib/reviews/delivery.ts`, `functions/api/admin/reviews.ts`, `workers/review-requests/` | `docs/operations/GOOGLE-REVIEWS.md` |
+| Customer portal (passwordless sessions, billing, documents, requests) | `src/lib/portal/service.ts`, `functions/api/portal/*`, `src/pages/portal/index.astro`, migration `0045` | `docs/operations/CUSTOMER-PORTAL.md` |
+| Retention registry, legal holds, Data Control exports | `functions/api/admin/storage.ts`, migration `0046` | `docs/operations/OFFSITE-BACKUPS.md` |
+| Document signing reminders and link lifetime | `src/lib/documents/reminders.ts`, `workers/document-reminders/`, migration `0047` | `docs/operations/DOCUMENT-MANAGEMENT.md` |
 | Analytics, consent, event taxonomy, attribution | `src/scripts/consent-controller.ts`, `src/lib/analytics/`, `src/lib/attribution.ts` | `docs/analytics/ANALYTICS-SETUP.md`, `docs/analytics/GTM-CONTAINER-SETUP.md` |
 | Visual design, tokens, images, icons, OG image | `src/styles/`, `public/brand/`, `src/assets/images/` | `docs/design/DESIGN-SYSTEM.md`, `docs/design/IMAGE-GUIDE.md`, `docs/design/IMAGE-SOURCE-REGISTER.md` |
-| Customer CRM and complete property profiles | src/lib/admin/crm.ts, src/lib/admin/property-profile.ts, unctions/api/admin/customers.ts, src/scripts/admin.ts, migration  028 | docs/verification/VERIFICATION.md |
+| Document packet builder, variables and template lifecycle | `src/lib/documents/service.ts`, `functions/api/admin/documents.ts`, migration `0038`, `src/pages/admin/index.astro` | `docs/operations/DOCUMENT-MANAGEMENT.md` |
+| Document revisions, owner review and re-signing queue | `src/lib/documents/service.ts` (`listDocumentUpdates`, `acknowledgeDocumentUpdate`), `functions/api/admin/documents.ts` (`view=updates`, `acknowledge_update`), `src/scripts/admin.ts` | `docs/operations/DOCUMENT-MANAGEMENT.md` |
+| Admin Quick Estimate and promotions | `src/lib/admin/quick-estimate.ts`, `quick-estimate-document.ts`, `functions/api/admin/quick-estimates.ts`, migration `0039` | `docs/operations/QUICK-ESTIMATE.md` |
+| Branded legal templates, register and renderer | `docs/legal/`, `scripts/render-legal-docs.mjs`, `docs/brand/LOGO-AUTHORITY.md` | `docs/legal/LEGAL-DOCUMENT-REGISTER.md` |
+| Encrypted off-site backup and restore | `scripts/backup/`, `.github/workflows/backup.yml` | `docs/operations/OFFSITE-BACKUPS.md` |
+| Customer CRM and complete property profiles | src/lib/admin/crm.ts, src/lib/admin/property-profile.ts, functions/api/admin/customers.ts, src/scripts/admin.ts, migration 0028 | docs/verification/VERIFICATION.md |
+| Unified customer file and job lifecycle | `customers`, `properties`, `appointments`, `invoices`, `signing_requests`, `payments`, `communications`, `job_media` | `docs/operations/CUSTOMER-FILE-JOB-LIFECYCLE.md` |
 | Customer photo intake (private R2, metadata stripping, owner links, retention) | `functions/api/photo-upload.ts`, `photo-view.ts`, `photo-cleanup.ts`, `src/lib/photos.ts`, `src/lib/photo-files.ts`, `src/scripts/photo-uploads.ts`, `src/components/PhotoUploadSection.astro` | `docs/operations/PHOTO-UPLOADS.md` |`n| Photo privacy rules (marketing/field photography) | `docs/privacy/PHOTO-PRIVACY-SOP.md` |
 | UTM links and QR assets | `src/config/marketing-links.ts` | `docs/marketing/UTM-MASTER-LINKS.md`, `docs/marketing/WHERE-TO-PASTE-UTM-LINKS.md` |
 | Marketing strategy, growth engines, platform priorities | — | `docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md` (execution front door), `docs/marketing/GROWTH-SYSTEM.md` (spine: flywheel, weekly loop, roadmap; subsystems `COMPETITIVE-STRATEGY.md`, `CONTENT-ENGINE.md`, `FIELD-CONTENT-CAPTURE.md`, `VIDEO-DIRECTING-SHEETS.md`, `CUSTOMER-LIFECYCLE.md`, `ACQUISITION-CHANNELS.md`, `LOCAL-AUTHORITY.md`, `ECONOMIC-MODEL.md`), `docs/marketing/MULTIPLATFORM-OPERATING-PLAN.md`, `docs/marketing/CONTENT-OPERATING-SYSTEM.md` |
@@ -416,6 +857,27 @@ required**, **whether a rebuild/regenerate step is needed**, and **what could br
   `docs/marketing/` (start with `MULTIPLATFORM-OPERATING-PLAN.md`).
 - Analytics configuration → `docs/analytics/ANALYTICS-SETUP.md`.
 - Operational settings and integrations → `docs/operations/`.
+
+## Execution reliability and production diagnosis
+
+The recurring failure mode in this project is not a lack of requirements; it is
+stopping at the first documented gate, incomplete admin workflow or report. Apply
+these rules before declaring work complete or blocked:
+
+- Inspect existing code, schema, admin screens and **local data** before proposing a new system or concluding data is missing.
+- Trace a production failure through the actual record, endpoint, gate and provider response. Quote the observed reason.
+- Distinguish missing configuration, missing implementation, owner-only action and a genuine external blocker.
+- If an owner-facing capability is described as usable, complete the admin screen and the server path that operate it, not just the data layer.
+- Do not leave a customer-facing action such as Pay Now visible when the server gate will reject it; either enable the full path or remove/disable the action with an exact explanation.
+- Do not use "feature gate", "prelaunch" or "owner approval" as a substitute for the implementable portion of the work.
+- Verify visual behavior at real desktop, laptop, tablet and phone widths, including clipping, scrolling, focus and touch.
+- Re-test production after deployment. Unit tests alone are not production verification.
+- Record the exact residual blocker and the next implementable step; never call a partially implemented workflow finished.
+
+`RECURRING_SCHEDULING_ENABLED` is a safety gate, not a reason to leave recurring
+checkout in a dead-end state. If the gate is off, the customer-facing Pay Now
+path must not be offered; if it is on, recurring checkout, scheduling and
+failure recovery must be operational.
 
 ## Working method
 
@@ -623,18 +1085,18 @@ collections are intentionally empty — not errors.
   the exact four-dollar-sign design (first filled gold, three outlined). The small footer review
   button uses the matching reading-glasses vector at 24 px. Church Cleaning is the
   sixth homepage card. Registry: `docs/design/WHITE-TILE-ICON-INVENTORY.md`.
-- **Authentic reviews live (2026-10-24, Initiative 5.0):** the homepage reviews section is a
-  premium layered editorial carousel (`src/components/Reviews.astro`) rendering ONE prominent
-  center review with two recessed-but-readable equal-height neighbours; it is progressively
-  enhanced (no-JS shows every review readable), keyboard/swipe navigable, respects
-  `prefers-reduced-motion`, and never autoplays.
-  Three genuine owner-supplied Google reviews render — **Christina, Richard, Laura** — public
-  attributions are **first names only** (never publish surnames in testimonials). Christina and
-  Richard carry their authentic 5-star ratings; Laura's rating is verified as five stars
-  (owner-supplied Google Maps review, checked 2026-10-24). Review source files are `src/content/reviews/christina.md`,
-  `richard.md`, `laura.md` (quote text verbatim; never fabricate or "improve" it). Never
-  fabricate additional reviews or aggregate/Review schema; new genuine entries render
-  automatically and the verified Google reviews link stays intact.
+- **Authentic reviews live (2026-10-24; owner-approved set 2026-11-20):** the homepage reviews
+  section is a premium layered editorial carousel (`src/components/Reviews.astro`) with one
+  prominent center card and two recessed, readable neighbours. It is progressively enhanced
+  (no-JS shows every review), keyboard/swipe navigable, respects `prefers-reduced-motion`, never
+  autoplays and sizes cards to their content. The owner-approved displayed set is **Christina,
+  Richard, Laura, Dennis D, Rob & Christi Moore, K V and S Ismail**. Bob, Amanda and Elizabeth are
+  explicitly excluded. K V and S Ismail use the exact owner-supplied text; K V's "bi-monthly"
+  wording is preserved. Dennis has two actual review photographs and Laura one; they are optimized
+  copies of the public Google review photos in `src/assets/images/reviews/`, never stock or
+  AI substitutes. The owner removed the former summary/disclaimer text under the heading; do not
+  restore it. Review source files live in `src/content/reviews/`; never fabricate reviews or
+  aggregate/Review schema.
 - **Five-step estimator (owner priority UX directive; current 2026-10-29):** the residential and STR
   journey is exactly **When & Where → Service & Home → Condition & Frequency → Your Details →
   Extras & Payment** (`src/lib/estimate/steps.ts`, `src/lib/estimate/engines.ts`). Step 1 now
@@ -723,7 +1185,8 @@ collections are intentionally empty — not errors.
   additional profile
   URLs (TikTok, Pinterest, Rumble, Gab, Parler, Locals). Instagram, YouTube and X were added
   2026-10-27, so **twelve profiles render** in the Follow Us section (including the verified Google
-  Business Profile) as **logo-only 52px circular buttons** in four columns (4 + 4 + 4 on phones). Platform names are visually
+  Business Profile) as **logo-only official marks on transparent 44px touch targets** with no
+  white circular chips; rows centre and wrap naturally on phones. Platform names are visually
   hidden but remain each link's explicit accessible name. Icons use official marks, including
   Nextdoor's house-"n" favicon, the official Gab and Parler marks and the official Locals logo
   (`src/components/SocialIcon.astro` documents each source). **The owner confirms the basic

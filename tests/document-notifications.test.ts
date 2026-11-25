@@ -147,9 +147,10 @@ test('the owner email contains an attachment and no signing token', async () => 
   assert.deepEqual(email.to, ['owner@sparkling-standard.com']);
   const attachments = email.attachments as Array<{ filename: string; content: string }>;
   assert.equal(attachments.length, 1);
-  assert.match(attachments[0].filename, /^executed-signreq_test_1\.txt$/);
+  assert.match(attachments[0].filename, /^executed-agreement-.*\.txt$/);
   const decoded = Buffer.from(attachments[0].content, 'base64').toString('utf8');
   assert.match(decoded, /EXECUTED DOCUMENT COPY/);
+  assert.doesNotMatch(JSON.stringify(email), /SHA-256|Consent version|Signing request:/i);
   assert.doesNotMatch(JSON.stringify(email), /token=/i);
 });
 

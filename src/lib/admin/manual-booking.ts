@@ -12,6 +12,7 @@ import type { PricingConfig } from '../../config/pricing.ts';
 import type { D1Database, D1PreparedStatement } from './d1.ts';
 import { AdminAuthError, audit, type AdminActor } from './operations.ts';
 import { markBookingCommitment } from '../booking/commitments.ts';
+import { zonedTimeToUtc } from '../booking/time.ts';
 import { requestPricingConfig } from '../pricing/server.ts';
 import { activeEntitlementForCustomer, FRIENDS15_CODE } from '../promotions/entitlements.ts';
 import { evaluatePromotionForQuote } from '../promotions/service.ts';
@@ -35,6 +36,7 @@ import type {
   PetSituation,
 } from '../estimate/types.ts';
 import { evaluateDocumentGate } from '../documents/service.ts';
+import { queueReviewForAppointment } from '../reviews/service.ts';
 import { availabilityForDate, type BookingEnv } from '../booking/service.ts';
 import {
   createCalendarEvent,
@@ -72,7 +74,8 @@ export interface ManualFacilityInput {
 
 export interface ManualEstimateInput {
   engine: ManualEngine;
-  serviceType?: 'standard' | 'deep' | 'move_in_out' | 'str_turnover' | undefined;
+  serviceType?: 'standard' | 'deep' | 'move_in_out' | 'str_turnover' | 'move_out' | 'move_in' | undefined;
+  serviceLabel?: string | undefined;
   propertyType?: PropertyType | undefined;
   squareFeet?: number | undefined;
   bedrooms?: number | undefined;
@@ -86,6 +89,11 @@ export interface ManualEstimateInput {
   pets?: PetSituation | undefined;
   supportiveEligible?: boolean | undefined;
   promotionCode?: string | undefined;
+  pricingMethod?: 'estimated' | 'custom' | undefined;
+  customPrice?: number | undefined;
+  discountType?: 'none' | 'percent' | 'fixed' | undefined;
+  discountValue?: number | undefined;
+  discountReason?: string | undefined;
   facility?: ManualFacilityInput | undefined;
 }
 
@@ -175,6 +183,7 @@ function cents(amount: number | null | undefined): number | null {
 function serviceCodeForEngine(engine: ManualEngine, serviceType: string): string {
   if (engine === 'commercial') return 'commercial-cleaning';
   if (engine === 'church') return 'church-cleaning';
+  if (serviceType === 'move_out' || serviceType === 'move_in') return 'move_in_out';
   return serviceType;
 }
 
@@ -187,7 +196,7 @@ function engineIsFacility(engine: ManualEngine): boolean {
   return engine === 'commercial' || engine === 'church';
 }
 
-function normalizeInput(raw: Record<string, unknown>): ManualEstimateInput {
+export function normalizeInput(raw: Record<string, unknown>): ManualEstimateInput {
   const engine = text(raw.engine, 20) as ManualEngine;
   if (!['residential', 'str', 'commercial', 'church'].includes(engine)) {
     throw new AdminAuthError(400, 'manual_engine_invalid');
@@ -196,6 +205,7 @@ function normalizeInput(raw: Record<string, unknown>): ManualEstimateInput {
   return {
     engine,
     serviceType: text(raw.serviceType, 20) as ManualEstimateInput['serviceType'] || (engine === 'str' ? 'str_turnover' : 'standard'),
+    serviceLabel: text(raw.serviceLabel, 120),
     propertyType: text(raw.propertyType, 20) as PropertyType,
     squareFeet: numberOrUndefined(raw.squareFeet),
     bedrooms: numberOrUndefined(raw.bedrooms),
@@ -209,6 +219,11 @@ function normalizeInput(raw: Record<string, unknown>): ManualEstimateInput {
     pets: text(raw.pets, 30) as PetSituation,
     supportiveEligible: flag(raw.supportiveEligible),
     promotionCode: text(raw.promotionCode, 40),
+    pricingMethod: raw.pricingMethod === 'custom' ? 'custom' : 'estimated',
+    customPrice: numberOrUndefined(raw.customPrice),
+    discountType: raw.discountType === 'percent' || raw.discountType === 'fixed' ? raw.discountType : 'none',
+    discountValue: numberOrUndefined(raw.discountValue),
+    discountReason: text(raw.discountReason, 300),
     facility: {
       cleanableSqft: numberOrUndefined(facilityRaw.cleanableSqft),
       restroomFixtures: numberOrUndefined(facilityRaw.restroomFixtures),
@@ -277,10 +292,13 @@ function savedPropertyCoordinates(property: Record<string, unknown>): { lat: num
   return isUsableLatLng(coordinates) ? coordinates : null;
 }
 
-async function propertyDestination(
+export type EstimateDestination = { lat: number; lng: number; source: ManualQuoteTravel['destinationSource'] } | null;
+
+/** Resolves a saved property or a typed address to a routable destination. */
+export async function addressDestination(
   env: ManualBookingEnv,
   property: Record<string, unknown>,
-): Promise<{ lat: number; lng: number; source: ManualQuoteTravel['destinationSource'] } | null> {
+): Promise<EstimateDestination> {
   const saved = savedPropertyCoordinates(property);
   if (saved) return { ...saved, source: 'property' };
   const address = [property.line1, property.line2, property.city, property.state, property.postal_code]
@@ -294,6 +312,13 @@ async function propertyDestination(
   const reference = zip ? zipReference[zip] : null;
   if (reference) return { lat: reference.lat, lng: reference.lng, source: 'zip_centroid' };
   return null;
+}
+
+async function propertyDestination(
+  env: ManualBookingEnv,
+  property: Record<string, unknown>,
+): Promise<EstimateDestination> {
+  return addressDestination(env, property);
 }
 
 async function travelFor(
@@ -378,7 +403,9 @@ function estimateContext(
 function residentialDraft(input: ManualEstimateInput, property: Record<string, unknown>): EstimateInputDraft {
   const propertyType = input.propertyType || (text(property.property_type, 20) as PropertyType) || 'house';
   return {
-    serviceType: input.serviceType ?? (input.engine === 'str' ? 'str_turnover' : 'standard'),
+    serviceType: input.serviceType === 'move_out' || input.serviceType === 'move_in'
+      ? 'move_in_out'
+      : input.serviceType ?? (input.engine === 'str' ? 'str_turnover' : 'standard'),
     propertyType,
     squareFeet: input.squareFeet ?? numberOrUndefined(property.square_feet),
     bedrooms: input.bedrooms ?? numberOrUndefined(property.bedrooms),
@@ -403,8 +430,11 @@ function snapshotFields(
   const fields: Record<string, string> = {
     request_type: 'reservation_request',
     booking_source: 'admin_manual',
-    service_type: input.serviceType ?? (input.engine === 'str' ? 'str_turnover' : 'standard'),
+    service_type: input.serviceType === 'move_out' || input.serviceType === 'move_in'
+      ? 'move_in_out'
+      : input.serviceType ?? (input.engine === 'str' ? 'str_turnover' : 'standard'),
     service_address: text(context.property.line1, 200),
+    ...(input.serviceLabel ? { service_label: input.serviceLabel } : {}),
     address_city: text(context.property.city, 120),
     address_state: text(context.property.state, 20),
     zip: text(context.property.postal_code, 12),
@@ -445,6 +475,19 @@ function snapshotFields(
     fields.frequency = String(facility.frequency ?? 'weekly');
   }
   if (quote.totalCents !== null) fields.quoted_price = (quote.totalCents / 100).toFixed(2);
+  if (input.pricingMethod === 'custom') {
+    fields.pricing_method = 'custom';
+    fields.custom_price = Number(input.customPrice ?? 0).toFixed(2);
+  } else {
+    fields.pricing_method = 'estimated';
+  }
+  if (input.discountType && input.discountType !== 'none' && Number(input.discountValue ?? 0) > 0) {
+    fields.admin_discount_type = input.discountType;
+    fields.admin_discount_value = String(input.discountValue);
+    if (input.discountReason) fields.admin_discount_reason = input.discountReason;
+    if (quote.discountAmountCents) fields.admin_discount_cents = String(quote.discountAmountCents);
+  }
+  if (quote.totalCents !== null) fields.admin_agreed_price = (quote.totalCents / 100).toFixed(2);
   if (quote.laborHours !== null) fields.labor_hours = String(quote.laborHours);
   if (quote.ongoingPerVisitCents !== null) fields.ongoing_price_per_visit = (quote.ongoingPerVisitCents / 100).toFixed(2);
   if (quote.travel.oneWayMiles !== null) fields.travel_one_way_miles = String(quote.travel.oneWayMiles);
@@ -478,25 +521,37 @@ async function documentRequirements(
  * Produces an itemized manual quote using the active published pricing. No
  * booking, hold, invoice, email or calendar event is created here.
  */
-export async function quoteManualBooking(
+interface PriceContext {
+  branchId: string;
+  customerId?: string;
+  propertyId?: string;
+  reference: string;
+  serviceDate?: string;
+}
+
+/**
+ * Shared server-side pricing for an owner-created estimate. Manual bookings and
+ * Quick Estimates both call this function, so the four engines, promotion
+ * rules, travel economics and service history rules can never diverge.
+ */
+export async function priceEstimateInput(
   env: ManualBookingEnv,
   db: D1Database,
-  actor: AdminActor,
-  raw: Record<string, unknown>,
-): Promise<ManualQuote> {
-  const input = normalizeInput(raw);
-  const customerId = text(raw.customerId, 100);
-  const propertyId = text(raw.propertyId, 100);
-  if (!customerId || !propertyId) throw new AdminAuthError(400, 'customer_property_required');
-  const context = await scopedCustomerProperty(db, actor, customerId, propertyId);
-  const entitlement = input.engine === 'residential' && ['standard', 'deep'].includes(input.serviceType ?? '')
-    ? await activeEntitlementForCustomer(db, customerId, FRIENDS15_CODE)
+  input: ManualEstimateInput,
+  destination: Awaited<ReturnType<typeof propertyDestination>>,
+  priceContext: PriceContext,
+  property: Record<string, unknown> = {},
+): Promise<Omit<ManualQuote, 'fields' | 'documentsRequired'>> {
+  const customPricing = input.pricingMethod === 'custom';
+  const entitlement = !customPricing &&
+    input.engine === 'residential' &&
+    ['standard', 'deep'].includes(input.serviceType ?? '') &&
+    priceContext.customerId
+    ? await activeEntitlementForCustomer(db, priceContext.customerId, FRIENDS15_CODE)
     : null;
-  const config = await requestPricingConfig(db);
-  const destination = await propertyDestination(env, context.property);
+  const config = await requestPricingConfig(db, priceContext.branchId ?? undefined);
   const { travel, routed } = await travelFor(env, destination);
-  const reference = text(raw.reference, MAX_REFERENCE) || 'ADMIN-DRAFT';
-  const docs = await documentRequirements(db, input, context, reference);
+  const reference = priceContext.reference;
   const serviceCode = serviceCodeForEngine(input.engine, input.serviceType ?? 'standard');
   const base = {
     engine: input.engine,
@@ -505,7 +560,7 @@ export async function quoteManualBooking(
     pricingVersion: engineIsFacility(input.engine)
       ? config.commercialPricing.configVersion.value
       : config.instantQuote.configVersion.value,
-    documentsRequired: docs,
+    documentsRequired: [] as ManualQuote['documentsRequired'],
   };
 
   if (engineIsFacility(input.engine)) {
@@ -535,7 +590,7 @@ export async function quoteManualBooking(
     });
     const priced = price.priced && Number.isFinite(price.total);
     const totalCents = priced ? cents(price.total) : null;
-    const quoteWithoutFields = {
+    return {
       ...base,
       status: priced ? 'priced' as const : 'custom_confirmation_required' as const,
       totalCents,
@@ -556,16 +611,15 @@ export async function quoteManualBooking(
       message: priced ? null : 'This facility scope requires personal review.',
       entitlement: null,
     };
-    return {
-      ...quoteWithoutFields,
-      fields: snapshotFields(input, context, quoteWithoutFields),
-    };
   }
 
-  const draft = residentialDraft(input, context.property);
+  const pricingInput = input.serviceType === 'move_out' || input.serviceType === 'move_in'
+    ? { ...input, serviceType: 'move_in_out' as const }
+    : input;
+  const draft = residentialDraft(pricingInput, property);
   const validation = validateEstimateInput(draft);
   if (!validation.ok) {
-    const invalidQuote = {
+    return {
       ...base,
       status: 'invalid' as const,
       totalCents: null,
@@ -584,10 +638,6 @@ export async function quoteManualBooking(
       message: validation.issues[0] ?? 'Complete the estimate inputs.',
       entitlement: null,
     };
-    return {
-      ...invalidQuote,
-      fields: snapshotFields(input, context, invalidQuote),
-    };
   }
   const estimate = calculateEstimate(draft, estimateContext(config, routed, input.promotionCode ?? ''));
   const amount = selectInstantAmount(estimate, config.instantQuote.selection.value, config);
@@ -598,18 +648,18 @@ export async function quoteManualBooking(
   const oneTimeSelected = Boolean(selectedPromotionCode && !persistentSelected);
   let promotionDiscountCents = 0;
   let promotionLabel = '';
-  if (priced && oneTimeSelected) {
+  if (priced && oneTimeSelected && !customPricing) {
     if (estimate.pricing.discount) throw new AdminAuthError(409, 'promotion_not_combinable');
     const evaluation = await evaluatePromotionForQuote(db, {
       code: selectedPromotionCode,
       cleaningAmountCents: eligibleCleaningCents,
-      serviceType: input.serviceType ?? 'standard',
-      branchId: context.branchId ?? 'branch_pensacola',
+      serviceType: pricingInput.serviceType ?? 'standard',
+      branchId: priceContext.branchId || 'branch_pensacola',
       frequency: input.frequency ?? 'one_time',
       quoteReference: reference,
       holdId: '',
-      customerId,
-      ...(text(raw.date, 10) ? { serviceDate: text(raw.date, 10) } : {}),
+      customerId: priceContext.customerId ?? '',
+      ...(priceContext.serviceDate ? { serviceDate: priceContext.serviceDate } : {}),
       hasExistingDiscount: false,
     });
     if (!evaluation.ok || !evaluation.discountCents) {
@@ -619,6 +669,7 @@ export async function quoteManualBooking(
     promotionLabel = evaluation.promotion?.name ? `Promotion - ${evaluation.promotion.name}` : selectedPromotionCode;
   }
   const canApplyEntitlement = Boolean(
+    !customPricing &&
     priced &&
     entitlement &&
     !estimate.pricing.discount &&
@@ -654,7 +705,7 @@ export async function quoteManualBooking(
         ),
       )
     : null;
-  const quoteWithoutFields = {
+  return {
     ...base,
     status: priced ? 'priced' as const : 'custom_confirmation_required' as const,
     totalCents: priced ? cents(effectiveAmount ?? amount ?? 0) : null,
@@ -697,12 +748,111 @@ export async function quoteManualBooking(
         }
       : null,
   };
+}
+
+function customDiscountCents(baseCents: number, input: ManualEstimateInput): number {
+  const type = input.discountType ?? 'none';
+  const value = Number(input.discountValue ?? 0);
+  if (type === 'none' || !Number.isFinite(value) || value <= 0) return 0;
+  if (type === 'percent') {
+    if (value > 100) throw new AdminAuthError(400, 'discount_percent_invalid');
+    return Math.round((baseCents * value) / 100);
+  }
+  return Math.round(value * 100);
+}
+
+function applyManualPricing(
+  core: Omit<ManualQuote, 'fields' | 'documentsRequired'>,
+  input: ManualEstimateInput,
+): Omit<ManualQuote, 'fields' | 'documentsRequired'> {
+  const custom = input.pricingMethod === 'custom';
+  const baseCents = custom
+    ? Math.round(Number(input.customPrice ?? 0) * 100)
+    : core.totalCents;
+  if (baseCents === null || !Number.isFinite(baseCents) || baseCents <= 0) {
+    if (custom) throw new AdminAuthError(400, 'custom_price_invalid');
+    return core;
+  }
+  let discountCents = customDiscountCents(baseCents, input);
+  if (!custom && discountCents > 0 && (core.discountAmountCents ?? 0) > 0) {
+    throw new AdminAuthError(409, 'discount_not_combinable');
+  }
+  discountCents = Math.min(discountCents, baseCents);
+  const totalCents = baseCents - discountCents;
+  if (totalCents <= 0) throw new AdminAuthError(400, 'custom_price_invalid');
+  if (!custom && discountCents === 0) return core;
+  const discountLabel = discountCents > 0
+    ? `Administrator discount${input.discountReason ? ` — ${input.discountReason}` : ''}`
+    : null;
+  const breakdown = core.breakdown
+    ? {
+        ...core.breakdown,
+        basePrice: custom ? baseCents / 100 : core.breakdown.basePrice,
+        extrasSubtotal: custom ? 0 : core.breakdown.extrasSubtotal,
+        addonPrices: custom ? [] : core.breakdown.addonPrices,
+        selectedExtras: custom ? [] : core.breakdown.selectedExtras,
+        travelAdjustment: custom ? 0 : core.breakdown.travelAdjustment,
+        discount: discountCents > 0
+          ? {
+              id: 'admin-discount',
+              source: 'admin',
+              percent: input.discountType === 'percent' ? Number(input.discountValue ?? 0) : 0,
+              amount: discountCents / 100,
+              label: discountLabel ?? 'Administrator discount',
+            }
+          : custom
+            ? null
+            : core.breakdown.discount,
+        subtotal: totalCents / 100,
+      }
+    : null;
+  return {
+    ...core,
+    status: 'priced',
+    totalCents,
+    range: custom ? null : core.range,
+    breakdown,
+    cleaningSubtotalCents: custom ? baseCents : core.cleaningSubtotalCents,
+    travelAdjustmentCents: custom ? 0 : core.travelAdjustmentCents,
+    extrasSubtotalCents: custom ? 0 : core.extrasSubtotalCents,
+    discountAmountCents: discountCents > 0 ? discountCents : core.discountAmountCents,
+    discountLabel: discountCents > 0 ? discountLabel : core.discountLabel,
+    message: null,
+  };
+}
+
+/**
+ * Produces an itemized manual quote using the active published pricing. No
+ * booking, hold, invoice, email or calendar event is created here.
+ */
+export async function quoteManualBooking(
+  env: ManualBookingEnv,
+  db: D1Database,
+  actor: AdminActor,
+  raw: Record<string, unknown>,
+): Promise<ManualQuote> {
+  const input = normalizeInput(raw);
+  const customerId = text(raw.customerId, 100);
+  const propertyId = text(raw.propertyId, 100);
+  if (!customerId || !propertyId) throw new AdminAuthError(400, 'customer_property_required');
+  const context = await scopedCustomerProperty(db, actor, customerId, propertyId);
+  const reference = text(raw.reference, MAX_REFERENCE) || 'ADMIN-DRAFT';
+  const docs = await documentRequirements(db, input, context, reference);
+  const destination = await propertyDestination(env, context.property);
+  const core = await priceEstimateInput(env, db, input, destination, {
+    branchId: context.branchId ?? actor.branchId ?? 'branch_pensacola',
+    customerId,
+    propertyId,
+    reference,
+    ...(text(raw.date, 10) ? { serviceDate: text(raw.date, 10) } : {}),
+  }, context.property);
+  const pricedCore = applyManualPricing(core, input);
+  const quoteWithoutFields = { ...pricedCore, documentsRequired: docs };
   return {
     ...quoteWithoutFields,
     fields: snapshotFields(input, context, quoteWithoutFields),
   };
 }
-
 function slotEnd(start: string, durationMinutes: number): string {
   return new Date(Date.parse(start) + durationMinutes * 60_000).toISOString();
 }
@@ -805,7 +955,7 @@ export async function createManualBooking(
 
   const context = await scopedCustomerProperty(db, actor, input.customerId, input.propertyId);
   const quote = await deps.quote(env, db, actor, { ...raw, reference: 'ADMIN-DRAFT' });
-  if (quote.status !== 'priced' || quote.totalCents === null || quote.durationMinutes === null) {
+  if (quote.status !== 'priced' || quote.totalCents === null) {
     throw new AdminAuthError(409, 'quote_not_priced');
   }
   const destination = await propertyDestination(env, context.property);
@@ -834,6 +984,32 @@ export async function createManualBooking(
   if (!exact) throw new AdminAuthError(409, 'slot_unavailable');
   const teamMemberIds = await resolveCrew(db, input.teamMemberIds ?? [], exact.resourceIds);
   if (teamMemberIds.length === 0) throw new AdminAuthError(409, 'crew_unresolved');
+
+  const existing = await db
+    .prepare(
+      `SELECT id, hold_id, quote_reference FROM booking_requests
+       WHERE customer_id = ? AND property_id = ? AND start_at = ? AND status = 'pending'
+         AND hold_id LIKE 'manual_%' AND created_at >= datetime('now', '-15 minutes')
+       ORDER BY created_at DESC LIMIT 1`,
+    )
+    .bind(input.customerId, input.propertyId, exact.start)
+    .first<{ id: string; hold_id: string; quote_reference: string }>();
+  if (existing) {
+    await audit(db, {
+      actorUserId: actor.id,
+      action: 'booking.manual_duplicate_suppressed',
+      entityType: 'booking_request',
+      entityId: existing.id,
+      detail: existing.quote_reference,
+    });
+    return {
+      requestId: existing.id,
+      holdId: existing.hold_id,
+      reference: existing.quote_reference,
+      quote,
+      appointmentId: null,
+    };
+  }
 
   const reference = `MB-${input.date.replaceAll('-', '')}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
   quote.fields.preferred_date = input.date;
@@ -941,6 +1117,267 @@ export async function createManualBooking(
     detail: `${reference}:${quote.totalCents}:${teamMemberIds.join(',')}`,
   });
   return { requestId, holdId, reference, quote, appointmentId: null };
+}
+
+export interface CreateCompletedServiceResult {
+  appointmentId: string;
+  estimateId: string;
+  reference: string;
+  serviceCode: string;
+  serviceDate: string;
+  totalCents: number;
+  discountCents: number;
+  linkedSigningRequestId: string | null;
+  existing?: boolean;
+}
+
+/**
+ * Records a cleaning that has already been performed. It never checks future
+ * availability, never writes Google Calendar and never creates an active
+ * reservation. The completed appointment is the job record used for invoicing.
+ */
+export async function createCompletedService(
+  _env: ManualBookingEnv,
+  db: D1Database,
+  actor: AdminActor,
+  raw: Record<string, unknown>,
+): Promise<CreateCompletedServiceResult> {
+  const input = normalizeInput(raw) as CreateManualBookingInput;
+  input.customerId = text(raw.customerId, 100);
+  input.propertyId = text(raw.propertyId, 100);
+  input.date = text(raw.completedDate, 10) || text(raw.date, 10);
+  input.teamMemberIds = Array.isArray(raw.teamMemberIds)
+    ? [...new Set(raw.teamMemberIds.filter((value): value is string => typeof value === 'string'))].slice(0, bookingConfig.maxCrewSize)
+    : [];
+  input.notes = text(raw.notes, 2000);
+  if (!input.customerId || !input.propertyId) throw new AdminAuthError(400, 'customer_property_required');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new AdminAuthError(400, 'completed_date_required');
+  if (input.pricingMethod !== 'custom' || Number(input.customPrice ?? 0) <= 0) {
+    throw new AdminAuthError(400, 'completed_custom_price_required');
+  }
+  if (input.teamMemberIds.length === 0) throw new AdminAuthError(400, 'completed_crew_required');
+  const context = await scopedCustomerProperty(db, actor, input.customerId, input.propertyId);
+  const timeZone = context.branchId === 'branch_tampa' ? 'America/New_York' : 'America/Chicago';
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  if (input.date > today) throw new AdminAuthError(400, 'completed_date_in_future');
+  const serviceCode = serviceCodeForEngine(input.engine, input.serviceType ?? 'standard');
+  const service = await db
+    .prepare('SELECT name FROM services WHERE code = ? AND active = 1 LIMIT 1')
+    .bind(serviceCode)
+    .first<{ name: string }>();
+  if (!service) throw new AdminAuthError(400, 'service_type_invalid');
+  const baseCents = Math.round(Number(input.customPrice) * 100);
+  const discountCents = Math.min(baseCents - 1, customDiscountCents(baseCents, input));
+  const totalCents = baseCents - discountCents;
+  if (totalCents <= 0) throw new AdminAuthError(400, 'custom_price_invalid');
+  const crew = await staffResourceSelection(db, input.teamMemberIds);
+  const duplicate = await db
+    .prepare(
+      `SELECT a.id, a.estimate_id, a.reference, a.start_at, a.timezone,
+              e.total_cents, e.service_code, e.discount_cents, e.input_snapshot_json
+       FROM appointments a
+       LEFT JOIN estimates e ON e.id = a.estimate_id
+       WHERE a.customer_id = ? AND a.property_id = ? AND a.source = 'admin_completed'
+         AND date(a.start_at) = ? AND a.status = 'completed' AND e.service_code = ?
+       ORDER BY a.created_at DESC LIMIT 1`,
+    )
+    .bind(input.customerId, input.propertyId, input.date, serviceCode)
+    .first<Record<string, unknown>>();
+  if (duplicate) {
+    const duplicateFields = (() => {
+      try {
+        return JSON.parse(String(duplicate.input_snapshot_json ?? '{}')) as Record<string, unknown>;
+      } catch {
+        return {} as Record<string, unknown>;
+      }
+    })();
+    await audit(db, {
+      actorUserId: actor.id,
+      action: 'booking.completed_service_reused',
+      entityType: 'appointment',
+      entityId: String(duplicate.id),
+      detail: String(duplicate.reference ?? ''),
+    });
+    return {
+      appointmentId: String(duplicate.id),
+      estimateId: String(duplicate.estimate_id ?? ''),
+      reference: String(duplicate.reference ?? ''),
+      serviceCode: String(duplicate.service_code ?? serviceCode),
+      serviceDate: String(duplicateFields.completed_service_date ?? input.date),
+      totalCents: Number(duplicate.total_cents ?? totalCents),
+      discountCents: Number(duplicate.discount_cents ?? 0),
+      linkedSigningRequestId: null,
+      existing: true,
+    };
+  }
+  const reference = `HC-${input.date.replaceAll('-', '')}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+  const duration = 120;
+  const start = zonedTimeToUtc(input.date, '12:00', timeZone);
+  const end = new Date(start.getTime() + duration * 60_000);
+  const discountLabel = discountCents > 0
+    ? `Administrator discount${input.discountReason ? ` — ${input.discountReason}` : ''}`
+    : null;
+  const quote: ManualQuote = {
+    engine: input.engine,
+    status: 'priced',
+    totalCents,
+    range: null,
+    laborHours: null,
+    durationMinutes: duration,
+    breakdown: null,
+    cleaningSubtotalCents: baseCents,
+    travelAdjustmentCents: 0,
+    extrasSubtotalCents: 0,
+    discountAmountCents: discountCents || null,
+    discountLabel,
+    ongoingPerVisitCents: null,
+    ongoingFrequency: null,
+    tier: null,
+    pricingVersion: 'admin-completed.v1',
+    serviceCode,
+    travel: {
+      oneWayMiles: null,
+      durationMinutes: null,
+      verified: false,
+      provider: 'none',
+      method: 'none',
+      destinationSource: 'property',
+    },
+    message: null,
+    entitlement: null,
+    fields: {},
+    documentsRequired: [],
+  };
+  const fields = {
+    ...snapshotFields(input, context, quote),
+    request_type: 'completed_service',
+    booking_source: 'admin_completed',
+    completed_service_date: input.date,
+    appointment_type: 'completed',
+    service_label: input.serviceLabel || service.name,
+    preferred_date: input.date,
+    preferred_time: '',
+    booked_crew_size: String(input.teamMemberIds.length),
+    admin_team_member_ids: input.teamMemberIds.join(','),
+    admin_notes: input.notes ?? '',
+    quote_reference: reference,
+    admin_agreed_price: (totalCents / 100).toFixed(2),
+    pricing_method: 'custom',
+    custom_price: (baseCents / 100).toFixed(2),
+    ...(discountCents > 0 ? {
+      admin_discount_type: input.discountType ?? 'none',
+      admin_discount_value: String(input.discountValue ?? 0),
+      admin_discount_reason: input.discountReason ?? '',
+      admin_discount_cents: String(discountCents),
+    } : {}),
+  };
+  quote.fields = fields;
+  const signingRequestId = text(raw.signingRequestId, 100);
+  if (signingRequestId) {
+    const signing = await db
+      .prepare(
+        `SELECT id, property_id FROM signing_requests
+         WHERE id = ? AND customer_id = ? AND status = 'signed' LIMIT 1`,
+      )
+      .bind(signingRequestId, context.customerId)
+      .first<{ id: string; property_id: string | null }>();
+    if (!signing) throw new AdminAuthError(400, 'signing_request_not_eligible');
+    if (signing.property_id && signing.property_id !== context.propertyId) {
+      throw new AdminAuthError(400, 'signing_request_property_mismatch');
+    }
+  }
+  const estimateId = `est_${crypto.randomUUID()}`;
+  const appointmentId = `appt_${crypto.randomUUID()}`;
+  const statements: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO estimates
+         (id, customer_id, property_id, branch_id, service_code, status, source, quote_reference,
+          input_snapshot_json, pricing_version, labor_hours, subtotal_cents, discount_cents, tax_cents,
+          total_cents, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'accepted', 'admin_completed', ?, ?, ?, NULL, ?, ?, 0, ?, ?, ?)`,
+      )
+      .bind(
+        estimateId,
+        context.customerId,
+        context.propertyId,
+        context.branchId,
+        serviceCode,
+        reference,
+        JSON.stringify(fields),
+        quote.pricingVersion,
+        baseCents,
+        discountCents,
+        totalCents,
+        now(),
+        now(),
+      ),
+    db
+      .prepare(
+        `INSERT INTO appointments
+         (id, branch_id, customer_id, property_id, estimate_id, booking_request_id, status,
+          start_at, end_at, timezone, duration_minutes, crew_size, source, reference, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NULL, 'completed', ?, ?, ?, ?, ?, 'admin_completed', ?, ?, ?, ?)`,
+      )
+      .bind(
+        appointmentId,
+        context.branchId,
+        context.customerId,
+        context.propertyId,
+        estimateId,
+        start.toISOString(),
+        end.toISOString(),
+        timeZone,
+        duration,
+        input.teamMemberIds.length,
+        reference,
+        `Historical completed service. Service date ${input.date}; time not verified.`,
+        now(),
+        now(),
+      ),
+    ...crew.teamRows.map((member) =>
+      db
+        .prepare('INSERT INTO appointment_resources (appointment_id, team_member_id, role) VALUES (?, ?, ?)')
+        .bind(
+          appointmentId,
+          String(member.id),
+          Number(member.is_solo) === 1 ? 'solo' : Number(member.is_lead) === 1 ? 'lead' : 'cleaner',
+        ),
+    ),
+  ];
+  if (db.batch) await db.batch(statements);
+  else for (const statement of statements) await statement.run();
+  let linkedSigningRequestId: string | null = null;
+  if (signingRequestId) {
+    await db
+      .prepare('UPDATE signing_requests SET appointment_id = ?, updated_at = ? WHERE id = ?')
+      .bind(appointmentId, now(), signingRequestId)
+      .run();
+    linkedSigningRequestId = signingRequestId;
+  }
+  await queueReviewForAppointment(db, appointmentId).catch(() => undefined);
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'booking.completed_service_recorded',
+    entityType: 'appointment',
+    entityId: appointmentId,
+    detail: `${reference}:${totalCents}:${input.teamMemberIds.join(',')}${linkedSigningRequestId ? `:signed:${linkedSigningRequestId}` : ''}`,
+  });
+  return {
+    appointmentId,
+    estimateId,
+    reference,
+    serviceCode,
+    serviceDate: input.date,
+    totalCents,
+    discountCents,
+    linkedSigningRequestId,
+  };
 }
 
 export interface ConfirmManualBookingResult {

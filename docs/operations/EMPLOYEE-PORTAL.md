@@ -59,9 +59,9 @@ The employee job board shows **today and tomorrow only** in America/Chicago.
 Open `/employee/install/` for illustrated steps. The portal is a home-screen web app, not a
 native App Store or Google Play application.
 
-**iPhone/iPad (Safari):** Share â†’ Add to Home Screen â†’ name it â€œSS Teamâ€ â†’ Add.
+**iPhone/iPad (Safari):** Share → Add to Home Screen → name it “SS Team” → Add.
 
-**Android (Chrome):** three-dot menu â†’ Install app (or Add to Home screen) â†’ confirm.
+**Android (Chrome):** three-dot menu → Install app (or Add to Home screen) → confirm.
 
 The manifest uses the approved Sparkling Standard icon and opens in standalone display mode.
 
@@ -121,14 +121,14 @@ or unavailable, the event records the exact status (`denied`, `unavailable` or `
 and **the time is still recorded**. No coordinates are invented.
 
 Managers and the owner can review the verification status and a map link in
-**Admin â†’ Timekeeping â†’ Location verification**. Employees cannot see another employee's
+**Admin → Timekeeping → Location verification**. Employees cannot see another employee's
 location. Coordinates are never shown publicly and are not sent to analytics.
 
 ## 7. Manager timekeeping tools
 
-**Admin â†’ Timekeeping** provides:
+**Admin → Timekeeping** provides:
 
-- a week selector and the Mondayâ€“Sunday workweek;
+- a week selector and the Monday–Sunday workweek;
 - compensated, break, meal and overtime totals per employee;
 - open shifts and **missing clock-out** flags (an open shift of 14 hours or more);
 - every interval with an **Edit** action;
@@ -155,7 +155,7 @@ the correction record.
 
 | Message | Meaning | Action |
 | --- | --- | --- |
-| Your account is not linked to a team-member profile yet | The admin account exists but the roster link is missing | Ask the owner/manager to link it under Timekeeping â†’ Staff access |
+| Your account is not linked to a team-member profile yet | The admin account exists but the roster link is missing | Ask the owner/manager to link it under Timekeeping → Staff access |
 | Your employee profile is inactive | The team-member record is disabled | Ask management |
 | You are already clocked in | An open interval exists | Clock out or end the current break/meal |
 | That action does not match your current clock state | Wrong action for the state | Use the action shown for the current state |

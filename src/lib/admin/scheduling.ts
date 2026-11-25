@@ -60,8 +60,13 @@ export async function listAppointments(
   input: { from?: string; to?: string; status?: string } = {},
 ): Promise<Array<Record<string, unknown>>> {
   const branch = scope(actor, 'a.branch_id');
-  const from = validIso(input.from ?? '') ? input.from! : '1970-01-01T00:00';
-  const to = validIso(input.to ?? '') ? input.to! : '2999-12-31T23:59';
+  const now = new Date();
+  const from = validIso(input.from ?? '')
+    ? input.from!
+    : new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10) + 'T00:00:00.000Z';
+  const to = validIso(input.to ?? '')
+    ? input.to!
+    : new Date(now.getTime() + 61 * 86_400_000).toISOString().slice(0, 10) + 'T23:59:59.999Z';
   const status = text(input.status, 20);
   const result = await db
     .prepare(
@@ -358,7 +363,13 @@ export async function listRecurring(
   const branch = scope(actor, 'r.branch_id');
   const result = await db
     .prepare(
-      `SELECT r.*, c.first_name, c.last_name, p.line1, p.city
+      `SELECT r.*, c.first_name, c.last_name, p.line1, p.city,
+              (SELECT GROUP_CONCAT(tm.display_name, ', ')
+                 FROM appointments a
+                 JOIN appointment_resources ar ON ar.appointment_id = a.id
+                 JOIN team_members tm ON tm.id = ar.team_member_id
+                WHERE a.recurring_plan_id = r.id AND a.start_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                  AND a.status IN ('pending','confirmed','in_progress')) AS assigned_names
        FROM recurring_plans r JOIN customers c ON c.id = r.customer_id
        JOIN properties p ON p.id = r.property_id
        WHERE 1 = 1 ${branch.sql} ORDER BY r.next_visit_date ASC LIMIT 200`,

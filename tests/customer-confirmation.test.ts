@@ -10,7 +10,7 @@ const business = {
   name: 'Sparkling Standard',
   founder: 'Hayli',
   phone: '(850) 426-8479',
-  email: 'owner@sparkling-standard.com',
+  email: 'booking@sparkling-standard.com',
   website: 'sparkling-standard.com',
 };
 
@@ -74,7 +74,7 @@ test('the branded HTML is email-safe: inline styles, no scripts, no external ima
   assert.doesNotMatch(confirmation.html, /<script/i);
   assert.doesNotMatch(confirmation.html, /<img/i);
   assert.doesNotMatch(confirmation.html, /https?:\/\/(?!sparkling-standard\.com)/i);
-  assert.match(confirmation.html, /Standards That Make Your Space Sparkle\./);
+  assert.match(confirmation.html, /Standards That Sparkle\./);
 });
 
 test('the summary and the provisional estimate appear in both HTML and plain text', () => {
@@ -159,7 +159,7 @@ test('the confirmation carries the owner-approved contact block and signature', 
   const confirmation = buildCustomerConfirmation(reservation, business);
   for (const body of [confirmation.html, confirmation.text]) {
     assert.match(body, /\(850\) 426-8479/);
-    assert.match(body, /owner@sparkling-standard\.com/);
+    assert.match(body, /booking@sparkling-standard\.com/);
     assert.match(body, /sparkling-standard\.com/);
     assert.match(body, /Hayli/);
   }

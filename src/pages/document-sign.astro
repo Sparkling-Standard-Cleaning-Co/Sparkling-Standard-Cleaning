@@ -1,6 +1,8 @@
 ---
 import '../styles/global.css';
 import '../styles/employee.css';
+import '../styles/signing.css';
+import { DOCUMENT_BRAND_CSS } from '../lib/documents/branding.ts';
 ---
 
 <!doctype html>
@@ -11,21 +13,48 @@ import '../styles/employee.css';
     <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#8a4a52" />
     <title>Sign Documents | Sparkling Standard</title>
+    <style is:inline set:html={DOCUMENT_BRAND_CSS}></style>
   </head>
-  <body class="employee-body">
-    <main class="employee-shell">
-      <header class="employee-brand">
+  <body class="signing-body">
+    <main class="signing-shell">
+      <header class="signing-brand">
         <img src="/brand/icon-192.png" alt="" width="40" height="40" />
         <div>
-          <p class="employee-brand__name">Sparkling Standard</p>
-          <p class="employee-brand__sub">Secure documents</p>
+          <p class="signing-brand__name">Sparkling Standard</p>
+          <p class="signing-brand__sub">Secure documents and electronic signature</p>
         </div>
       </header>
 
-      <section class="employee-card" data-document-sign>
-        <p class="employee-muted" data-document-status>Loading your secure document set…</p>
+      <section data-document-sign>
+        <p class="signing-status" data-document-status role="status" aria-live="polite">
+          Loading your secure document set…
+        </p>
         <div data-document-content hidden></div>
       </section>
+
+      <dialog class="signing-dialog" data-document-dialog aria-labelledby="signing-dialog-title">
+        <div class="signing-dialog__head">
+          <h2 id="signing-dialog-title" data-document-dialog-title>Document</h2>
+          <button class="signing-btn signing-btn--ghost" type="button" data-document-dialog-close>
+            Close
+          </button>
+        </div>
+        <div class="signing-dialog__body" data-document-dialog-body></div>
+      </dialog>
+
+      <dialog
+        class="signing-dialog signing-signature-dialog"
+        data-signature-dialog
+        aria-labelledby="signature-dialog-title"
+      >
+        <div class="signing-dialog__head">
+          <h2 id="signature-dialog-title">X — Adopt your signature</h2>
+          <button class="signing-btn signing-btn--ghost" type="button" data-modal-cancel>
+            Cancel
+          </button>
+        </div>
+        <div class="signing-dialog__body" data-signature-dialog-body></div>
+      </dialog>
     </main>
     <script>
       import '../scripts/document-sign';

@@ -6,12 +6,66 @@
  * environment values. No credential is ever returned to a browser or logged.
  */
 import { zonedTimeToUtc } from './time.ts';
+import { BRANCH_PENSACOLA, BRANCH_TAMPA, branchConfig } from '../../config/branches.ts';
 
 export interface GoogleCalendarEnv {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REFRESH_TOKEN?: string;
+  /** Legacy/default calendar. Retained for Pensacola compatibility. */
   GOOGLE_CALENDAR_ID?: string;
+  GOOGLE_CALENDAR_ID_PENSACOLA?: string;
+  GOOGLE_CALENDAR_ID_TAMPA?: string;
+}
+
+/**
+ * Returns the calendar id for one branch without ever borrowing another
+ * branch's calendar. Tampa must have its own id; a missing Tampa id is a
+ * configuration failure, not permission to write into Pensacola.
+ */
+export function calendarIdForBranch(
+  env: GoogleCalendarEnv,
+  branchId: string | null | undefined,
+): string {
+  if (branchId === BRANCH_TAMPA) return env.GOOGLE_CALENDAR_ID_TAMPA?.trim() ?? '';
+  if (branchId === BRANCH_PENSACOLA) {
+    return env.GOOGLE_CALENDAR_ID_PENSACOLA?.trim() || env.GOOGLE_CALENDAR_ID?.trim() || '';
+  }
+  return env.GOOGLE_CALENDAR_ID?.trim() ?? '';
+}
+
+/** Returns an env bound to the branch calendar, or null when that branch is not configured. */
+export function calendarEnvForBranch(
+  env: GoogleCalendarEnv,
+  branchId: string | null | undefined,
+): GoogleCalendarEnv | null {
+  const id = calendarIdForBranch(env, branchId);
+  return id ? { ...env, GOOGLE_CALENDAR_ID: id } : null;
+}
+
+/** Uses the owner-saved branch calendar id when present, then the branch env value. */
+export async function calendarEnvForBranchWithDb(
+  env: GoogleCalendarEnv,
+  db: { prepare(query: string): { bind(...values: unknown[]): { first<T>(): Promise<T | null> } } } | null | undefined,
+  branchId: string | null | undefined,
+): Promise<GoogleCalendarEnv | null> {
+  if (db && (branchId === BRANCH_PENSACOLA || branchId === BRANCH_TAMPA)) {
+    try {
+      const row = await db
+        .prepare('SELECT calendar_id FROM branches WHERE id = ? LIMIT 1')
+        .bind(branchId)
+        .first<{ calendar_id?: string | null }>();
+      const stored = row?.calendar_id?.trim() ?? '';
+      if (stored) return { ...env, GOOGLE_CALENDAR_ID: stored };
+    } catch {
+      // The migration may not be applied yet; fall back to the env value.
+    }
+  }
+  return calendarEnvForBranch(env, branchId);
+}
+
+export function calendarTimeZoneForBranch(branchId: string | null | undefined): string {
+  return branchConfig(branchId)?.timezone ?? branchConfig(BRANCH_PENSACOLA)?.timezone ?? 'America/Chicago';
 }
 
 export interface GoogleCalendarEvent {

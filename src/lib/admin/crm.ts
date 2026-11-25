@@ -3,6 +3,7 @@ import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database, D1PreparedStatement } from './d1.ts';
 import { hasPropertyInput, normalizePropertyInput, type NormalizedProperty } from './property-profile.ts';
 import { defaultActiveBranch } from './branches.ts';
+import { resolveServiceBranchStrict } from '../branches/registry.ts';
 import { buildLeadNotification } from '../forms/lead-notification.ts';
 
 function now(): string {
@@ -38,15 +39,55 @@ function customerBranch(actor: AdminActor, requested: unknown): string | null {
   return text(requested, 80) || null;
 }
 
+export interface CustomerListInput {
+  q?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+  sort?: string;
+}
+
+const CUSTOMER_SORTS: Record<string, string> = {
+  created_at: 'c.created_at DESC, c.id ASC',
+  name: 'c.last_name ASC, c.first_name ASC, c.id ASC',
+  status: 'c.status ASC, c.created_at DESC, c.id ASC',
+};
+
+function customerFilters(actor: AdminActor, input: CustomerListInput): { sql: string; bind: unknown[] } {
+  const q = text(input.q, 120);
+  const requested = input.status ?? '';
+  const deleted = requested === 'deleted';
+  const status = deleted ? 'archived' : ['active', 'archived'].includes(requested) ? requested : '';
+  const branch = scope(actor, 'c.primary_branch_id');
+  return {
+    sql: `WHERE c.source <> 'financial_system'
+         AND (? = '' OR c.status = ?)
+         ${deleted
+           ? "AND c.first_name = 'Deleted' AND c.last_name = 'Customer'"
+           : status === 'archived'
+             ? "AND NOT (c.first_name = 'Deleted' AND c.last_name = 'Customer')"
+             : ''}
+         AND (? = '' OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company_name LIKE ?
+              OR EXISTS (SELECT 1 FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.normalized_value LIKE ?))
+         ${branch.sql}`,
+    bind: [status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q.toLowerCase()}%`, ...branch.bind],
+  };
+}
+
+export function customerPageBounds(input: CustomerListInput): { limit: number; offset: number; sort: string } {
+  const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 200);
+  const offset = Math.max(Number(input.offset) || 0, 0);
+  const sort = CUSTOMER_SORTS[input.sort ?? ''] ? String(input.sort) : 'created_at';
+  return { limit, offset, sort };
+}
+
 export async function listCustomers(
   db: D1Database,
   actor: AdminActor,
-  input: { q?: string; status?: string; limit?: number },
+  input: CustomerListInput,
 ): Promise<Array<Record<string, unknown>>> {
-  const q = text(input.q, 120);
-  const status = ['active', 'archived'].includes(input.status ?? '') ? input.status : '';
-  const bounded = Math.min(Math.max(Number(input.limit) || 50, 1), 200);
-  const branch = scope(actor, 'c.primary_branch_id');
+  const bounds = customerPageBounds(input);
+  const filter = customerFilters(actor, input);
   const result = await db
     .prepare(
       `SELECT c.id, c.first_name, c.last_name, c.company_name, c.status, c.source,
@@ -56,26 +97,206 @@ export async function listCustomers(
               (SELECT value FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.kind = 'phone' ORDER BY cc.is_primary DESC LIMIT 1) AS phone,
               (SELECT COUNT(*) FROM properties p WHERE p.customer_id = c.id AND p.status = 'active') AS property_count
        FROM customers c LEFT JOIN branches b ON b.id = c.primary_branch_id
-       WHERE c.source <> 'financial_system'
-         AND (? = '' OR c.status = ?)
-         AND (? = '' OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company_name LIKE ?
-              OR EXISTS (SELECT 1 FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.normalized_value LIKE ?))
-         ${branch.sql}
-       ORDER BY c.created_at DESC LIMIT ?`,
+       ${filter.sql}
+       ORDER BY ${CUSTOMER_SORTS[bounds.sort]} LIMIT ? OFFSET ?`,
     )
-    .bind(
-      status,
-      status,
-      q,
-      `%${q}%`,
-      `%${q}%`,
-      `%${q}%`,
-      `%${q.toLowerCase()}%`,
-      ...branch.bind,
-      bounded,
-    )
+    .bind(...filter.bind, bounds.limit, bounds.offset)
     .all();
   return result.results ?? [];
+}
+
+export async function countCustomers(
+  db: D1Database,
+  actor: AdminActor,
+  input: CustomerListInput,
+): Promise<number> {
+  const filter = customerFilters(actor, input);
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS count FROM customers c ${filter.sql}`)
+    .bind(...filter.bind)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+export interface CustomerTimelineEvent {
+  at: string;
+  kind: string;
+  title: string;
+  detail: string;
+  entityType: string;
+  entityId: string;
+  appointmentId?: string;
+  invoiceId?: string;
+  requestId?: string;
+  leadId?: string;
+}
+
+function human(value: unknown): string {
+  const raw = String(value ?? '').replaceAll('_', ' ').trim();
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
+}
+
+function customerMoney(value: unknown): string {
+  const cents = Number(value);
+  return Number.isFinite(cents) ? `$${(cents / 100).toFixed(2)}` : '$0.00';
+}
+
+function buildCustomerTimeline(input: {
+  leads: Array<Record<string, unknown>>;
+  estimates: Array<Record<string, unknown>>;
+  appointments: Array<Record<string, unknown>>;
+  invoices: Array<Record<string, unknown>>;
+  payments: Array<Record<string, unknown>>;
+  signingRequests: Array<Record<string, unknown>>;
+  reviewRequests: Array<Record<string, unknown>>;
+  communications: Array<Record<string, unknown>>;
+  jobMedia: Array<Record<string, unknown>>;
+  notes: Array<Record<string, unknown>>;
+  tipAllocations: Array<Record<string, unknown>>;
+}): CustomerTimelineEvent[] {
+  const events: CustomerTimelineEvent[] = [];
+  const add = (
+    at: unknown,
+    kind: string,
+    title: string,
+    detail: string,
+    links: Partial<CustomerTimelineEvent> = {},
+  ): void => {
+    const value = String(at ?? '').trim();
+    if (!value) return;
+    events.push({
+      at: value,
+      kind,
+      title,
+      detail,
+      entityType: links.entityType ?? '',
+      entityId: links.entityId ?? '',
+      ...links,
+    });
+  };
+  for (const row of input.leads) {
+    add(row.created_at, 'inquiry', 'Inquiry received', `${human(row.request_type)} · ${human(row.status)}`, {
+      entityType: 'lead',
+      entityId: String(row.id ?? ''),
+      leadId: String(row.id ?? ''),
+    });
+  }
+  for (const row of input.estimates) {
+    add(row.created_at, 'estimate', `Estimate ${String(row.quote_reference ?? '')}`.trim(), `${customerMoney(row.total_cents)} · ${human(row.status)}`, {
+      entityType: 'estimate',
+      entityId: String(row.id ?? ''),
+    });
+  }
+  for (const row of input.appointments) {
+    add(row.start_at, 'job', `Service ${human(row.status)}`, `Job ${String(row.reference ?? '')}`, {
+      entityType: 'appointment',
+      entityId: String(row.id ?? ''),
+      appointmentId: String(row.id ?? ''),
+    });
+    const updated = String(row.updated_at ?? '');
+    const started = String(row.start_at ?? '');
+    if (updated && updated !== started && ['completed', 'cancelled', 'no_show'].includes(String(row.status))) {
+      add(updated, 'job', `Service ${human(row.status)}`, `Job ${String(row.reference ?? '')}`, {
+        entityType: 'appointment',
+        entityId: String(row.id ?? ''),
+        appointmentId: String(row.id ?? ''),
+      });
+    }
+  }
+  for (const row of input.invoices) {
+    add(
+      row.created_at,
+      'invoice',
+      `${row.invoice_role === 'supplemental' ? 'Supplemental invoice' : 'Invoice'} ${String(row.number ?? '')}`.trim(),
+      `${customerMoney(row.total_cents)} · ${human(row.status)}`,
+      {
+        entityType: 'invoice',
+        entityId: String(row.id ?? ''),
+        invoiceId: String(row.id ?? ''),
+        ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+      },
+    );
+  }
+  for (const row of input.payments) {
+    const tip = Number(row.tip_cents ?? 0);
+    add(
+      row.received_at || row.created_at,
+      'payment',
+      `Payment ${human(row.status)}`,
+      `${customerMoney(row.amount_cents)}${tip > 0 ? ` including ${customerMoney(tip)} gratuity` : ''} via ${human(row.provider)}`,
+      {
+        entityType: 'payment',
+        entityId: String(row.id ?? ''),
+        ...(row.invoice_id ? { invoiceId: String(row.invoice_id) } : {}),
+        ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+      },
+    );
+  }
+  for (const row of input.signingRequests) {
+    const label = String(row.packet_name || row.bundle_code || 'Agreement');
+    if (row.executed_at) {
+      add(row.executed_at, 'agreement', 'Agreement executed', label, {
+        entityType: 'signing_request',
+        entityId: String(row.id ?? ''),
+        requestId: String(row.id ?? ''),
+        ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+      });
+    }
+    add(row.created_at, 'agreement', 'Agreement request created', `${label} · ${human(row.status)}`, {
+      entityType: 'signing_request',
+      entityId: String(row.id ?? ''),
+      requestId: String(row.id ?? ''),
+      ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+    });
+  }
+  for (const row of input.reviewRequests) {
+    add(
+      row.sent_at || row.created_at,
+      'review',
+      `Review invitation ${human(row.status)}`,
+      String(row.suppressed_reason || row.channel || ''),
+      { entityType: 'review_request', entityId: String(row.id ?? '') },
+    );
+  }
+  for (const row of input.communications) {
+    add(
+      row.created_at,
+      'communication',
+      `${human(row.channel)} ${human(row.direction)}`,
+      `${human(row.status)}${row.subject ? ` · ${String(row.subject)}` : row.template ? ` · ${String(row.template)}` : ''}`,
+      { entityType: 'communication', entityId: String(row.id ?? '') },
+    );
+  }
+  for (const row of input.jobMedia) {
+    add(row.created_at, 'photo', 'Photo added', human(row.kind), {
+      entityType: 'job_media',
+      entityId: String(row.id ?? ''),
+      ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+    });
+  }
+  for (const row of input.notes) {
+    add(row.created_at, 'note', 'Internal note', String(row.body ?? '').slice(0, 180), {
+      entityType: 'customer_note',
+      entityId: String(row.id ?? ''),
+    });
+  }
+  for (const row of input.tipAllocations) {
+    add(
+      row.created_at,
+      'tip',
+      'Gratuity allocation',
+      `${String(row.team_member_name || 'Unassigned')} · ${customerMoney(row.amount_cents)} · ${human(row.status)}`,
+      {
+        entityType: 'tip_allocation',
+        entityId: String(row.id ?? ''),
+        ...(row.invoice_id ? { invoiceId: String(row.invoice_id) } : {}),
+        ...(row.appointment_id ? { appointmentId: String(row.appointment_id) } : {}),
+      },
+    );
+  }
+  return events
+    .sort((left, right) => right.at.localeCompare(left.at))
+    .slice(0, 150);
 }
 
 export async function getCustomer(
@@ -95,7 +316,7 @@ export async function getCustomer(
   if (!customer) return null;
   const canSeeNotes = actor.role === 'owner' || actor.role === 'manager';
   const canSeeFinance = actor.role === 'owner' || actor.permissions.includes('finance.read');
-  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations] = await Promise.all([
+  const [contacts, properties, notes, leads, estimates, appointments, recurring, invoices, paymentAuthorizations, signingRequests, gifts, quickEstimates, reviewState, payments, communications, reviewRequests, jobMedia, tipAllocations] = await Promise.all([
     db.prepare('SELECT * FROM customer_contacts WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     db.prepare('SELECT * FROM properties WHERE customer_id = ? ORDER BY is_primary DESC, created_at').bind(customerId).all(),
     canSeeNotes
@@ -103,9 +324,21 @@ export async function getCustomer(
       : Promise.resolve({ success: true, results: [] }),
     db.prepare('SELECT id, request_type, status, quote_reference, delivery_status, created_at FROM leads WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50').bind(customerId).all(),
     db.prepare('SELECT id, quote_reference, status, total_cents, created_at FROM estimates WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50').bind(customerId).all(),
-    db.prepare('SELECT id, reference, status, start_at, end_at FROM appointments WHERE customer_id = ? ORDER BY start_at DESC LIMIT 50').bind(customerId).all(),
+    db.prepare(
+      `SELECT id, reference, status, start_at, end_at, property_id, created_at, updated_at
+       FROM appointments WHERE customer_id = ? ORDER BY start_at DESC LIMIT 50`,
+    ).bind(customerId).all(),
     db.prepare('SELECT id, frequency, status, ongoing_price_cents, next_visit_date FROM recurring_plans WHERE customer_id = ? ORDER BY created_at DESC').bind(customerId).all(),
-    db.prepare('SELECT id, number, status, total_cents, balance_cents, due_date FROM invoices WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50').bind(customerId).all(),
+    db.prepare(
+      `SELECT id, number, status, total_cents, balance_cents, due_date, appointment_id,
+              invoice_role, related_invoice_id, created_at
+       FROM invoices WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId).all().catch(() =>
+      db.prepare(
+        `SELECT id, number, status, total_cents, balance_cents, due_date, appointment_id, created_at
+         FROM invoices WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+      ).bind(customerId).all(),
+    ),
     canSeeFinance
       ? db.prepare(
           `SELECT pa.id, pa.service_code, pa.amount_cents, pa.max_amount_cents, pa.charge_after_service,
@@ -114,20 +347,107 @@ export async function getCustomer(
            WHERE pa.customer_id = ? ORDER BY pa.created_at DESC LIMIT 25`,
         ).bind(customerId).all()
       : Promise.resolve({ success: true, results: [] }),
+    db.prepare(
+      `SELECT id, packet_name, bundle_code, status, booking_reference, appointment_id,
+              signer_email, executed_at, created_at
+       FROM signing_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId).all().catch(() =>
+      db.prepare(
+        `SELECT id, bundle_code, status, booking_reference, appointment_id,
+                signer_email, executed_at, created_at
+         FROM signing_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+      ).bind(customerId).all(),
+    ),
+    db.prepare(
+      `SELECT id, code, status, value_cents, balance_cents, valid_from_date, activates_at, created_at,
+              CASE WHEN purchaser_customer_id = ? THEN 'purchased' ELSE 'received' END AS role
+       FROM gift_certificates WHERE purchaser_customer_id = ? OR recipient_customer_id = ?
+       ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId, customerId, customerId).all(),
+    db.prepare(
+      `SELECT id, status, engine, service_code, total_cents, ongoing_cents, address_text,
+              converted_request_id, created_at, updated_at
+       FROM quick_estimates WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
+    db.prepare('SELECT * FROM customer_review_state WHERE customer_id = ? LIMIT 1')
+      .bind(customerId).first().catch(() => null),
+    canSeeFinance
+      ? db.prepare(
+          `SELECT id, invoice_id, appointment_id, provider, status, amount_cents,
+                  service_cents, tip_cents, tip_refunded_cents, received_at, created_at
+           FROM payments WHERE customer_id = ? ORDER BY COALESCE(received_at, created_at) DESC LIMIT 100`,
+        ).bind(customerId).all().catch(() =>
+          db.prepare(
+            `SELECT id, invoice_id, appointment_id, provider, status, amount_cents, received_at, created_at
+             FROM payments WHERE customer_id = ? ORDER BY COALESCE(received_at, created_at) DESC LIMIT 100`,
+          ).bind(customerId).all(),
+        )
+      : Promise.resolve({ success: true, results: [] }),
+    db.prepare(
+      `SELECT id, appointment_id, channel, direction, template, status, subject, created_at
+       FROM communications WHERE customer_id = ? ORDER BY created_at DESC LIMIT 100`,
+    ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
+    db.prepare(
+      `SELECT id, status, channel, created_at, sent_at, suppressed_reason
+       FROM review_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+    ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
+    db.prepare(
+      `SELECT jm.id, jm.appointment_id, jm.kind, jm.content_type, jm.created_at
+       FROM job_media jm
+       WHERE jm.appointment_id IN (SELECT id FROM appointments WHERE customer_id = ?)
+       ORDER BY jm.created_at DESC LIMIT 100`,
+    ).bind(customerId).all().catch(() => ({ success: true, results: [] })),
+    canSeeFinance
+      ? db.prepare(
+          `SELECT ta.id, ta.payment_id, ta.invoice_id, ta.appointment_id, ta.team_member_id,
+                  ta.amount_cents, ta.refunded_cents, ta.status, ta.created_at,
+                  tm.display_name AS team_member_name
+           FROM tip_allocations ta LEFT JOIN team_members tm ON tm.id = ta.team_member_id
+           WHERE ta.customer_id = ? ORDER BY ta.created_at DESC LIMIT 100`,
+        ).bind(customerId).all().catch(() => ({ success: true, results: [] }))
+      : Promise.resolve({ success: true, results: [] }),
   ]);
+  const paymentRows = payments.results ?? [];
+  const communicationRows = communications.results ?? [];
+  const reviewRequestRows = reviewRequests.results ?? [];
+  const jobMediaRows = jobMedia.results ?? [];
+  const noteRows = notes.results ?? [];
+  const tipAllocationRows = tipAllocations.results ?? [];
   return {
     customer,
     contacts: contacts.results ?? [],
     properties: (properties.results ?? []).map((property) =>
       canSeeNotes ? property : { ...property, internal_notes: '' },
     ),
-    notes: notes.results ?? [],
+    notes: noteRows,
     leads: leads.results ?? [],
     estimates: estimates.results ?? [],
     appointments: appointments.results ?? [],
     recurringPlans: recurring.results ?? [],
     invoices: invoices.results ?? [],
     paymentAuthorizations: paymentAuthorizations.results ?? [],
+    signingRequests: signingRequests.results ?? [],
+    gifts: gifts.results ?? [],
+    quickEstimates: quickEstimates.results ?? [],
+    reviewState,
+    payments: paymentRows,
+    communications: communicationRows,
+    reviewRequests: reviewRequestRows,
+    jobMedia: jobMediaRows,
+    tipAllocations: tipAllocationRows,
+    timeline: buildCustomerTimeline({
+      leads: leads.results ?? [],
+      estimates: estimates.results ?? [],
+      appointments: appointments.results ?? [],
+      invoices: invoices.results ?? [],
+      payments: paymentRows,
+      signingRequests: signingRequests.results ?? [],
+      reviewRequests: reviewRequestRows,
+      communications: communicationRows,
+      jobMedia: jobMediaRows,
+      notes: noteRows,
+      tipAllocations: tipAllocationRows,
+    }),
   };
 }
 
@@ -137,9 +457,17 @@ export async function createCustomer(
   input: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const id = `cust_${crypto.randomUUID()}`;
+  let requestedBranch = customerBranch(actor, input.branchId);
+  if (!requestedBranch && actor.role === 'owner') {
+    const resolved = await resolveServiceBranchStrict(db, {
+      zip: text(input.postalCode, 10),
+      state: text(input.state, 2),
+    }).catch(() => null);
+    requestedBranch = resolved?.branch?.id ?? null;
+  }
   const branchId = await assertBranch(
     db,
-    customerBranch(actor, input.branchId) ?? (await defaultActiveBranch(db)),
+    requestedBranch ?? (await defaultActiveBranch(db)),
   );
   const first = text(input.firstName, 80);
   const last = text(input.lastName, 80);
@@ -249,7 +577,7 @@ export async function updateCustomer(
 }
 
 const PROPERTY_COLUMNS =
-  'label, line1, line2, city, state, postal_code, access_notes, parking_notes, property_type, square_feet, bedrooms, full_baths, half_baths, stories, beds, pets, internal_notes, is_primary';
+  'label, line1, line2, city, state, postal_code, latitude, longitude, precision, access_notes, parking_notes, property_type, square_feet, bedrooms, full_baths, half_baths, stories, beds, pets, internal_notes, is_primary';
 
 function propertyBindValues(property: NormalizedProperty): unknown[] {
   return [
@@ -259,6 +587,9 @@ function propertyBindValues(property: NormalizedProperty): unknown[] {
     property.city,
     property.state,
     property.postalCode,
+    property.latitude,
+    property.longitude,
+    property.precision,
     property.accessNotes,
     property.parkingNotes,
     property.propertyType,
@@ -281,7 +612,7 @@ function propertyInsertStatement(
   return db
     .prepare(
       `INSERT INTO properties (id, customer_id, branch_id, ${PROPERTY_COLUMNS})
-       VALUES (?, ?, ?, ${new Array(18).fill('?').join(', ')})`,
+       VALUES (?, ?, ?, ${new Array(PROPERTY_COLUMNS.split(',').length).fill('?').join(', ')})`,
     )
     .bind(input.id, input.customerId, input.branchId, ...propertyBindValues(input.property));
 }
@@ -293,9 +624,9 @@ function propertyUpdateStatement(
   return db
     .prepare(
       `UPDATE properties SET label = ?, line1 = ?, line2 = ?, city = ?, state = ?, postal_code = ?,
-         access_notes = ?, parking_notes = ?, property_type = ?, square_feet = ?, bedrooms = ?,
-         full_baths = ?, half_baths = ?, stories = ?, beds = ?, pets = ?, internal_notes = ?,
-         is_primary = ?, status = ?, updated_at = ?
+         latitude = ?, longitude = ?, precision = ?, access_notes = ?, parking_notes = ?, property_type = ?,
+         square_feet = ?, bedrooms = ?, full_baths = ?, half_baths = ?, stories = ?, beds = ?, pets = ?,
+         internal_notes = ?, is_primary = ?, status = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(...propertyBindValues(input.property), input.status, now(), input.id);
@@ -351,14 +682,39 @@ export async function updateProperty(
 ): Promise<void> {
   const property = await db
     .prepare(
-      `SELECT p.id, p.customer_id, p.status FROM properties p
+      `SELECT p.id, p.customer_id, p.status, p.line1, p.city, p.state, p.postal_code,
+              p.latitude, p.longitude, p.precision
+       FROM properties p
        JOIN customers c ON c.id = p.customer_id
        WHERE p.id = ? ${scope(actor, 'c.primary_branch_id').sql} LIMIT 1`,
     )
     .bind(propertyId, ...scope(actor, 'c.primary_branch_id').bind)
-    .first<{ id: string; customer_id: string; status: string }>();
+    .first<{
+      id: string;
+      customer_id: string;
+      status: string;
+      line1: string;
+      city: string;
+      state: string;
+      postal_code: string;
+      latitude: number | null;
+      longitude: number | null;
+      precision: string;
+    }>();
   if (!property) throw new AdminAuthError(404, 'property_not_found');
   const normalized = normalizePropertyInput(input);
+  const addressChanged =
+    normalized.line1 !== property.line1 ||
+    normalized.city !== property.city ||
+    normalized.state !== property.state ||
+    normalized.postalCode !== property.postal_code;
+  if (input.latitude === undefined && input.longitude === undefined && !addressChanged) {
+    normalized.latitude = property.latitude;
+    normalized.longitude = property.longitude;
+    normalized.precision = ['exact', 'street', 'approximate', 'zip'].includes(property.precision)
+      ? (property.precision as 'exact' | 'street' | 'approximate' | 'zip')
+      : 'exact';
+  }
   const status =
     input.status === 'archived' ? 'archived' : input.status === 'active' ? 'active' : property.status;
   const statements: D1PreparedStatement[] = [];
@@ -388,14 +744,52 @@ export async function addCustomerNote(
   await audit(db, { actorUserId: actor.id, action: 'customer.note_added', entityType: 'customer', entityId: customerId });
 }
 
-export async function listLeads(
-  db: D1Database,
-  actor: AdminActor,
-  input: { status?: string; q?: string; limit?: number },
-): Promise<Array<Record<string, unknown>>> {
+export interface LeadListInput {
+  status?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+  sort?: string;
+}
+
+const LEAD_SORTS: Record<string, string> = {
+  created_at: 'l.created_at DESC, l.id ASC',
+  status: 'l.status ASC, l.created_at DESC, l.id ASC',
+  request_type: 'l.request_type ASC, l.created_at DESC, l.id ASC',
+};
+
+function leadFilters(actor: AdminActor, input: LeadListInput): { sql: string; bind: unknown[] } {
   const status = text(input.status, 30);
   const q = text(input.q, 120);
   const branch = scope(actor, 'l.branch_id');
+  const statusSql =
+    status === 'active'
+      ? "l.status NOT IN ('archived','lost','converted')"
+      : "(? = '' OR l.status = ?)";
+  const statusBind: unknown[] = status === 'active' ? [] : [status, status];
+  return {
+    sql: `WHERE ${statusSql}
+         AND (? = '' OR l.quote_reference LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?
+              OR p.line1 LIKE ? OR l.payload_json LIKE ?)
+         ${branch.sql}`,
+    bind: [...statusBind, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind],
+  };
+}
+
+export function leadPageBounds(input: LeadListInput): { limit: number; offset: number; sort: string } {
+  const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 200);
+  const offset = Math.max(Number(input.offset) || 0, 0);
+  const sort = LEAD_SORTS[input.sort ?? ''] ? String(input.sort) : 'created_at';
+  return { limit, offset, sort };
+}
+
+export async function listLeads(
+  db: D1Database,
+  actor: AdminActor,
+  input: LeadListInput,
+): Promise<Array<Record<string, unknown>>> {
+  const bounds = leadPageBounds(input);
+  const filter = leadFilters(actor, input);
   const result = await db
     .prepare(
       `SELECT l.id, l.request_type, l.status, l.source, l.quote_reference, l.delivery_status,
@@ -405,15 +799,30 @@ export async function listLeads(
               p.line1, p.city, p.state, p.postal_code
        FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
        LEFT JOIN properties p ON p.id = l.property_id
-       WHERE (? = '' OR l.status = ?)
-         AND (? = '' OR l.quote_reference LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?
-              OR p.line1 LIKE ? OR l.payload_json LIKE ?)
-         ${branch.sql}
-       ORDER BY l.created_at DESC LIMIT ?`,
+       ${filter.sql}
+       ORDER BY ${LEAD_SORTS[bounds.sort]} LIMIT ? OFFSET ?`,
     )
-    .bind(status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind, Math.min(Math.max(Number(input.limit) || 100, 1), 300))
+    .bind(...filter.bind, bounds.limit, bounds.offset)
     .all();
   return result.results ?? [];
+}
+
+export async function countLeads(
+  db: D1Database,
+  actor: AdminActor,
+  input: LeadListInput,
+): Promise<number> {
+  const filter = leadFilters(actor, input);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM leads l
+       LEFT JOIN customers c ON c.id = l.customer_id
+       LEFT JOIN properties p ON p.id = l.property_id
+       ${filter.sql}`,
+    )
+    .bind(...filter.bind)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
 }
 
 export async function updateLead(
@@ -437,6 +846,84 @@ export async function updateLead(
     await addCustomerNote(db, actor, row.customer_id, text(input.note, 2000));
   }
   await audit(db, { actorUserId: actor.id, action: 'lead.updated', entityType: 'lead', entityId: leadId, detail: status });
+}
+
+export async function leadArchiveEligibility(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+  operation: 'archive' | 'restore' | 'delete',
+): Promise<{ ok: boolean; error?: string; row?: Record<string, unknown> }> {
+  const row = await db
+    .prepare(
+      `SELECT l.id, l.request_type, l.status, l.customer_id, l.quote_reference
+       FROM leads l WHERE l.id = ? ${scope(actor, 'l.branch_id').sql} LIMIT 1`,
+    )
+    .bind(leadId, ...scope(actor, 'l.branch_id').bind)
+    .first<Record<string, unknown>>();
+  if (!row) return { ok: false, error: 'lead_not_found' };
+  if (operation === 'restore') {
+    return String(row.status) === 'archived' ? { ok: true, row } : { ok: false, error: 'lead_not_archived', row };
+  }
+  if (operation === 'archive') {
+    return String(row.status) === 'archived' ? { ok: true, row } : { ok: true, row };
+  }
+  if (actor.role !== 'owner') return { ok: false, error: 'owner_required', row };
+  if (row.customer_id) return { ok: false, error: 'linked_customer_history_retained', row };
+  if (String(row.request_type) === 'reservation_request') {
+    return { ok: false, error: 'reservation_history_retained', row };
+  }
+  if (String(row.quote_reference ?? '').trim()) {
+    return { ok: false, error: 'quoted_inquiry_history_retained', row };
+  }
+  return { ok: true, row };
+}
+
+export async function archiveLead(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+): Promise<void> {
+  const result = await leadArchiveEligibility(db, actor, leadId, 'archive');
+  if (!result.ok) throw new AdminAuthError(404, result.error ?? 'lead_not_found');
+  if (String(result.row?.status) !== 'archived') {
+    await db
+      .prepare("UPDATE leads SET status = 'archived', updated_at = ? WHERE id = ?")
+      .bind(now(), leadId)
+      .run();
+  }
+  await audit(db, { actorUserId: actor.id, action: 'lead.archived', entityType: 'lead', entityId: leadId });
+}
+
+export async function restoreLead(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+): Promise<void> {
+  const result = await leadArchiveEligibility(db, actor, leadId, 'restore');
+  if (!result.ok) throw new AdminAuthError(409, result.error ?? 'lead_not_archived');
+  await db
+    .prepare("UPDATE leads SET status = 'new', updated_at = ? WHERE id = ?")
+    .bind(now(), leadId)
+    .run();
+  await audit(db, { actorUserId: actor.id, action: 'lead.restored', entityType: 'lead', entityId: leadId });
+}
+
+export async function deleteDisposableLead(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+): Promise<void> {
+  const result = await leadArchiveEligibility(db, actor, leadId, 'delete');
+  if (!result.ok) throw new AdminAuthError(result.error === 'owner_required' ? 403 : 409, result.error ?? 'lead_not_deletable');
+  await db.prepare('DELETE FROM leads WHERE id = ?').bind(leadId).run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'lead.disposable_deleted',
+    entityType: 'lead',
+    entityId: leadId,
+    detail: 'No customer, reservation or quote history was linked.',
+  });
 }
 
 export async function retryLeadNotification(
@@ -533,6 +1020,25 @@ export async function deleteCustomer(
   const current = await getCustomer(db, actor, customerId);
   if (!current) return { mode: 'deleted' };
   const stamp = now();
+  const legalHold = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM legal_holds
+       WHERE status = 'active'
+         AND (
+           (subject_type = 'customer' AND subject_id = ?)
+           OR (subject_type = 'booking_request' AND subject_id IN
+               (SELECT id FROM booking_requests WHERE customer_id = ?))
+           OR (subject_type = 'appointment' AND subject_id IN
+               (SELECT id FROM appointments WHERE customer_id = ?))
+           OR (subject_type = 'invoice' AND subject_id IN
+               (SELECT id FROM invoices WHERE customer_id = ?))
+         )`,
+    )
+    .bind(customerId, customerId, customerId, customerId)
+    .first<{ n: number }>();
+  if (Number(legalHold?.n ?? 0) > 0) {
+    throw new AdminAuthError(409, 'legal_hold_active');
+  }
   const blockers = await Promise.all([
     count(db, "SELECT COUNT(*) AS n FROM appointments WHERE customer_id = ? AND status IN ('pending','confirmed','in_progress')", customerId),
     count(db, "SELECT COUNT(*) AS n FROM booking_requests WHERE customer_id = ? AND status IN ('pending','confirmed') AND archived_at IS NULL AND closed_at IS NULL", customerId),
@@ -566,9 +1072,13 @@ export async function deleteCustomer(
     db.prepare("UPDATE signing_requests SET signer_email = '', updated_at = ? WHERE customer_id = ?").bind(stamp, customerId),
     db
       .prepare(
-        `UPDATE document_signatures SET signer_name = 'Redacted', signer_email = ''
+        `UPDATE document_signatures SET signer_name = 'Redacted', signer_email = '',
+           signed_content_text = ''
          WHERE signing_request_id IN (SELECT id FROM signing_requests WHERE customer_id = ?)`,
       )
+      .bind(customerId),
+    db
+      .prepare("UPDATE agreements SET signed_content_text = '' WHERE customer_id = ?")
       .bind(customerId),
     db
       .prepare(
@@ -578,6 +1088,16 @@ export async function deleteCustomer(
       )
       .bind(customerId, customerId),
   ];
+  const portalTable = await db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'customer_portal_requests' LIMIT 1")
+    .first<{ name: string }>();
+  if (portalTable) {
+    scrubStatements.push(
+      db.prepare("UPDATE customer_portal_requests SET message = '[redacted]' WHERE customer_id = ?").bind(customerId),
+      db.prepare('DELETE FROM customer_portal_sessions WHERE customer_id = ?').bind(customerId),
+      db.prepare('DELETE FROM customer_portal_tokens WHERE customer_id = ?').bind(customerId),
+    );
+  }
   if (db.batch) await db.batch(scrubStatements);
   else for (const statement of scrubStatements) await statement.run();
   const hasHistory = history.some((value) => value > 0);

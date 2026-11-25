@@ -219,19 +219,21 @@ async function evaluateResource(
     }
   }
 
-  if (previousJob && !previousJob.location) {
-    return { resourceId: resource.id, feasible: false, busyMinutes, reason: 'travel_unavailable' };
+  // A cleaner is ready at the start of their configured workday. Public slots
+  // must not be delayed by travel from a home/origin before the first job.
+  // Travel and buffers apply only when a real previous appointment must be
+  // finished first.
+  let earliestStart = dayStart;
+  if (previousJob) {
+    if (!previousJob.location) {
+      return { resourceId: resource.id, feasible: false, busyMinutes, reason: 'travel_unavailable' };
+    }
+    const fromTravel = await travel(previousJob.location, request.destination);
+    if (fromTravel === null) {
+      return { resourceId: resource.id, feasible: false, busyMinutes, reason: 'travel_unavailable' };
+    }
+    earliestStart = addMinutes(previousJob.end, bufferMinutes + fromTravel);
   }
-  const from = previousJob?.location ?? resource.origin;
-  const fromTravel = await travel(from, request.destination);
-  if (fromTravel === null) {
-    return { resourceId: resource.id, feasible: false, busyMinutes, reason: 'travel_unavailable' };
-  }
-  // The first job starts at the workday start plus actual mobilization travel;
-  // between-job buffers apply only after an existing appointment.
-  const earliestStart = previousJob
-    ? addMinutes(previousJob.end, bufferMinutes + fromTravel)
-    : addMinutes(dayStart, fromTravel);
   if (candidateStart < earliestStart) {
     return { resourceId: resource.id, feasible: false, busyMinutes, reason: 'blocked' };
   }

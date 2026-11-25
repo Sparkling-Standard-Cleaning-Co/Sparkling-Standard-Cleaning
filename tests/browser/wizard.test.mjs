@@ -133,7 +133,7 @@ async function fillStepOne(page, zip = '32503') {
 }
 
 async function fillHome(page) {
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="standard"])');
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');
@@ -325,7 +325,7 @@ test('completed steps can be revisited from the navigator without losing answers
       () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
     );
     assert.equal(await activeStep(page), 2, 'advances once step 1 is complete');
-    assert.equal(await page.locator('input[name="serviceType"]:checked').count(), 0);
+    assert.equal(await page.locator('input[name="serviceType"]:checked').inputValue(), 'standard');
   } finally {
     await context.close();
   }
@@ -342,7 +342,7 @@ test('a reload starts a fresh blank questionnaire at step 1', async () => {
     await page.reload({ waitUntil: 'load' });
     assert.equal(await activeStep(page), 1, 'reload returns to step 1');
     assert.equal(await page.inputValue('#est-zip'), '', 'no answers are restored');
-    assert.equal(await page.locator('input[name="serviceType"]:checked').count(), 0);
+    assert.equal(await page.locator('input[name="serviceType"]:checked').inputValue(), 'standard');
     assert.equal(await page.inputValue('#est-sqft'), '');
     assert.equal(await page.locator('[data-estimate-live]').isVisible(), false, 'no stale price panel');
   } finally {
@@ -376,7 +376,7 @@ test('browser back/forward never resurrects an old questionnaire', async () => {
     await page.goBack({ waitUntil: 'load' });
     assert.equal(await activeStep(page), 1, 'back navigation starts fresh');
     assert.equal(await page.inputValue('#est-zip'), '', 'no old answers from bfcache');
-    assert.equal(await page.locator('input[name="serviceType"]:checked').count(), 0);
+    assert.equal(await page.locator('input[name="serviceType"]:checked').inputValue(), 'standard');
   } finally {
     await context.close();
   }
@@ -389,7 +389,7 @@ test('Start Over clears the questionnaire even though nothing is stored', async 
     assert.equal(await activeStep(page), 2);
     await page.click('[data-estimate-reset]');
     assert.equal(await activeStep(page), 1);
-    assert.equal(await page.locator('input[name="serviceType"]:checked').count(), 0);
+    assert.equal(await page.locator('input[name="serviceType"]:checked').inputValue(), 'standard');
     assert.equal(await page.inputValue('#est-zip'), '');
     const storedKeys = await page.evaluate(() =>
       Object.keys(window.localStorage).filter((key) => key.includes('estimate') || key.includes('draft')),

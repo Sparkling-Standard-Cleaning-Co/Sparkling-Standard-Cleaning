@@ -8,6 +8,12 @@ import GoogleG from './GoogleG.astro';
 import Icon from './Icon.astro';
 import Scripture from './Scripture.astro';
 
+interface Props {
+  hasMobileBar?: boolean;
+}
+
+const { hasMobileBar = false } = Astro.props;
+
 const preview = import.meta.env.PUBLIC_PREVIEW_MODE === 'true';
 const year = new Date().getFullYear();
 const reviewLeaveUrl = isPending(business.reviews.submissionUrl) ? null : business.reviews.submissionUrl;
@@ -25,7 +31,7 @@ const taglineLead = taglineWords.join(' ');
 const phone = isPending(business.phone) ? null : business.phone;
 ---
 
-<footer class="site-footer">
+<footer class:list={['site-footer', { 'site-footer--has-mobile-bar': hasMobileBar }]}>
   <div class="container">
     <div class="site-footer__masthead">
       <Logo class="brand" />
@@ -35,14 +41,13 @@ const phone = isPending(business.phone) ? null : business.phone;
       </p>
       {
         socialEntries.length > 0 && (
-          <section class="social-follow social-follow--bubble" data-social-follow aria-labelledby="social-follow-heading">
+          <section class="social-follow social-follow--integrated" data-social-follow aria-labelledby="social-follow-heading">
             <h2 class="social-follow__title" id="social-follow-heading">Follow Us</h2>
             <p class="social-follow__copy">Follow along for updates and a closer look at our work.</p>
             <SocialLinks />
           </section>
         )
       }
-      <p class="small site-footer__area">{business.serviceArea.summary}</p>
       {preview && <p class="small"><span class="pending-badge">Pre-launch preview</span></p>}
     </div>
 
@@ -144,7 +149,7 @@ const phone = isPending(business.phone) ? null : business.phone;
     <div class="site-footer__bottom">
       <span>© {year} {isPending(business.legalName) ? siteName() : business.legalName}. All rights reserved.</span>
       <span>
-        <a href="/privacy/">Privacy</a> &middot; <a href="/terms/">Terms</a> &middot; <a href="/terms/#cancellation-rescheduling">Cancellation</a> &middot; <a href="/gift-certificates/">Gift Certificates</a> &middot; <a href="/service-area/">Service Area</a>
+        <a href={`mailto:${business.hiringEmail}?subject=${encodeURIComponent('Cleaning career inquiry')}`} data-cta="footer-hiring">Careers</a> &middot; <a href="/portal/">Customer Portal</a> &middot; <a href="/privacy/">Privacy</a> &middot; <a href="/terms/">Terms</a> &middot; <a href="/terms/#cancellation-rescheduling">Cancellation</a> &middot; <a href="/gift-certificates/">Gift Certificates</a> &middot; <a href="/service-area/">Service Area</a>
       </span>
     </div>
   </div>

@@ -1,8 +1,9 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { AdminAuthError, audit, rateLimit, requireActor, requireCsrf, requireStepUp } from '../../../src/lib/admin/operations.ts';
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
   changePassword,
+  countAudit,
   getSettings,
   inviteAdmin,
   issuePasswordReset,
@@ -15,10 +16,21 @@ import {
   updateAdminRole,
   updateAdminStatus,
 } from '../../../src/lib/admin/accounts.ts';
-import { disableMfa, enableMfa, startMfaEnrollment, verifyTotp } from '../../../src/lib/admin/mfa.ts';
+import {
+  consumeRecoveryCode,
+  createEmailMfaChallenge,
+  disableMfa,
+  enableEmailMfa,
+  enableMfa,
+  generateEmailCode,
+  startMfaEnrollment,
+  verifyEmailMfaChallenge,
+  verifyTotp,
+} from '../../../src/lib/admin/mfa.ts';
 import { decryptMfaSecret, mfaKeyConfigured } from '../../../src/lib/admin/secrets.ts';
 import {
   buildOpsInvitationEmail,
+  buildOpsMfaCodeEmail,
   buildOpsPasswordChangedEmail,
   buildOpsPasswordResetEmail,
   sendAdminEmail,
@@ -59,7 +71,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     }
     await requireActor(db, context.request, 'admin.manage');
     if (view === 'audit') {
-      return json({ ok: true, audit: await listAudit(db, actor, Number(url.searchParams.get('limit') ?? 100)) });
+      const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? 50)));
+      const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
+      const q = url.searchParams.get('q') ?? '';
+      const [auditRows, total] = await Promise.all([
+        listAudit(db, actor, limit, offset, q),
+        countAudit(db, actor, q),
+      ]);
+      return json({ ok: true, audit: auditRows, total, limit, offset });
     }
     if (view === 'settings') {
       return json({ ok: true, settings: await getSettings(db) });
@@ -82,6 +101,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (
       action === 'mfa_setup' ||
       action === 'mfa_enable' ||
+      action === 'mfa_email_start' ||
+      action === 'mfa_email_enable' ||
       action === 'mfa_disable' ||
       action === 'revoke_others' ||
       action === 'change_password'
@@ -111,6 +132,60 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         );
         return json({ ok: true });
       }
+      if (action === 'mfa_email_start') {
+        if (actor.mfaEnabled) return json({ ok: false, error: 'mfa_already_enabled' }, 409);
+        const password = String(body.password ?? '');
+        const storedPassword = await db
+          .prepare('SELECT password_hash FROM admin_users WHERE id = ? LIMIT 1')
+          .bind(actor.id)
+          .first<{ password_hash: string }>();
+        if (!storedPassword || !(await verifyPassword(password, storedPassword.password_hash))) {
+          return json({ ok: false, error: 'reauth_failed' }, 401);
+        }
+        const key = context.env.RESEND_API_KEY?.trim();
+        if (!key) return json({ ok: false, error: 'email_mfa_not_configured' }, 503);
+        if (!(await rateLimit(db, `ops:mfa-email:${actor.id}`, 5, 15, 15))) {
+          return json({ ok: false, error: 'rate_limited' }, 429);
+        }
+        const emailCode = generateEmailCode();
+        const challenge = await createEmailMfaChallenge(db, actor.id, emailCode);
+        const site = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;
+        const delivered = await sendAdminEmail(
+          {
+            RESEND_API_KEY: key,
+            ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
+            PUBLIC_SITE_URL: site,
+          },
+          actor.email,
+          buildOpsMfaCodeEmail({ PUBLIC_SITE_URL: site }, emailCode, actor.name),
+          `ops-mfa-code-${crypto.randomUUID()}`,
+        );
+        if (!delivered) {
+          await audit(db, { actorUserId: actor.id, action: 'admin.mfa_email_setup_failed' });
+          return json({ ok: false, error: 'mfa_email_unavailable' }, 503);
+        }
+        await audit(db, { actorUserId: actor.id, action: 'admin.mfa_email_setup_started' });
+        return json({
+          ok: true,
+          method: 'email',
+          challengeToken: challenge.token,
+          expiresAt: challenge.expiresAt,
+          resendAfterSeconds: challenge.resendAfterSeconds,
+        });
+      }
+      if (action === 'mfa_email_enable') {
+        const verified = await verifyEmailMfaChallenge(
+          db,
+          String(body.challengeToken ?? ''),
+          { code: String(body.code ?? '') },
+        );
+        if (!verified || verified.userId !== actor.id) {
+          return json({ ok: false, error: 'mfa_code_invalid' }, 401);
+        }
+        const codes = await enableEmailMfa(db, actor.id);
+        await audit(db, { actorUserId: actor.id, action: 'admin.mfa_email_enabled' });
+        return json({ ok: true, recoveryCodes: codes });
+      }
       if (action === 'mfa_setup') {
         if (actor.mfaEnabled) return json({ ok: false, error: 'mfa_already_enabled' }, 409);
         if (!mfaKeyConfigured(context.env.MFA_ENCRYPTION_KEY)) {
@@ -128,13 +203,25 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       const password = String(body.password ?? '');
       const code = String(body.code ?? '');
-      const stored = await db.prepare('SELECT password_hash, mfa_secret FROM admin_users WHERE id = ?').bind(actor.id).first<{ password_hash: string; mfa_secret: string | null }>();
+      const stored = await db
+        .prepare('SELECT password_hash, mfa_secret, mfa_method FROM admin_users WHERE id = ?')
+        .bind(actor.id)
+        .first<{ password_hash: string; mfa_secret: string | null; mfa_method: string | null }>();
       if (!stored || !(await verifyPassword(password, stored.password_hash))) {
         return json({ ok: false, error: 'password_invalid' }, 401);
       }
-      if (!stored.mfa_secret) return json({ ok: false, error: 'mfa_not_enabled' }, 400);
-      const secret = await decryptMfaSecret(stored.mfa_secret, context.env.MFA_ENCRYPTION_KEY);
-      if (!secret || !(await verifyTotp(secret, code))) return json({ ok: false, error: 'mfa_code_invalid' }, 401);
+      if (!stored.mfa_secret && stored.mfa_method !== 'email') {
+        return json({ ok: false, error: 'mfa_not_enabled' }, 400);
+      }
+      if (stored.mfa_method === 'email') {
+        const recoveryCode = String(body.recoveryCode ?? '');
+        if (!recoveryCode || !(await consumeRecoveryCode(db, actor.id, recoveryCode))) {
+          return json({ ok: false, error: 'mfa_code_invalid' }, 401);
+        }
+      } else {
+        const secret = await decryptMfaSecret(stored.mfa_secret ?? '', context.env.MFA_ENCRYPTION_KEY);
+        if (!secret || !(await verifyTotp(secret, code))) return json({ ok: false, error: 'mfa_code_invalid' }, 401);
+      }
       await disableMfa(db, actor.id);
       await audit(db, { actorUserId: actor.id, action: 'admin.mfa_disabled' });
       return json({ ok: true });
@@ -142,6 +229,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
 
     const actor = await requireActor(db, context.request, 'admin.manage');
     requireCsrf(context.request, actor);
+    requireStepUp(actor);
     if (action === 'invite') {
       const result = await inviteAdmin(db, actor, body);
       const origin = context.env.PUBLIC_SITE_URL?.trim() || new URL(context.request.url).origin;

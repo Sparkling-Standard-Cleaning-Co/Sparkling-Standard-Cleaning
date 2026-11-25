@@ -13,15 +13,19 @@ import {
   readOpsActor,
   requireActor,
   requireCsrf,
+  requireStepUp,
 } from '../src/lib/admin/operations.ts';
 import { hashPassword } from '../src/lib/admin/auth.ts';
 import { persistLeadSubmission } from '../src/lib/admin/lead-persistence.ts';
 import { onRequestGet as overviewGet } from '../functions/api/admin/overview.ts';
 import { onRequestPost as authPost } from '../functions/api/admin/auth.ts';
 import { onRequestGet as adminRequestsGet, onRequestPost as adminRequestsPost } from '../functions/api/admin/requests.ts';
+import { onRequestPost as accountsPost } from '../functions/api/admin/accounts.ts';
+import { onRequestGet as adminLeadsGet, onRequestPost as adminLeadsPost } from '../functions/api/admin/leads.ts';
 import { onRequestGet as operationsGet } from '../functions/api/admin/operations.ts';
 import { onRequestPost as operationsPost } from '../functions/api/admin/operations.ts';
 import { onRequestGet as customersGet } from '../functions/api/admin/customers.ts';
+import { onRequestGet as storageGet, onRequestPost as storagePost } from '../functions/api/admin/storage.ts';
 
 const MFA_KEY = 'synthetic-mfa-encryption-key-32-bytes-minimum';
 
@@ -62,45 +66,7 @@ class TestD1 implements D1Database {
 function migratedDb(): TestD1 {
   const db = new TestD1();
   db.raw.exec('PRAGMA foreign_keys = ON');
-  for (const file of [
-    '0001_operational_foundation.sql',
-    '0002_admin_security_and_seeds.sql',
-    '0003_admin_session_hardening.sql',
-    '0004_branch_scope.sql',
-    '0005_admin_accounts_and_operations.sql',
-    '0006_service_catalog_and_lead_permissions.sql',
-    '0007_cleaner_field_scope.sql',
-    '0008_invoice_payment_links.sql',
-    '0009_signed_documents_and_payment_authorizations.sql',
-    '0010_signed_content_and_card_setup.sql',
-    '0011_booking_management_and_notifications.sql',
-    '0012_employee_timekeeping.sql',
-    '0013_request_lifecycle.sql',
-    '0014_request_payment_status.sql',
-    '0015_recurring_schedule.sql',
-    '0016_recurring_occurrence_state.sql',
-    '0017_dynamic_booking_resources.sql',
-    '0018_document_management_and_signing.sql',
-    '0019_recurring_worker_runs.sql',
-    '0020_recurring_worker_claim_owner.sql',
-    '0021_least_privilege_cleaner_role.sql',
-    '0022_refund_idempotency.sql',
-    '0023_document_signature_attempts.sql',
-    '0024_financial_ledger_parties.sql',
-    '0025_refunds_disputes_webhooks.sql',
-    '0026_pricing_control.sql',
-    '0027_checkout_session_registry.sql',
-    '0028_property_profiles.sql',
-    '0029_booking_commitments.sql',
-    '0030_booking_payment_claims.sql',
-    '0031_document_execution_integrity.sql',
-    '0032_promotions_and_redemptions.sql',
-    '0033_promotion_deadlines.sql',
-    '0034_promotion_scope.sql',
-    '0035_promotion_supportive_stacking.sql',
-    '0036_customer_promotion_entitlements.sql',
-    '0037_payment_receipts.sql',
-  ]) {
+  for (const file of fs.readdirSync('migrations').filter((name) => name.endsWith('.sql')).sort()) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }
   return db;
@@ -442,9 +408,14 @@ import {
   passwordProblem,
 } from '../src/lib/password-policy.ts';
 import {
+  createEmailMfaChallenge,
   createMfaChallenge,
+  emailMfaChallengeExists,
+  enableEmailMfa,
   enableMfa,
+  prepareEmailMfaResend,
   startMfaEnrollment,
+  verifyEmailMfaChallenge,
   verifyMfaChallenge,
 } from '../src/lib/admin/mfa.ts';
 import { operationsReport } from '../src/lib/admin/reporting.ts';
@@ -520,6 +491,275 @@ test('MFA enrollment, challenge verification and one-time recovery codes work', 
   const reused = await createMfaChallenge(db, owner.id);
   assert.equal(await verifyMfaChallenge(db, reused.token, { recoveryCode: codes![0]!, encryptionKey: MFA_KEY }), null);
   assert.equal(actor.mfaEnabled, false, 'the existing session remains valid until revoked');
+});
+
+test('email MFA challenges are hashed, single-use, rate-limited and recoverable', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'email-mfa@example.test',
+    name: 'Email MFA Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const challenge = await createEmailMfaChallenge(db, owner.id, '123456');
+  assert.equal(await emailMfaChallengeExists(db, challenge.token), true);
+  assert.equal(await verifyEmailMfaChallenge(db, challenge.token, { code: '000000' }), null);
+  const cooldown = await prepareEmailMfaResend(db, challenge.token, '654321');
+  assert.equal(cooldown.ok, false);
+  assert.equal(cooldown.reason, 'cooldown');
+  db.raw
+    .prepare('UPDATE admin_email_mfa_challenges SET last_sent_at = ?')
+    .run(new Date(Date.now() - 120_000).toISOString());
+  const resent = await prepareEmailMfaResend(db, challenge.token, '654321');
+  assert.equal(resent.ok, true);
+  assert.equal(await verifyEmailMfaChallenge(db, challenge.token, { code: '123456' }), null);
+  assert.deepEqual(await verifyEmailMfaChallenge(db, challenge.token, { code: '654321' }), {
+    userId: owner.id,
+  });
+  assert.equal(await verifyEmailMfaChallenge(db, challenge.token, { code: '654321' }), null);
+
+  const recoveryCodes = await enableEmailMfa(db, owner.id);
+  assert.equal(recoveryCodes.length, 8);
+  const authenticated = await authenticate(db, owner.email, 'SyntheticOwner!2026');
+  assert.equal(authenticated?.mfaEnabled, true);
+  assert.equal(authenticated?.mfaMethod, 'email');
+  const recoveryChallenge = await createEmailMfaChallenge(db, owner.id, '111111');
+  assert.deepEqual(
+    await verifyEmailMfaChallenge(db, recoveryChallenge.token, { recoveryCode: recoveryCodes[0] }),
+    { userId: owner.id },
+  );
+});
+
+test('sensitive actions require a fresh MFA step-up and the step-up route refreshes it', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'step-up@example.test',
+    name: 'Step Up Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const enrollment = await startMfaEnrollment(db, owner.id, owner.email, MFA_KEY);
+  await enableMfa(db, owner.id, totpCode(enrollment.secret), MFA_KEY);
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  let actor = await readOpsActor(db, request(cookie));
+  assert.ok(actor);
+  assert.throws(() => requireStepUp(actor!), /mfa_step_up_required/);
+
+  const start = await authPost({
+    request: new Request('https://example.test/api/admin/auth', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'X-CSRF-Token': session.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'step_up_start' }),
+    }),
+    env: { DB: db, MFA_ENCRYPTION_KEY: MFA_KEY },
+  } as never);
+  assert.equal(start.status, 200);
+  const started = (await start.json()) as { challengeToken?: string; mfaMethod?: string };
+  assert.equal(started.mfaMethod, 'totp');
+  assert.ok(started.challengeToken);
+
+  const verify = await authPost({
+    request: new Request('https://example.test/api/admin/auth', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'X-CSRF-Token': session.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'step_up_verify',
+        challengeToken: started.challengeToken,
+        code: totpCode(enrollment.secret),
+      }),
+    }),
+    env: { DB: db, MFA_ENCRYPTION_KEY: MFA_KEY },
+  } as never);
+  assert.equal(verify.status, 200);
+  actor = await readOpsActor(db, request(cookie));
+  assert.ok(actor?.stepUpAt);
+  requireStepUp(actor!);
+
+  db.raw
+    .prepare('UPDATE admin_sessions SET step_up_at = ? WHERE user_id = ?')
+    .run(new Date(Date.now() - 11 * 60_000).toISOString(), owner.id);
+  actor = await readOpsActor(db, request(cookie));
+  assert.throws(() => requireStepUp(actor!), /mfa_step_up_required/);
+});
+test('data exports reject a stale MFA session and recover after step-up', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'export-step-up@example.test',
+    name: 'Export Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const enrollment = await startMfaEnrollment(db, owner.id, owner.email, MFA_KEY);
+  await enableMfa(db, owner.id, totpCode(enrollment.secret), MFA_KEY);
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  const url = 'https://example.test/api/admin/storage?export=customers&format=csv';
+  const blocked = await storageGet({
+    request: new Request(url, { headers: { Cookie: cookie } }),
+    env: { DB: db },
+  } as never);
+  assert.equal(blocked.status, 403);
+  assert.equal(((await blocked.json()) as { error?: string }).error, 'mfa_step_up_required');
+
+  db.raw
+    .prepare('UPDATE admin_sessions SET step_up_at = ? WHERE user_id = ?')
+    .run(new Date().toISOString(), owner.id);
+  const allowed = await storageGet({
+    request: new Request(url, { headers: { Cookie: cookie } }),
+    env: { DB: db },
+  } as never);
+  assert.equal(allowed.status, 200);
+  assert.match(allowed.headers.get('Content-Type') ?? '', /text\/csv/);
+});
+test('email MFA enrollment, verified login and recovery work together with a controlled account', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'email-enrollment@example.test',
+    name: 'Email Enrollment Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  const sent: Array<Record<string, unknown>> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_input, init) => {
+    sent.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    return new Response(JSON.stringify({ id: 'email_mfa_controlled' }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const env = {
+      DB: db,
+      RESEND_API_KEY: 're_test_synthetic',
+      RESEND_FROM_EMAIL: 'notifications@example.test',
+      PUBLIC_SITE_URL: 'https://sparkling-standard.com',
+    };
+    const started = await accountsPost({
+      request: new Request('https://example.test/api/admin/accounts', {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'mfa_email_start', password: 'SyntheticOwner!2026' }),
+      }),
+      env,
+    } as never);
+    assert.equal(started.status, 200);
+    const enrollment = (await started.json()) as { challengeToken?: string };
+    assert.ok(enrollment.challengeToken);
+    assert.equal(sent.length, 1);
+    const code = String(sent[0].text ?? '').match(/\b\d{6}\b/)?.[0] ?? '';
+    assert.match(code, /^\d{6}$/);
+
+    const enabled = await accountsPost({
+      request: new Request('https://example.test/api/admin/accounts', {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'mfa_email_enable',
+          challengeToken: enrollment.challengeToken,
+          code,
+        }),
+      }),
+      env,
+    } as never);
+    assert.equal(enabled.status, 200);
+    const recovery = (await enabled.json()) as { recoveryCodes?: string[] };
+    assert.equal(recovery.recoveryCodes?.length, 8);
+    const authenticated = await authenticate(db, owner.email, 'SyntheticOwner!2026');
+    assert.equal(authenticated?.mfaEnabled, true);
+    assert.equal(authenticated?.mfaMethod, 'email');
+    const refreshed = await readOpsActor(db, request(cookie));
+    assert.equal(refreshed?.mfaEnabled, true);
+    assert.equal(refreshed?.stepUpAt, null);
+
+    const disabled = await accountsPost({
+      request: new Request('https://example.test/api/admin/accounts', {
+        method: 'POST',
+        headers: {
+          Cookie: cookie,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'mfa_disable',
+          password: 'SyntheticOwner!2026',
+          recoveryCode: recovery.recoveryCodes?.[0],
+        }),
+      }),
+      env,
+    } as never);
+    assert.equal(disabled.status, 200);
+    assert.equal((await authenticate(db, owner.email, 'SyntheticOwner!2026'))?.mfaEnabled, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+test('the login route sends an email code and accepts it without exposing a session early', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'email-login@example.test',
+    name: 'Email Login Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  await enableEmailMfa(db, owner.id);
+  const sent: Array<Record<string, unknown>> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_input, init) => {
+    sent.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+    return new Response(JSON.stringify({ id: 'email_mfa_test' }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const env = {
+      DB: db,
+      RESEND_API_KEY: 're_test_synthetic',
+      RESEND_FROM_EMAIL: 'notifications@example.test',
+      PUBLIC_SITE_URL: 'https://sparkling-standard.com',
+    };
+    const login = await authPost({
+      request: new Request('https://example.test/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', email: owner.email, password: 'SyntheticOwner!2026' }),
+      }),
+      env,
+    } as never);
+    const payload = (await login.json()) as {
+      mfaRequired?: boolean;
+      mfaMethod?: string;
+      challengeToken?: string;
+    };
+    assert.equal(payload.mfaRequired, true);
+    assert.equal(payload.mfaMethod, 'email');
+    assert.equal(login.headers.get('Set-Cookie'), null);
+    assert.equal(sent.length, 1);
+    const body = String(sent[0].text ?? '');
+    const code = body.match(/\b\d{6}\b/)?.[0] ?? '';
+    assert.match(code, /^\d{6}$/);
+    const verify = await authPost({
+      request: new Request('https://example.test/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mfa_verify', challengeToken: payload.challengeToken, code }),
+      }),
+      env,
+    } as never);
+    assert.equal(verify.status, 200);
+    assert.match(verify.headers.get('Set-Cookie') ?? '', /^ss_ops=/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('invitations, password reset and account status are enforced', async () => {
@@ -1237,7 +1477,7 @@ test('signed payment authorization gates saved-card setup and off-session chargi
   }
 });
 
-// â”€â”€ Owner password policy and self-service recovery (2026-10-30) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Owner password policy and self-service recovery (2026-10-30) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 
 function authRequest(body: unknown, ip = '198.51.100.10', origin?: string): Request {
   const headers: Record<string, string> = {
@@ -1490,7 +1730,7 @@ test('legacy requests can be opened, flagged as possible duplicates and linked',
   );
   const payload = JSON.stringify({
     source: 'r2_backfill',
-    locationText: '6360 HAUPERT LANE ? MOLINO, FL 32577',
+    locationText: '100 S BAYLEN ST - PENSACOLA, FL 32502',
     destination: { lat: 30.719, lng: -87.442 },
   });
   insert.run('BR-1', 'hold-1', 'SS-ONE', '2026-10-30T13:45:00.000Z', '2026-10-30T21:03:00.000Z', payload);
@@ -1504,7 +1744,7 @@ test('legacy requests can be opened, flagged as possible duplicates and linked',
   assert.equal(detailResponse.status, 200);
   const detail = (await detailResponse.json()) as Record<string, unknown>;
   assert.equal((detail.request as Record<string, unknown>).customer_id, null);
-  assert.equal((detail.payload as Record<string, unknown>).locationText, '6360 HAUPERT LANE ? MOLINO, FL 32577');
+  assert.equal((detail.payload as Record<string, unknown>).locationText, '100 S BAYLEN ST - PENSACOLA, FL 32502');
   assert.equal((detail.possibleDuplicates as unknown[]).length, 1, 'the second legacy request is flagged');
   assert.equal(detail.email, '');
 
@@ -1512,7 +1752,7 @@ test('legacy requests can be opened, flagged as possible duplicates and linked',
     firstName: 'Verified',
     lastName: 'Customer',
     email: 'verified@example.test',
-    addressLine1: '6360 Haupert Ln',
+    addressLine1: '100 S Baylen St',
     city: 'Molino',
     state: 'FL',
     postalCode: '32577',
@@ -1701,6 +1941,152 @@ test('closed and archived requests stay searchable and can be reopened', async (
   assert.equal(reopenedRow.archived_at, null);
 });
 
+test('bulk reservation actions reach the real handler, preview eligibility and persist outcomes', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'bulk-owner@example.test',
+    name: 'Bulk Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES (?, ?, ?, ?, '2026-11-10', ?, ?, 120, '{}')`,
+    )
+    .run('BR-BULK-CLOSED', 'hold-bulk-1', 'released', 'SS-BULK-1', '2026-11-10T14:00:00.000Z', '2026-11-10T16:00:00.000Z');
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES (?, ?, 'pending', ?, '2026-11-11', ?, ?, 120, '{}')`,
+    )
+    .run('BR-BULK-ACTIVE', 'hold-bulk-2', 'SS-BULK-2', '2026-11-11T14:00:00.000Z', '2026-11-11T16:00:00.000Z');
+  const headers = {
+    Cookie: `ss_ops=${session.token}`,
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': actor!.csrf,
+  };
+  const post = (payload: Record<string, unknown>) =>
+    adminRequestsPost({
+      request: new Request('https://example.test/api/admin/requests', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      }),
+      env: { DB: db },
+    } as never);
+
+  const previewResponse = await post({
+    action: 'bulk_preview',
+    operation: 'archive',
+    requestIds: ['BR-BULK-CLOSED', 'BR-BULK-ACTIVE'],
+  });
+  assert.equal(previewResponse.status, 200, 'bulk actions no longer require a single requestId');
+  const preview = (await previewResponse.json()) as {
+    eligible: number;
+    ineligible: number;
+    results: Array<{ id: string; ok: boolean; error?: string }>;
+  };
+  assert.equal(preview.eligible, 1);
+  assert.equal(preview.ineligible, 1);
+  assert.equal(
+    preview.results.find((entry) => entry.id === 'BR-BULK-ACTIVE')?.error,
+    'active_request_must_close_or_cancel',
+  );
+
+  const archived = await post({
+    action: 'bulk',
+    operation: 'archive',
+    confirm: true,
+    requestIds: ['BR-BULK-CLOSED', 'BR-BULK-ACTIVE'],
+  });
+  assert.equal(archived.status, 200);
+  const archivedBody = (await archived.json()) as {
+    succeeded: number;
+    failed: number;
+    results: Array<{ id: string; ok: boolean; error?: string }>;
+  };
+  assert.equal(archivedBody.succeeded, 1);
+  assert.equal(archivedBody.failed, 1, 'an active obligation is protected from archiving');
+  const rows = db.raw
+    .prepare("SELECT id, archived_at FROM booking_requests WHERE id IN ('BR-BULK-CLOSED','BR-BULK-ACTIVE') ORDER BY id")
+    .all() as Array<{ id: string; archived_at: string | null }>;
+  assert.ok(rows.find((row) => row.id === 'BR-BULK-CLOSED')?.archived_at);
+  assert.equal(rows.find((row) => row.id === 'BR-BULK-ACTIVE')?.archived_at, null);
+  const auditRows = db.raw
+    .prepare("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'request.bulk_archived' AND entity_id = 'BR-BULK-CLOSED'")
+    .get() as { n: number };
+  assert.equal(auditRows.n, 1, 'the persisted operation is audited');
+
+  const restored = await post({
+    action: 'bulk',
+    operation: 'restore',
+    confirm: true,
+    requestIds: ['BR-BULK-CLOSED'],
+  });
+  assert.equal(restored.status, 200);
+  const restoredRow = db.raw
+    .prepare('SELECT archived_at FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-CLOSED') as { archived_at: string | null };
+  assert.equal(restoredRow.archived_at, null);
+
+  const protectedArchive = await post({ action: 'archive', requestId: 'BR-BULK-ACTIVE' });
+  assert.equal(protectedArchive.status, 409, 'an individual archive cannot bypass an active obligation');
+  const denied = await post({
+    action: 'bulk',
+    operation: 'deny',
+    confirm: true,
+    requestIds: ['BR-BULK-ACTIVE'],
+  });
+  assert.equal(denied.status, 200);
+  const deniedRow = db.raw
+    .prepare('SELECT status, closed_at FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-ACTIVE') as { status: string; closed_at: string | null };
+  assert.equal(deniedRow.status, 'declined');
+  assert.ok(deniedRow.closed_at);
+
+  const archivedAfterDeny = await post({ action: 'archive', requestId: 'BR-BULK-ACTIVE' });
+  assert.equal(archivedAfterDeny.status, 200, 'a closed record can be archived individually');
+  const archivedAfterDenyRow = db.raw
+    .prepare('SELECT archived_at FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-ACTIVE') as { archived_at: string | null };
+  assert.ok(archivedAfterDenyRow.archived_at);
+
+  db.raw
+    .prepare(
+      `INSERT INTO booking_requests
+       (id, hold_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+       VALUES ('BR-BULK-TEST', 'hold-bulk-3', 'pending', 'SS-BULK-TEST', '2026-11-12', '2026-11-12T14:00:00.000Z', '2026-11-12T16:00:00.000Z', 120, '{}')`,
+    )
+    .run();
+  const marked = await post({
+    action: 'bulk',
+    operation: 'mark_test',
+    confirm: true,
+    requestIds: ['BR-BULK-TEST'],
+  });
+  assert.equal(marked.status, 200);
+  const testRow = db.raw
+    .prepare('SELECT is_test FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-TEST') as { is_test: number };
+  assert.equal(testRow.is_test, 1);
+  const deletedTest = await post({
+    action: 'bulk',
+    operation: 'delete_test',
+    confirm: true,
+    requestIds: ['BR-BULK-TEST'],
+  });
+  assert.equal(deletedTest.status, 200);
+  const gone = db.raw
+    .prepare("SELECT COUNT(*) AS n FROM booking_requests WHERE id = 'BR-BULK-TEST'")
+    .get() as { n: number };
+  assert.equal(gone.n, 0, 'an eligible test record is actually deleted');
+});
+
 test('customers archive, restore and permanently delete when no history blocks it', async () => {
   const db = migratedDb();
   const owner = await enrollOwner(db, {
@@ -1750,6 +2136,20 @@ test('customers archive, restore and permanently delete when no history blocks i
   assert.equal(retained.first_name, 'Deleted');
   assert.equal(retained.status, 'archived');
   assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM booking_requests WHERE id = ?').get('BR-HISTORY') as { n: number }).n, 1);
+
+  const heldCustomer = await createCustomer(db, actor!, {
+    firstName: 'Held', lastName: 'Customer', email: 'delete-held@example.test',
+  });
+  db.raw.prepare(
+    "INSERT INTO legal_holds (id, subject_type, subject_id, reason, status) VALUES ('hold-delete-test','customer',?, 'active litigation hold','active')",
+  ).run(heldCustomer.id);
+  await assert.rejects(
+    () => deleteCustomer(db, actor!, String(heldCustomer.id), 'DELETE'),
+    (error: Error & { code?: string }) => error.code === 'legal_hold_active',
+  );
+  assert.ok(db.raw.prepare('SELECT id FROM customers WHERE id = ?').get(heldCustomer.id));
+  db.raw.prepare("UPDATE legal_holds SET status = 'released' WHERE id = 'hold-delete-test'").run();
+  assert.equal((await deleteCustomer(db, actor!, String(heldCustomer.id), 'DELETE')).mode, 'deleted');
 
   const protectedCustomer = await createCustomer(db, actor!, {
     firstName: 'Protected',
@@ -1892,4 +2292,448 @@ test('a paid invoice produces exactly one idempotent customer receipt', async ()
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+import { onRequestPost as financePost } from '../functions/api/admin/finance.ts';
+import { buildReceipt } from '../src/lib/payments/receipt.ts';
+import { loadInvoiceReceiptData } from '../src/lib/invoicing/invoice-receipt.ts';
+
+test('the invoice receipt is built from the persisted paid invoice and records delivery failure honestly', async () => {
+  const db = migratedDb();
+  const { owner, actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Receipt', lastName: 'Customer', email: 'receipt-phase-a@example.test',
+    addressLine1: '100 Receipt Street', city: 'Pensacola', postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    serviceCode: 'residential-cleaning',
+    issueDate: '2026-11-19',
+    lines: [
+      { kind: 'service', description: 'Residential cleaning', quantity: 1, unitAmountCents: 12000, totalCents: 12000 },
+      { kind: 'discount', description: 'FRIENDS15', quantity: 1, unitAmountCents: 1800, totalCents: 1800 },
+    ],
+  });
+  await recordPayment(db, actor, {
+    invoiceId: invoice.id, provider: 'cash', amount: 102, idempotencyKey: 'receipt-phase-a-payment',
+  });
+  const loaded = await loadInvoiceReceiptData(db, invoice.id);
+  assert.ok(loaded);
+  assert.equal(loaded.data.receiptNumber, `${invoice.number}-R1`);
+  assert.equal(loaded.data.customerEmail, 'receipt-phase-a@example.test');
+  assert.equal(loaded.data.totalCents, 10200);
+  assert.equal(loaded.data.paidCents, 10200);
+  assert.equal(loaded.data.balanceCents, 0);
+  assert.equal(loaded.data.paymentStatus, 'paid');
+  assert.ok(loaded.data.lines.some((line) => line.kind === 'discount'));
+  const built = buildReceipt(loaded.data);
+  assert.match(built.html, /Sparkling Standard Cleaning Co\./);
+  assert.match(built.html, /Standards That Sparkle\./);
+  assert.match(built.html, /receipt-phase-a@example\.test/);
+  assert.match(built.html, /Residential cleaning/);
+  assert.match(built.html, /FRIENDS15/);
+  assert.match(built.text, /Total: \$102\.00/);
+  assert.match(built.text, /Total paid|Paid: \$102\.00/);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ error: 'synthetic rejection' }), { status: 422 })) as typeof fetch;
+  try {
+    const failed = await deliverInvoiceReceipt(db, { RESEND_API_KEY: 'test', RESEND_FROM_EMAIL: 'owner@example.test' }, {
+      invoiceId: invoice.id,
+      actorUserId: owner.id,
+      force: true,
+    });
+    assert.equal(failed.status, 'failed');
+    const row = db.raw.prepare('SELECT status, error_code FROM payment_receipts WHERE invoice_id = ?').get(invoice.id) as {
+      status: string; error_code: string;
+    };
+    assert.equal(row.status, 'failed');
+    assert.match(row.error_code, /provider_422|failed/);
+    const auditRow = db.raw
+      .prepare("SELECT action FROM admin_audit WHERE entity_id = ? AND action LIKE 'invoice.receipt_%' ORDER BY created_at DESC LIMIT 1")
+      .get(invoice.id) as { action: string };
+    assert.equal(auditRow.action, 'invoice.receipt_failed');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('resending an invoice receipt requires finance permission and matching branch access', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Branch', lastName: 'Customer', email: 'branch-receipt@example.test',
+    addressLine1: '200 Branch Street', city: 'Pensacola', postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor, {
+    customerId: customer.id,
+    serviceCode: 'residential-cleaning',
+    issueDate: '2026-11-19',
+    lines: [{ kind: 'service', description: 'Residential cleaning', quantity: 1, unitAmountCents: 9000, totalCents: 9000 }],
+  });
+  await recordPayment(db, actor, {
+    invoiceId: invoice.id, provider: 'cash', amount: 90, idempotencyKey: 'branch-receipt-payment',
+  });
+  const managerId = 'admin_manager_receipt';
+  db.raw
+    .prepare(
+      `INSERT INTO admin_users (id, role_id, branch_id, email, password_hash, display_name, status)
+       VALUES (?, 'manager', 'branch_pensacola', 'manager-receipt@example.test', 'unused', 'Synthetic Manager', 'active')`,
+    )
+    .run(managerId);
+  const managerSession = await createOpsSession(db, managerId, request());
+  const managerResponse = await financePost({
+    request: new Request('https://example.test/api/admin/finance', {
+      method: 'POST',
+      headers: {
+        Cookie: `ss_ops=${managerSession.token}`,
+        'X-CSRF-Token': managerSession.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'resend_invoice_receipt', invoiceId: invoice.id }),
+    }),
+    env: { DB: db } as never,
+  });
+  assert.equal(managerResponse.status, 403);
+
+  const financeId = 'admin_finance_tampa';
+  db.raw
+    .prepare(
+      `INSERT INTO admin_users (id, role_id, branch_id, email, password_hash, display_name, status)
+       VALUES (?, 'finance', 'branch_tampa', 'finance-tampa@example.test', 'unused', 'Synthetic Finance', 'active')`,
+    )
+    .run(financeId);
+  const financeSession = await createOpsSession(db, financeId, request());
+  const financeResponse = await financePost({
+    request: new Request('https://example.test/api/admin/finance', {
+      method: 'POST',
+      headers: {
+        Cookie: `ss_ops=${financeSession.token}`,
+        'X-CSRF-Token': financeSession.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'resend_invoice_receipt', invoiceId: invoice.id }),
+    }),
+    env: { DB: db } as never,
+  });
+  assert.equal(financeResponse.status, 404);
+  const row = db.raw.prepare('SELECT COUNT(*) AS count FROM payment_receipts WHERE invoice_id = ?').get(invoice.id) as { count: number };
+  assert.equal(row.count, 0);
+});
+
+test('sending an invoice email does not require a fresh email-code step-up for an authenticated owner', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'invoice-send-no-stepup@example.test',
+    name: 'Invoice Send Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const enrollment = await startMfaEnrollment(db, owner.id, owner.email, MFA_KEY);
+  await enableMfa(db, owner.id, totpCode(enrollment.secret), MFA_KEY);
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor?.mfaEnabled);
+  assert.equal(actor?.stepUpAt, null);
+  const customer = await createCustomer(db, actor!, {
+    firstName: 'Invoice',
+    lastName: 'Recipient',
+    email: 'invoice-recipient@example.test',
+    addressLine1: '100 Invoice Street',
+    city: 'Pensacola',
+    state: 'FL',
+    postalCode: '32502',
+  });
+  const invoice = await createInvoice(db, actor!, {
+    customerId: customer.id,
+    serviceCode: 'move_in_out',
+    serviceLabel: 'Move-Out Cleaning',
+    serviceDate: '2026-11-23',
+    lines: [{ kind: 'service', description: 'Move-Out Cleaning', quantity: 1, unitAmountCents: 27500, totalCents: 27500 }],
+  });
+  const originalFetch = globalThis.fetch;
+  let sends = 0;
+  globalThis.fetch = (async () => {
+    sends += 1;
+    return new Response(JSON.stringify({ id: 'email_invoice_sent_1' }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const response = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: {
+          Cookie: `ss_ops=${session.token}`,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'email_invoice',
+          invoiceId: invoice.id,
+          idempotencyKey: 'invoice-send-no-stepup',
+        }),
+      }),
+      env: { DB: db, RESEND_API_KEY: 'synthetic', RESEND_FROM_EMAIL: 'owner@example.test' },
+    } as never);
+    assert.equal(response.status, 200);
+    assert.equal(((await response.json()) as { status?: string }).status, 'sent');
+    assert.equal(sends, 1);
+    const auditRow = db.raw
+      .prepare("SELECT action FROM admin_audit WHERE entity_id = ? AND action = 'invoice.emailed' ORDER BY created_at DESC LIMIT 1")
+      .get(invoice.id) as { action: string } | undefined;
+    assert.equal(auditRow?.action, 'invoice.emailed');
+
+    const noCsrf = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: { Cookie: `ss_ops=${session.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'email_invoice', invoiceId: invoice.id }),
+      }),
+      env: { DB: db, RESEND_API_KEY: 'synthetic', RESEND_FROM_EMAIL: 'owner@example.test' },
+    } as never);
+    assert.equal(noCsrf.status, 403);
+    assert.equal(((await noCsrf.json()) as { error?: string }).error, 'csrf_failed');
+    assert.equal(sends, 1, 'a CSRF failure never sends a second email');
+
+    const stepUpStillRequired = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: {
+          Cookie: `ss_ops=${session.token}`,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'create_invoice',
+          customerId: customer.id,
+          lines: [{ kind: 'service', description: 'High risk test', quantity: 1, unitAmountCents: 100, totalCents: 100 }],
+        }),
+      }),
+      env: { DB: db },
+    } as never);
+    assert.equal(stepUpStillRequired.status, 403);
+    assert.equal(((await stepUpStillRequired.json()) as { error?: string }).error, 'mfa_step_up_required');
+
+    db.raw
+      .prepare(
+        `INSERT INTO admin_users (id, role_id, email, password_hash, display_name, status)
+         VALUES ('admin_no_finance', 'manager', 'no-finance@example.test', 'unused', 'Synthetic Manager', 'active')`,
+      )
+      .run();
+    const managerSession = await createOpsSession(db, 'admin_no_finance', request());
+    const managerResponse = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: {
+          Cookie: `ss_ops=${managerSession.token}`,
+          'X-CSRF-Token': managerSession.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'email_invoice', invoiceId: invoice.id }),
+      }),
+      env: { DB: db, RESEND_API_KEY: 'synthetic', RESEND_FROM_EMAIL: 'owner@example.test' },
+    } as never);
+    assert.equal(managerResponse.status, 403);
+    assert.equal(sends, 1, 'an unauthorized manager never sends the invoice');
+
+    db.raw.prepare('UPDATE admin_sessions SET expires_at = ? WHERE user_id = ?').run('2020-01-01T00:00:00.000Z', owner.id);
+    const expiredResponse = await financePost({
+      request: new Request('https://example.test/api/admin/finance', {
+        method: 'POST',
+        headers: {
+          Cookie: `ss_ops=${session.token}`,
+          'X-CSRF-Token': session.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'email_invoice', invoiceId: invoice.id }),
+      }),
+      env: { DB: db, RESEND_API_KEY: 'synthetic', RESEND_FROM_EMAIL: 'owner@example.test' },
+    } as never);
+    assert.equal(expiredResponse.status, 401);
+    assert.equal(sends, 1, 'an expired session never sends the invoice');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('verified property coordinates are stored, preserved and invalidated when the address changes', async () => {
+  const db = migratedDb();
+  const { actor } = await ownerActor(db);
+  const customer = await createCustomer(db, actor, {
+    firstName: 'Coordinate', lastName: 'Customer', email: 'coords@example.test',
+    addressLine1: '1000 Bayou Blvd', city: 'Pensacola', state: 'FL', postalCode: '32503',
+    latitude: 30.4213, longitude: -87.2169, precision: 'exact',
+  });
+  const property = db.raw.prepare('SELECT id, latitude, longitude, precision FROM properties WHERE customer_id = ?').get(customer.id) as {
+    id: string; latitude: number; longitude: number; precision: string;
+  };
+  assert.equal(property.latitude, 30.4213);
+  assert.equal(property.longitude, -87.2169);
+  assert.equal(property.precision, 'exact');
+
+  await updateProperty(db, actor, property.id, {
+    label: 'Service property', line1: '1000 Bayou Blvd', line2: '', city: 'Pensacola', state: 'FL',
+    postalCode: '32503', propertyType: '', pets: '',
+  });
+  const preserved = db.raw.prepare('SELECT latitude, longitude FROM properties WHERE id = ?').get(property.id) as { latitude: number; longitude: number };
+  assert.equal(preserved.latitude, 30.4213);
+  assert.equal(preserved.longitude, -87.2169);
+
+  await updateProperty(db, actor, property.id, {
+    label: 'Service property', line1: '2000 New Street', line2: '', city: 'Pensacola', state: 'FL',
+    postalCode: '32503', propertyType: '', pets: '',
+  });
+  const changed = db.raw.prepare('SELECT latitude, longitude FROM properties WHERE id = ?').get(property.id) as { latitude: number | null; longitude: number | null };
+  assert.equal(changed.latitude, null);
+  assert.equal(changed.longitude, null);
+
+  await updateProperty(db, actor, property.id, {
+    label: 'Service property', line1: '2000 New Street', line2: 'Apt 4', city: 'Pensacola', state: 'FL',
+    postalCode: '32503', latitude: 30.43, longitude: -87.22, precision: 'street',
+  });
+  const updated = db.raw.prepare('SELECT latitude, longitude, precision FROM properties WHERE id = ?').get(property.id) as {
+    latitude: number; longitude: number; precision: string;
+  };
+  assert.equal(updated.latitude, 30.43);
+  assert.equal(updated.longitude, -87.22);
+  assert.equal(updated.precision, 'street');
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM properties WHERE customer_id = ?').get(customer.id) as { n: number }).n, 1);
+});
+
+test('lead archive, restore and disposable deletion enforce history protections', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'lead-management@example.test',
+    name: 'Lead Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const actor = await readOpsActor(db, request(`ss_ops=${session.token}`));
+  assert.ok(actor);
+  const customer = await createCustomer(db, actor!, {
+    firstName: 'Linked', lastName: 'Customer', email: 'linked-lead@example.test',
+    addressLine1: '100 Lead Street', city: 'Pensacola', state: 'FL', postalCode: '32502',
+  });
+  db.raw.prepare(
+    `INSERT INTO leads (id, branch_id, customer_id, request_type, status, source, quote_reference, payload_json)
+     VALUES ('lead_linked', 'branch_pensacola', ?, 'reservation_request', 'new', 'website', 'SS-LINKED', '{"service_type":"deep"}')`,
+  ).run(customer.id);
+  db.raw.prepare(
+    `INSERT INTO leads (id, branch_id, request_type, status, source, quote_reference, payload_json)
+     VALUES ('lead_disposable', 'branch_pensacola', 'general_inquiry', 'lost', 'phone', '', '{"note":"synthetic"}')`,
+  ).run();
+  db.raw.prepare(
+    `INSERT INTO leads (id, branch_id, request_type, status, source, quote_reference, payload_json)
+     VALUES ('lead_archived', 'branch_pensacola', 'general_inquiry', 'archived', 'phone', '', '{}')`,
+  ).run();
+  const headers = {
+    Cookie: `ss_ops=${session.token}`,
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': actor!.csrf,
+  };
+  const post = (payload: Record<string, unknown>) =>
+    adminLeadsPost({
+      request: new Request('https://example.test/api/admin/leads', {
+        method: 'POST', headers, body: JSON.stringify(payload),
+      }),
+      env: { DB: db },
+    } as never);
+  const detail = await adminLeadsGet({
+    request: new Request('https://example.test/api/admin/leads?id=lead_linked', {
+      headers: { Cookie: `ss_ops=${session.token}` },
+    }),
+    env: { DB: db },
+  } as never);
+  assert.equal(detail.status, 200);
+  const detailBody = (await detail.json()) as { lead: Record<string, unknown> };
+  assert.equal((detailBody.lead.payload as Record<string, unknown>).service_type, 'deep');
+
+  assert.equal((await post({ action: 'archive', leadId: 'lead_linked' })).status, 200);
+  assert.equal((db.raw.prepare('SELECT status FROM leads WHERE id = ?').get('lead_linked') as { status: string }).status, 'archived');
+  assert.equal((await post({ action: 'restore', leadId: 'lead_archived' })).status, 200);
+  assert.equal((db.raw.prepare('SELECT status FROM leads WHERE id = ?').get('lead_archived') as { status: string }).status, 'new');
+  assert.equal((await post({ action: 'delete', leadId: 'lead_linked' })).status, 409);
+  assert.equal((await post({ action: 'delete', leadId: 'lead_disposable' })).status, 200);
+  assert.equal((db.raw.prepare("SELECT COUNT(*) AS n FROM leads WHERE id = 'lead_disposable'").get() as { n: number }).n, 0);
+
+  const bulk = await post({
+    action: 'bulk', operation: 'archive', confirm: true, leadIds: ['lead_linked', 'lead_archived'],
+  });
+  assert.equal(bulk.status, 200);
+  const bulkBody = (await bulk.json()) as { succeeded: number; failed: number };
+  assert.equal(bulkBody.succeeded, 2);
+  assert.equal(bulkBody.failed, 0);
+});
+
+test('photo inventory and cleanup preserve legal-hold photos and delete eligible ones', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'photo-cleanup@example.test',
+    name: 'Photo Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(db, owner.id, request());
+  const cookie = `ss_ops=${session.token}`;
+  db.raw
+    .prepare(
+      `INSERT INTO legal_holds (id, subject_type, subject_id, reason, status, created_by_admin_user_id, created_at)
+       VALUES ('hold_photo_test', 'photo_request', 'quote-held-1', 'Synthetic legal review', 'active', ?, ?)`,
+    )
+    .run(owner.id, new Date().toISOString());
+  const hash = '0123456789abcdef0123456789abcdef';
+  const keys = [
+    `leads/2026/01/quote-held-1/bathroom-${hash}.jpg`,
+    `leads/2026/01/quote-held-1/bathroom-${hash}.jpg.meta.json`,
+    `leads/2026/01/quote-free-1/kitchen-${hash}.jpg`,
+    `leads/2026/01/quote-free-1/kitchen-${hash}.jpg.meta.json`,
+  ];
+  const deleted: string[] = [];
+  const bucket = {
+    async list() {
+      return {
+        objects: [
+          { key: keys[0], uploaded: new Date('2026-01-01T12:00:00.000Z'), size: 1000 },
+          { key: keys[2], uploaded: new Date('2026-01-02T12:00:00.000Z'), size: 2000 },
+        ],
+        truncated: false,
+      };
+    },
+    async delete(input: string | string[]) {
+      deleted.push(...(Array.isArray(input) ? input : [input]));
+    },
+  };
+  const env = { DB: db, PHOTOS_BUCKET: bucket };
+  const inventory = await storageGet({
+    request: new Request('https://example.test/api/admin/storage?view=photos', { headers: { Cookie: cookie } }),
+    env,
+  } as never);
+  assert.equal(inventory.status, 200);
+  const inventoryBody = (await inventory.json()) as { photos?: Array<{ protected?: boolean; customer?: string }>; protectedCount?: number };
+  assert.equal(inventoryBody.protectedCount, 1);
+  assert.equal(inventoryBody.photos?.find((photo) => photo.customer === 'Unlinked photo' && photo.protected)?.protected, true);
+
+  const cleanup = await storagePost({
+    request: new Request('https://example.test/api/admin/storage', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'X-CSRF-Token': session.csrf, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'photo_cleanup', days: 30, dryRun: false }),
+    }),
+    env,
+  } as never);
+  assert.equal(cleanup.status, 200);
+  const cleanupBody = (await cleanup.json()) as { eligible?: number; protectedEligible?: number; deleted?: number };
+  assert.equal(cleanupBody.eligible, 2);
+  assert.equal(cleanupBody.protectedEligible, 1);
+  assert.equal(cleanupBody.deleted, 1);
+  assert.ok(deleted.includes(keys[2]), 'the eligible photo is deleted');
+  assert.ok(!deleted.includes(keys[0]), 'the legally held photo is preserved');
+
+  const heldDelete = await storagePost({
+    request: new Request('https://example.test/api/admin/storage', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'X-CSRF-Token': session.csrf, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'photo_delete', key: keys[0] }),
+    }),
+    env,
+  } as never);
+  assert.equal(heldDelete.status, 409);
+  assert.equal(((await heldDelete.json()) as { error?: string }).error, 'legal_hold_active');
 });

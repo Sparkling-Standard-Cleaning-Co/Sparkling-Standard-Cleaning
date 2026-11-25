@@ -22,22 +22,22 @@
 // they cannot drift.
 
 import { buildCustomerConfirmation, type ConfirmationBusiness } from './customer-confirmation.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
 /** Owner-approved public facts (drift-guarded by tests/customer-email.test.ts). */
 export const CUSTOMER_EMAIL_BUSINESS: ConfirmationBusiness = {
   name: 'Sparkling Standard',
   founder: 'Hayli',
   phone: '(850) 426-8479',
-  email: 'owner@sparkling-standard.com',
+  email: EMAIL_ROUTING.bookings,
   website: 'sparkling-standard.com',
 };
 
 /** Default sender once the Sparkling Standard domain is verified in Resend. */
-export const DEFAULT_CUSTOMER_EMAIL_FROM =
-  'Sparkling Standard <notifications@sparkling-standard.com>';
+export const DEFAULT_CUSTOMER_EMAIL_FROM = EMAIL_ROUTING.notificationsSender;
 
 /** Customer replies reach the owner directly. */
-export const DEFAULT_CUSTOMER_EMAIL_REPLY_TO = 'owner@sparkling-standard.com';
+export const DEFAULT_CUSTOMER_EMAIL_REPLY_TO = EMAIL_ROUTING.bookings;
 
 export const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 

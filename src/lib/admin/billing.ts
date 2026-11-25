@@ -2,6 +2,7 @@ import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
 import type { D1Database } from './d1.ts';
 import { beginRefund, recomputeInvoiceFinancials } from './refunds.ts';
+import { listInvoiceTips } from '../tips/service.ts';
 
 function now(): string {
   return new Date().toISOString();
@@ -38,27 +39,74 @@ function invoiceNumber(): string {
   return `INV-${stamp}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
 }
 
-export async function listInvoices(
-  db: D1Database,
-  actor: AdminActor,
-  input: { status?: string; q?: string } = {},
-): Promise<Array<Record<string, unknown>>> {
+export interface InvoiceListInput {
+  status?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+  sort?: string;
+}
+
+const INVOICE_SORTS: Record<string, string> = {
+  created_at: 'i.created_at DESC, i.id ASC',
+  due_date: 'i.due_date ASC, i.created_at DESC, i.id ASC',
+  balance: 'i.balance_cents DESC, i.created_at DESC, i.id ASC',
+  status: 'i.status ASC, i.created_at DESC, i.id ASC',
+};
+
+function invoiceFilters(actor: AdminActor, input: InvoiceListInput): { sql: string; bind: unknown[] } {
   const status = text(input.status, 20);
   const q = text(input.q, 120);
   const branch = scope(actor, 'i.branch_id');
+  return {
+    sql: `WHERE (? = '' OR i.status = ?)
+         AND (? = '' OR i.number LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?)
+         ${branch.sql}`,
+    bind: [status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind],
+  };
+}
+
+export function invoicePageBounds(input: InvoiceListInput): { limit: number; offset: number; sort: string } {
+  const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 200);
+  const offset = Math.max(Number(input.offset) || 0, 0);
+  const sort = INVOICE_SORTS[input.sort ?? ''] ? String(input.sort) : 'created_at';
+  return { limit, offset, sort };
+}
+
+export async function listInvoices(
+  db: D1Database,
+  actor: AdminActor,
+  input: InvoiceListInput = {},
+): Promise<Array<Record<string, unknown>>> {
+  const bounds = invoicePageBounds(input);
+  const filter = invoiceFilters(actor, input);
   const result = await db
     .prepare(
       `SELECT i.*, c.first_name, c.last_name, p.line1, p.city
        FROM invoices i JOIN customers c ON c.id = i.customer_id
        LEFT JOIN properties p ON p.id = i.property_id
-       WHERE (? = '' OR i.status = ?)
-         AND (? = '' OR i.number LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?)
-         ${branch.sql}
-       ORDER BY i.created_at DESC LIMIT 200`,
+       ${filter.sql}
+       ORDER BY ${INVOICE_SORTS[bounds.sort]} LIMIT ? OFFSET ?`,
     )
-    .bind(status, status, q, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind)
+    .bind(...filter.bind, bounds.limit, bounds.offset)
     .all();
   return result.results ?? [];
+}
+
+export async function countInvoices(
+  db: D1Database,
+  actor: AdminActor,
+  input: InvoiceListInput = {},
+): Promise<number> {
+  const filter = invoiceFilters(actor, input);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM invoices i JOIN customers c ON c.id = i.customer_id
+       ${filter.sql}`,
+    )
+    .bind(...filter.bind)
+    .first<{ count: number }>();
+  return Number(row?.count ?? 0);
 }
 
 export async function getInvoice(
@@ -70,6 +118,7 @@ export async function getInvoice(
   const invoice = await db
     .prepare(
       `SELECT i.*, c.first_name, c.last_name, c.company_name,
+              COALESCE(NULLIF(i.service_label, ''), s.name) AS service_name,
               (SELECT value FROM customer_contacts
                WHERE customer_contacts.customer_id = c.id AND customer_contacts.kind = 'email'
                ORDER BY is_primary DESC, created_at ASC LIMIT 1) AS customer_email,
@@ -78,20 +127,22 @@ export async function getInvoice(
                ORDER BY is_primary DESC, created_at ASC LIMIT 1) AS customer_phone,
               p.line1, p.line2, p.city, p.state, p.postal_code
        FROM invoices i JOIN customers c ON c.id = i.customer_id
+       LEFT JOIN services s ON s.code = i.service_code
        LEFT JOIN properties p ON p.id = i.property_id
        WHERE i.id = ? ${branch.sql} LIMIT 1`,
     )
     .bind(invoiceId, ...branch.bind)
     .first();
   if (!invoice) return null;
-  const [lines, payments, refunds, credits, receipts] = await Promise.all([
+  const [lines, payments, refunds, credits, receipts, tips] = await Promise.all([
     db.prepare('SELECT * FROM invoice_lines WHERE invoice_id = ? ORDER BY sort_order').bind(invoiceId).all(),
-    db.prepare('SELECT id, provider, status, amount_cents, received_at, created_at FROM payments WHERE invoice_id = ? ORDER BY created_at DESC').bind(invoiceId).all(),
+    db.prepare('SELECT id, provider, status, amount_cents, service_cents, tip_cents, received_at, created_at FROM payments WHERE invoice_id = ? ORDER BY created_at DESC').bind(invoiceId).all(),
     db.prepare('SELECT r.* FROM refunds r JOIN payments p ON p.id = r.payment_id WHERE p.invoice_id = ? ORDER BY r.created_at DESC').bind(invoiceId).all(),
     db.prepare('SELECT * FROM credits WHERE customer_id = ? ORDER BY created_at DESC').bind(invoice.customer_id).all(),
     db.prepare('SELECT * FROM payment_receipts WHERE invoice_id = ? ORDER BY created_at DESC LIMIT 10').bind(invoiceId).all(),
+    listInvoiceTips(db, invoiceId),
   ]);
-  return { invoice, lines: lines.results ?? [], payments: payments.results ?? [], refunds: refunds.results ?? [], credits: credits.results ?? [], receipts: receipts.results ?? [] };
+  return { invoice, lines: lines.results ?? [], payments: payments.results ?? [], refunds: refunds.results ?? [], credits: credits.results ?? [], receipts: receipts.results ?? [], tips };
 }
 
 export async function createInvoice(
@@ -108,6 +159,39 @@ export async function createInvoice(
   if (!customer) throw new AdminAuthError(404, 'customer_not_found');
   const propertyId = text(input.propertyId, 100) || null;
   const appointmentId = text(input.appointmentId, 100) || null;
+  const bookingRequestId = text(input.bookingRequestId, 120) || null;
+  const invoiceRole = input.invoiceRole === 'supplemental' ? 'supplemental' : 'primary';
+  const relatedInvoiceId = text(input.relatedInvoiceId, 100) || null;
+  if (bookingRequestId) {
+    const existing = await db
+      .prepare('SELECT id, number, total_cents FROM invoices WHERE booking_request_id = ? LIMIT 1')
+      .bind(bookingRequestId)
+      .first<{ id: string; number: string; total_cents: number }>();
+    if (existing) {
+      return { id: existing.id, number: existing.number, totalCents: Number(existing.total_cents) };
+    }
+  }
+  if (appointmentId && invoiceRole === 'primary') {
+    const existing = await db
+      .prepare("SELECT id, number, total_cents FROM invoices WHERE appointment_id = ? AND invoice_role = 'primary' LIMIT 1")
+      .bind(appointmentId)
+      .first<{ id: string; number: string; total_cents: number }>();
+    if (existing) {
+      return { id: existing.id, number: existing.number, totalCents: Number(existing.total_cents) };
+    }
+  }
+  if (relatedInvoiceId) {
+    const related = await db
+      .prepare('SELECT id, customer_id, appointment_id FROM invoices WHERE id = ? LIMIT 1')
+      .bind(relatedInvoiceId)
+      .first<{ id: string; customer_id: string; appointment_id: string | null }>();
+    if (!related || related.customer_id !== customerId) {
+      throw new AdminAuthError(400, 'invoice_related_invalid');
+    }
+    if (appointmentId && related.appointment_id && related.appointment_id !== appointmentId) {
+      throw new AdminAuthError(400, 'invoice_related_appointment_mismatch');
+    }
+  }
   if (propertyId) {
     const property = await db.prepare('SELECT id FROM properties WHERE id = ? AND customer_id = ? LIMIT 1').bind(propertyId, customerId).first();
     if (!property) throw new AdminAuthError(400, 'invoice_property_invalid');
@@ -116,10 +200,34 @@ export async function createInvoice(
     const appointment = await db.prepare('SELECT id FROM appointments WHERE id = ? AND customer_id = ? LIMIT 1').bind(appointmentId, customerId).first();
     if (!appointment) throw new AdminAuthError(400, 'invoice_appointment_invalid');
   }
+  if (bookingRequestId) {
+    const request = await db.prepare('SELECT id FROM booking_requests WHERE id = ? AND customer_id = ? LIMIT 1').bind(bookingRequestId, customerId).first();
+    if (!request) throw new AdminAuthError(400, 'invoice_booking_request_invalid');
+  }
   const lines = Array.isArray(input.lines) ? input.lines : [];
   if (lines.length === 0) throw new AdminAuthError(400, 'invoice_lines_required');
   const issueDate = text(input.issueDate, 10) || new Date().toISOString().slice(0, 10);
   const serviceCode = text(input.serviceCode, 80);
+  const serviceDate = text(input.serviceDate, 10);
+  const serviceLabel = text(input.serviceLabel, 120);
+  if (serviceCode) {
+    const service = await db
+      .prepare('SELECT code FROM services WHERE code = ? AND active = 1 LIMIT 1')
+      .bind(serviceCode)
+      .first();
+    if (!service) throw new AdminAuthError(400, 'invoice_service_invalid');
+  }
+  if (serviceDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) throw new AdminAuthError(400, 'invoice_service_date_invalid');
+    const timeZone = customer.primary_branch_id === 'branch_tampa' ? 'America/New_York' : 'America/Chicago';
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    if (serviceDate > today) throw new AdminAuthError(400, 'invoice_service_date_future');
+  }
   const dueDate = text(input.dueDate, 10) || dueDateFor(issueDate, serviceCode);
   let subtotal = 0;
   let discount = 0;
@@ -148,9 +256,9 @@ export async function createInvoice(
     .prepare(
       `INSERT INTO invoices
        (id, branch_id, customer_id, property_id, appointment_id, number, status, issue_date, due_date,
-        subtotal_cents, discount_cents, tax_cents, total_cents, amount_paid_cents, balance_cents,
-        created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        service_code, service_label, service_date, subtotal_cents, discount_cents, tax_cents, total_cents, amount_paid_cents, balance_cents,
+        booking_request_id, invoice_role, related_invoice_id, created_by_admin_user_id)
+       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
     )
     .bind(
       invoiceId,
@@ -161,11 +269,17 @@ export async function createInvoice(
       number,
       issueDate,
       dueDate,
+      serviceCode,
+      serviceLabel || null,
+      serviceDate || null,
       subtotal,
       discount,
       tax,
       totalCents,
       totalCents,
+      bookingRequestId,
+      invoiceRole,
+      relatedInvoiceId,
       actor.id,
     )
     .run();

@@ -39,6 +39,8 @@ test('the receipt is itemized, branded and shows tax and paid total', () => {
   assert.match(receipt.html, /\$150\.50/);
   assert.match(receipt.text, /Total: \$150\.50/);
   assert.match(receipt.text, /Paid: \$150\.50/);
+  assert.match(receipt.html, /Total paid/);
+  assert.doesNotMatch(receipt.html, />\u2212\$150\.50</);
 });
 
 test('the receipt escapes customer-supplied strings', () => {

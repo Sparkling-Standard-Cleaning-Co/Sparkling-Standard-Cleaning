@@ -1,3 +1,4 @@
+import './helpers/enable-signing.ts';
 // Estimate checkout endpoint tests: readiness, server-owned amounts, durable
 // idempotency, exact-price enforcement and price-change acceptance.
 // No network: geocoding, routing, Stripe and readiness probes are stubbed.
@@ -10,6 +11,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { D1Database, D1PreparedStatement, D1Result } from '../src/lib/admin/d1.ts';
 import { getActiveCheckoutSlot } from '../src/lib/payments/checkout-registry.ts';
+import { sha256Hex, signSigningRequest } from '../src/lib/documents/service.ts';
 
 import {
   onRequestGet,
@@ -17,6 +19,7 @@ import {
   paymentReadiness,
 } from '../functions/api/estimate-checkout.ts';
 import { calculateFacilityPrice, calculateFacilityWorkload } from '../src/lib/estimate/commercial.ts';
+import { commercialTierConfig } from '../src/config/estimators/commercial.ts';
 import { calculateEstimate } from '../src/lib/estimate/calculate.ts';
 import { selectInstantAmount } from '../src/lib/estimate/quote.ts';
 import { travelConfig } from '../src/config/estimators/travel.ts';
@@ -70,6 +73,10 @@ function checkoutDb(): TestD1 {
   }
   return db;
 }
+
+// The enabled facility path remains covered even though production ships with
+// facility online payment disabled until its own acceptance run.
+(commercialTierConfig as { facilityOnlinePaymentEnabled: boolean }).facilityOnlinePaymentEnabled = true;
 
 let ip = 0;
 let secretSerial = 0;
@@ -149,6 +156,12 @@ function providerStub(options: { includeDuration?: boolean } = {}) {
         code: 'Ok',
         routes: [{ distance: 16093.44, ...(includeDuration ? { duration: 1200 } : {}) }],
       });
+    }
+    if (href.includes('/v1/customers/')) {
+      return jsonResponse({ id: 'cus_test_synthetic', metadata: { customer_id: 'synthetic' } });
+    }
+    if (href.endsWith('/v1/customers')) {
+      return jsonResponse({ id: 'cus_test_synthetic' });
     }
     if (href.includes('/v1/checkout/sessions/')) {
       return jsonResponse({
@@ -369,6 +382,7 @@ test('a valid facility quote creates one session at the server-calculated amount
         const body = init?.body as URLSearchParams;
         amountCents = body.get('line_items[0][price_data][unit_amount]') ?? '';
         assert.equal(body.get('metadata[checkout_kind]'), 'estimate_payment');
+        assert.equal(body.get('customer_update[email]'), null, 'Stripe rejects customer_update[email]');
         assert.match(body.get('metadata[checkout_attempt]') ?? '', /^[a-f0-9]{64}$/);
         assert.match(String(init?.headers && (init.headers as Record<string, string>)['Idempotency-Key']), /^ss-estimate-[a-f0-9]{64}-1$/);
       }
@@ -618,8 +632,12 @@ test('a facility payment without a server-confirmed street address is reservatio
   assert.equal(provider.postCount(), 0);
 });
 
-function validResidentialInput(serviceType: 'standard' | 'str_turnover', options: { supportive?: boolean } = {}) {
+function validResidentialInput(
+  serviceType: 'standard' | 'str_turnover',
+  options: { supportive?: boolean; frequency?: 'one_time' | 'weekly' | 'biweekly' | 'monthly' } = {},
+) {
   const isStr = serviceType === 'str_turnover';
+  const frequency = options.frequency ?? 'one_time';
   const input = {
     serviceType,
     propertyType: isStr ? ('condo' as const) : ('house' as const),
@@ -628,7 +646,7 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover', options
     fullBaths: 2,
     halfBaths: 0,
     ...(isStr ? { beds: 2 } : {}),
-    frequency: 'one_time' as const,
+    frequency,
     condition: 'maintained' as const,
     lastClean: 'within_month' as const,
     addonIds: [],
@@ -677,11 +695,21 @@ function validResidentialInput(serviceType: 'standard' | 'str_turnover', options
       full_baths: '2',
       half_baths: '0',
       ...(isStr ? { beds: '2' } : {}),
-      frequency: 'one_time',
+      frequency,
       condition: 'maintained',
       last_cleaned: 'within_month',
       pets: 'none',
       ...(options.supportive ? { supportive_eligible: 'yes' } : {}),
+      ...(result.ongoing
+        ? {
+            initial_deep_clean_required: 'yes',
+            initial_deep_clean_acknowledged: 'yes',
+            first_visit_total: String(amount),
+            ongoing_regular_price_per_visit: String(result.ongoing.regularPerVisitPrice),
+            ongoing_price_per_visit: String(result.ongoing.perVisitPrice),
+            ongoing_frequency: result.ongoing.frequency,
+          }
+        : {}),
       addon_ids: '',
       zip: '32502',
       service_address: '100 S Baylen St',
@@ -755,6 +783,52 @@ for (const serviceType of ['standard', 'str_turnover'] as const) {
     assert.equal(amount > 0, true);
   });
 }
+
+test('a Stripe parameter failure is retained so a retry advances the idempotency key', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const keys: string[] = [];
+  let posts = 0;
+  const { fields: baseFields } = validResidentialInput('standard');
+  const fields = withHold(baseFields, ledger);
+  const fetcher = async (url: string | URL, init?: RequestInit) => {
+    if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+      posts += 1;
+      keys.push(new Headers(init?.headers).get('Idempotency-Key') ?? '');
+      if (posts === 1) {
+        return jsonResponse({
+          error: {
+            code: 'parameter_unknown',
+            type: 'invalid_request_error',
+            param: 'customer_update[email]',
+            message: 'Received unknown parameter: customer_update[email]',
+          },
+        }, 400);
+      }
+      return jsonResponse({ id: 'cs_retry', url: 'https://checkout.stripe.test/retry' });
+    }
+    return provider.stub(url, init);
+  };
+  const first = await withFetch(fetcher, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  assert.equal(first.status, 502);
+  const second = await withFetch(fetcher, () =>
+    onRequestPost({
+      request: jsonRequest({ fields, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  const secondBody = await second.json();
+  assert.equal(second.status, 200, JSON.stringify(secondBody));
+  assert.equal(posts, 2);
+  assert.match(keys[0] ?? '', /-1$/);
+  assert.match(keys[1] ?? '', /-2$/, 'the retry must not reuse Stripe cached failure idempotency');
+});
 
 test('a residential route without a driving duration cannot create checkout', async () => {
   const ledger = new FakeLedger();
@@ -1028,7 +1102,9 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
          combinable = 0,
          supportive_stackable = excluded.supportive_stackable,
          status = 'active',
-         scope = 'cleaning'`,
+         scope = 'cleaning',
+         booking_deadline_at = NULL,
+         service_deadline_at = NULL`,
     )
     .run(
       `promo_${input.code.toLowerCase()}`,
@@ -1043,7 +1119,7 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
     );
 }
 
-test('an explicitly compatible promotion stacks with Community Support', async () => {
+test('a promotion and Community Support never compound on the same charge', async () => {
   const ledger = new FakeLedger();
   const db = checkoutDb();
   await activeCheckoutPromotion(db, {
@@ -1058,6 +1134,7 @@ test('an explicitly compatible promotion stacks with Community Support', async (
   const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
   const fields = withHold(baseFields, ledger);
   const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  const promotionBaseCents = Math.round(amount * 100) + automaticCents;
   let unitAmount = '';
   let promotionCode = '';
   let receiptDiscount = '';
@@ -1083,9 +1160,53 @@ test('an explicitly compatible promotion stacks with Community Support', async (
   );
 
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
-  assert.equal(unitAmount, String(Math.round(amount * 100) - 7500));
+  assert.equal(unitAmount, String(promotionBaseCents - 7500), 'the larger promotion replaces—not stacks on—the same line');
   assert.equal(promotionCode, 'THANKS75');
   assert.equal(receiptDiscount, '7500');
+});
+
+test('a displayed promotion total is accepted against the matching server promotion', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  await activeCheckoutPromotion(db, {
+    code: 'THANKS75',
+    name: 'Thanksgiving Deep Clean Special',
+    valueCents: 7500,
+    supportiveStackable: true,
+    minPurchaseCents: 20000,
+  });
+  const env = { ...makeEnv(ledger), DB: db };
+  const provider = providerStub();
+  const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
+  const fields = withHold(baseFields, ledger);
+  const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  const finalCents = Math.round(amount * 100) + automaticCents - 7500;
+  let unitAmount = '';
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: {
+            ...fields,
+            promotion_code: 'THANKS75',
+            quoted_total: (finalCents / 100).toFixed(2),
+          },
+          acceptedAmount: finalCents / 100,
+          acceptRecalculated: true,
+          returnPath: '/estimate/residential/',
+        }),
+        env,
+      } as never),
+  );
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.equal(unitAmount, String(finalCents));
 });
 
 test('FRIENDS15 never stacks with Community Support and replaces it only when larger', async () => {
@@ -1131,6 +1252,61 @@ test('FRIENDS15 never stacks with Community Support and replaces it only when la
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
   assert.equal(promotionCode, 'FRIENDS15');
   assert.equal(unitAmount, String(promotionBaseCents - expectedDiscount));
+});
+
+test('HOLIDAY15 applies to the first visit while Community Support stays on future recurring visits', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  await activeCheckoutPromotion(db, {
+    code: 'HOLIDAY15',
+    name: 'Holidays',
+    valueCents: 0,
+    percent: 15,
+    kind: 'percent',
+    supportiveStackable: true,
+  });
+  const env = { ...makeEnv(ledger), DB: db, RECURRING_SCHEDULING_ENABLED: 'true' };
+  const provider = providerStub();
+  const { amount, result, fields: baseFields } = validResidentialInput('standard', {
+    supportive: true,
+    frequency: 'weekly',
+  });
+  assert.ok(result.ongoing, 'the recurring rate is present');
+  assert.equal(result.pricing.discount, null, 'Community Support is not taken off the first visit');
+  const ongoingDiscount = result.ongoing.pricing.discounts.find((discount) => discount.source === 'supportive');
+  assert.ok(ongoingDiscount && ongoingDiscount.amount > 0, 'Community Support is allocated to ongoing visits');
+  assert.ok(result.ongoing.regularPerVisitPrice > result.ongoing.perVisitPrice);
+  const fields = withHold(baseFields, ledger);
+  const promotionBaseCents = Math.round(amount * 100);
+  const expectedDiscount = Math.round((promotionBaseCents * 15) / 100);
+  let unitAmount = '';
+  let promotionCode = '';
+  let receiptDiscount = '';
+
+  const response = await withFetch(
+    async (url, init) => {
+      if (String(url).includes('/v1/checkout/sessions') && !String(url).includes('/v1/checkout/sessions/')) {
+        const body = init?.body as URLSearchParams;
+        unitAmount = body.get('line_items[0][price_data][unit_amount]') ?? '';
+        promotionCode = body.get('metadata[promotion_code]') ?? '';
+        receiptDiscount = body.get('metadata[promotion_discount_cents]') ?? '';
+      }
+      return provider.stub(url, init);
+    },
+    () =>
+      onRequestPost({
+        request: jsonRequest({
+          fields: { ...fields, promotion_code: 'HOLIDAY15' },
+          returnPath: '/estimate/residential/',
+        }),
+        env,
+      } as never),
+  );
+
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.equal(promotionCode, 'HOLIDAY15');
+  assert.equal(receiptDiscount, String(expectedDiscount));
+  assert.equal(unitAmount, String(promotionBaseCents - expectedDiscount), 'only HOLIDAY15 reduces the first-visit charge');
 });
 
 test('a valid but smaller submitted promotion never removes the better automatic discount', async () => {
@@ -1186,6 +1362,7 @@ test('a promotion is applied before gift-certificate value at checkout', async (
   const { amount, result, fields: baseFields } = validResidentialInput('standard', { supportive: true });
   const fields = withHold(baseFields, ledger);
   const automaticCents = Math.round((result.pricing.discount?.amount ?? 0) * 100);
+  const promotionBaseCents = Math.round(amount * 100) + automaticCents;
   let unitAmount = '';
   let giftApplied = '';
 
@@ -1216,5 +1393,129 @@ test('a promotion is applied before gift-certificate value at checkout', async (
 
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
   assert.equal(giftApplied, '10000');
-  assert.equal(unitAmount, String(Math.round(amount * 100) - 7500 - 10_000));
+  assert.equal(unitAmount, String(promotionBaseCents - 7500 - 10_000));
+});
+
+test('pre-payment signing blocks checkout, then the resume token completes the same session without a duplicate Stripe call', async () => {
+  const ledger = new FakeLedger();
+  const db = checkoutDb();
+  const env = { ...makeEnv(ledger), DB: db };
+  const provider = providerStub();
+  const { fields: baseFields } = validResidentialInput('standard');
+  const fields = withHold(baseFields, ledger);
+  const customerId = `cust_${randomUUID()}`;
+  const propertyId = `prop_${randomUUID()}`;
+  const requestId = `request_${randomUUID()}`;
+  const templateId = `tmpl_${randomUUID()}`;
+  const bundleId = `bundle_${randomUUID()}`;
+  const email = `docusign-${randomUUID()}@example.test`;
+  db.raw.prepare("INSERT INTO customers (id, primary_branch_id, first_name, last_name, status) VALUES (?, 'branch_pensacola', 'Synthetic', 'Checkout Customer', 'active')").run(customerId);
+  db.raw.prepare("INSERT INTO customer_contacts (id, customer_id, kind, value, normalized_value, is_primary) VALUES (?, ?, 'email', ?, ?, 1)").run(`cc_${randomUUID()}`, customerId, email, email);
+  db.raw.prepare("INSERT INTO properties (id, customer_id, branch_id, label, line1, city, state, postal_code, status) VALUES (?, ?, 'branch_pensacola', 'Home', '100 S Baylen St', 'Pensacola', 'FL', '32502', 'active')").run(propertyId, customerId);
+  db.raw.prepare(
+    `INSERT INTO booking_requests
+     (id, hold_id, branch_id, customer_id, property_id, status, quote_reference, requested_date, start_at, end_at, duration_minutes, payload_json)
+     VALUES (?, ?, 'branch_pensacola', ?, ?, 'pending', ?, '2026-11-03', ?, ?, 120, ?)`,
+  ).run(requestId, fields.booking_hold_id, customerId, propertyId, fields.quote_reference, fields.booking_slot_start, fields.booking_slot_end, JSON.stringify({ ...fields, email }));
+  const content = 'Service agreement for {{customer.legal_name}} at {{property.address}}. Price: {{price.summary}}.';
+  db.raw.prepare(
+    `INSERT INTO document_templates (id, title, category, version, status, source_kind, content_text, content_sha256, signer_party)
+     VALUES (?, 'Checkout Agreement', 'residential', '1.0', 'approved', 'text', ?, ?, 'customer')`,
+  ).run(templateId, content, await sha256Hex(content));
+  db.raw.prepare(
+    `INSERT INTO document_bundles (id, code, name, service_category, subject_type, status, version, is_system)
+     VALUES (?, 'customer.residential', 'Residential agreement', 'residential', 'customer', 'active', 1, 0)`,
+  ).run(bundleId);
+  db.raw.prepare(
+    `INSERT INTO document_bundle_items (bundle_id, template_id, sort_order, required, enforcement_stage)
+     VALUES (?, ?, 0, 1, 'before_payment')`,
+  ).run(bundleId, templateId);
+
+  const blocked = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ fields: { ...fields, email }, returnPath: '/estimate/residential/' }),
+      env,
+    } as never),
+  );
+  assert.equal(blocked.status, 409);
+  const blockedBody = (await blocked.json()) as { error?: string; signingUrl?: string };
+  assert.equal(blockedBody.error, 'documents_required');
+  assert.ok(blockedBody.signingUrl?.startsWith('/document-sign/?token='));
+  assert.equal(provider.postCount(), 0, 'no Stripe call while the agreement is unsigned');
+
+  const signingUrl = new URL(blockedBody.signingUrl ?? '', 'https://example.test');
+  const token = signingUrl.searchParams.get('token') ?? '';
+  const resume = signingUrl.searchParams.get('resume') ?? '';
+  assert.ok(token);
+  assert.ok(resume);
+  await signSigningRequest(db, token, {
+    signerName: 'Synthetic Checkout Customer',
+    signerEmail: email,
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Checkout Customer' } },
+    request: new Request('https://example.test/api/document-sign', {
+      headers: { 'CF-Connecting-IP': '203.0.113.77', 'User-Agent': 'synthetic-test' },
+    }),
+  });
+
+  const resumed = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ resume_token: resume }),
+      env,
+    } as never),
+  );
+  assert.equal(resumed.status, 200, JSON.stringify(await resumed.clone().json()));
+  const resumedBody = (await resumed.json()) as { ok?: boolean; url?: string };
+  assert.equal(resumedBody.ok, true);
+  assert.equal(resumedBody.url, 'https://checkout.stripe.test/session');
+  assert.equal(provider.postCount(), 1);
+
+  const repeated = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ resume_token: resume }),
+      env,
+    } as never),
+  );
+  assert.equal(repeated.status, 200);
+  assert.equal(provider.postCount(), 1, 'a repeated resume reuses the existing session');
+
+  const holdKey = `booking/holds/${fields.booking_hold_id}.json`;
+  const hold = JSON.parse(ledger.values.get(holdKey) ?? '{}') as { expiresAt?: string };
+  hold.expiresAt = '2020-01-01T00:00:00.000Z';
+  ledger.values.set(holdKey, JSON.stringify(hold));
+  const expiredHold = await withFetch(provider.stub, () =>
+    onRequestPost({
+      request: jsonRequest({ resume_token: resume }),
+      env,
+    } as never),
+  );
+  assert.equal(expiredHold.status, 400);
+  assert.equal(((await expiredHold.json()) as { error?: string }).error, 'booking_hold_expired');
+  assert.equal(provider.postCount(), 1, 'hold expiration is checked before any new Stripe session');
+});
+
+test('facility online payment fails closed until its activation gate is on', async () => {
+  const ledger = new FakeLedger();
+  const env = makeEnv(ledger);
+  const provider = providerStub();
+  const { fields } = validFacilityInput();
+  const config = commercialTierConfig as { facilityOnlinePaymentEnabled: boolean };
+  const previous = config.facilityOnlinePaymentEnabled;
+  config.facilityOnlinePaymentEnabled = false;
+  try {
+    const response = await withFetch(provider.stub, () =>
+      onRequestPost({
+        request: jsonRequest({ fields, returnPath: '/estimate/commercial/' }),
+        env,
+      } as never),
+    );
+    assert.equal(response.status, 409);
+    assert.equal(
+      ((await response.json()) as { error?: string }).error,
+      'facility_payment_not_activated',
+    );
+    assert.equal(provider.postCount(), 0, 'no Stripe session is created');
+  } finally {
+    config.facilityOnlinePaymentEnabled = previous;
+  }
 });

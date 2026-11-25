@@ -6,9 +6,9 @@
 //  - A platform renders ONLY when its confirmed URL is configured. PENDING
 //    platforms are filtered out, so adding a real URL later is a one-line
 //    config change and nothing else.
-//  - Logo-only presentation: each profile is a single circular button holding
-//    its official mark. The platform name is not displayed; the visually
-//    hidden text provides the link's explicit accessible name.
+//  - Logo-only presentation: each profile is its official mark on a generous
+//    transparent touch target (no white circular chip). The platform name is
+//    visually hidden but provides the link's explicit accessible name.
 //  - Outbound links open in a new tab with rel="noopener noreferrer".
 //  - These are outbound profile links: never append UTM/campaign parameters.
 //    UTMs belong on inbound links that point visitors TO this website.
@@ -73,7 +73,7 @@ const profiles = PROFILE_ORDER.flatMap((profile) => {
             rel="noopener noreferrer"
             data-cta={`social-${profile.key.toLowerCase()}`}
           >
-            <SocialIcon name={profile.icon} size={26} />
+            <SocialIcon name={profile.icon} size={32} />
             <span class="visually-hidden">
               {profile.label} — {siteName()} (opens in a new tab)
             </span>

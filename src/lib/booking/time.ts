@@ -93,6 +93,12 @@ export function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60_000);
 }
 
+/** Minutes after local midnight for an instant in the named zone. */
+export function localMinutesOfDay(date: Date, timeZone: string): number {
+  const parts = zonedParts(date, timeZone);
+  return parts.hour * 60 + parts.minute;
+}
+
 export function formatLocalTime(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat('en-US', {
     timeZone,

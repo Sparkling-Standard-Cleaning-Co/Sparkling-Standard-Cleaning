@@ -1,4 +1,4 @@
-// Attribution integration tests â€” the full chain from a campaign landing page
+// Attribution integration tests — the full chain from a campaign landing page
 // through internal navigation to the lead payload the owner receives.
 // Run with: npm run test:browser on :4409.
 
@@ -122,7 +122,7 @@ async function completeEstimate(page) {
   await page.waitForFunction(
     () => document.querySelector('.wizard__step[data-step="2"]')?.getAttribute('data-active') === 'true',
   );
-  await page.click('label.option:has(input[name="serviceType"][value="standard"])');
+  await page.click('label.segmented-choice__option:has(input[name="serviceType"][value="standard"])');
   await page.selectOption('#est-property', 'house');
   await page.fill('#est-sqft', '1600');
   await page.fill('#est-bedrooms', '3');

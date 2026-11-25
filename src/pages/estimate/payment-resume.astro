@@ -1,0 +1,53 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+---
+
+<BaseLayout
+  title="Secure Payment"
+  description="Review your signed agreement and complete secure payment for your Sparkling Standard cleaning request."
+  noindex
+  analytics={false}
+>
+  <section class="section">
+    <div class="container container--narrow text-center">
+      <span class="card__icon" style="margin-inline: auto"><Icon name="shield" /></span>
+      <h1 class="mt-4">Complete secure payment.</h1>
+      <p class="lead" style="margin-inline:auto" data-resume-state>
+        Your documents are signed. Review the amount below and continue to Stripe's secure checkout.
+      </p>
+      <p class="small text-muted" data-resume-reference hidden></p>
+
+      <div class="card mt-6" style="text-align:left" data-resume-summary hidden>
+        <h2 class="card__title">Signed agreement and payment summary</h2>
+        <dl class="signing-summary" data-resume-details></dl>
+        <p class="small text-muted" data-resume-email></p>
+        <div class="admin-actions" style="justify-content:center;margin-top:1rem">
+          <a class="btn btn--secondary" data-resume-pdf hidden target="_blank" rel="noopener"
+            >Download signed PDF</a
+          >
+          <a class="btn btn--ghost" href="/portal/">Open customer portal</a>
+        </div>
+        <button class="btn btn--primary btn--full mt-4" type="button" data-resume-continue>
+          Continue to secure payment
+        </button>
+      </div>
+
+      <div class="card mt-6" style="text-align:left" data-resume-actions hidden>
+        <h2 class="card__title">Price confirmation</h2>
+        <p class="step__text" data-resume-message></p>
+        <button class="btn btn--primary btn--full mt-4" type="button" data-resume-accept>
+          Accept the verified amount and continue
+        </button>
+      </div>
+
+      <p class="mt-6 small text-muted">
+        No card details are handled by this website. Payment is completed on Stripe's secure checkout.
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import '../../scripts/payment-resume';
+</script>

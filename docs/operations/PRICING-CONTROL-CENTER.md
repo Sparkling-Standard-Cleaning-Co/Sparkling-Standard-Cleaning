@@ -56,7 +56,8 @@ must reproduce those values and the existing `PRICING_CONFIG_VERSION`.
   `src/lib/pricing/snapshot.ts`.
 - **D1** — `pricing_versions` (migration `0026_pricing_control.sql`). Drafts
   are editable; published versions are immutable; at most one row may be
-  published (partial unique index).
+  published **per branch** (partial unique index on `branch_id`). Pensacola
+  is publishable; Tampa Bay remains draft/locked while prelaunch.
 - **Store** — `src/lib/pricing/store.ts`: create/save draft, publish,
   rollback, discard and history. Publishing archives the previous version and
   activates the new one in one D1 batch. Rollback appends a **new** version

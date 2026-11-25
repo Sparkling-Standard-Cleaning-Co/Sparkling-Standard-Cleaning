@@ -1,4 +1,4 @@
-// Regression test for Hayli's homepage audit â€” explicitly verifies that the
+// Regression test for Hayli's homepage audit — explicitly verifies that the
 // rendered homepage carries all six complete approved service descriptions,
 // including Church Cleaning and the mandatory Deep Cleaning prerequisite.
 //

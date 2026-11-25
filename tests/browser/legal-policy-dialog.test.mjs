@@ -1,0 +1,93 @@
+// Regression: viewing the Terms or Privacy policy from a checkout
+// acknowledgment must not navigate away or erase the customer's progress.
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
+import { chromium } from 'playwright';
+
+const PORT = 4556;
+const BASE = `http://localhost:${PORT}`;
+
+let server;
+let browser;
+
+before(async () => {
+  server = spawn(process.execPath, ['node_modules/astro/astro.js', 'preview', '--port', String(PORT)], {
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    try {
+      if ((await fetch(BASE + '/', { signal: AbortSignal.timeout(1500) })).ok) {
+        browser = await chromium.launch();
+        return;
+      }
+    } catch {
+      // not ready yet
+    }
+    await delay(500);
+  }
+  throw new Error('preview server did not become ready');
+});
+
+after(async () => {
+  await browser?.close();
+  server?.kill();
+});
+
+async function open(width = 1280, height = 900) {
+  const context = await browser.newContext({ viewport: { width, height } });
+  const page = await context.newPage();
+  return { context, page };
+}
+
+for (const viewport of [
+  { name: 'desktop', width: 1280, height: 900 },
+  { name: 'phone', width: 390, height: 844 },
+]) {
+  test(`policy links open an accessible modal without losing checkout state (${viewport.name})`, async () => {
+    const { context, page } = await open(viewport.width, viewport.height);
+    try {
+      await page.goto(BASE + '/gift-certificates/', { waitUntil: 'load' });
+      const startUrl = page.url();
+      const acceptance = page.locator('[data-terms-acceptance]').first();
+      const checkbox = acceptance.locator('input[type="checkbox"]');
+      assert.equal(await checkbox.isChecked(), false);
+
+      await acceptance.getByRole('link', { name: 'Terms and Conditions' }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.waitFor({ state: 'visible' });
+      await page.waitForFunction(() =>
+        document.querySelector('[data-legal-policy-body]')?.textContent?.includes('Terms of service'),
+      );
+      assert.equal(page.url(), startUrl, 'opening the policy never navigates away');
+      assert.equal(await checkbox.isChecked(), false, 'viewing the policy never checks acceptance');
+      assert.match((await dialog.textContent()) ?? '', /Terms of service/);
+      assert.equal(
+        await dialog.getByRole('link', { name: /Open full page in a new tab/i }).getAttribute('target'),
+        '_blank',
+      );
+
+      await page.keyboard.press('Escape');
+      await dialog.waitFor({ state: 'hidden' });
+      assert.equal(page.url(), startUrl);
+
+      await acceptance.getByRole('link', { name: 'Privacy Policy' }).click();
+      await dialog.waitFor({ state: 'visible' });
+      await page.waitForFunction(() =>
+        document.querySelector('[data-legal-policy-body]')?.textContent?.includes('Privacy policy'),
+      );
+      assert.match((await dialog.textContent()) ?? '', /Privacy policy/);
+      assert.equal(page.url(), startUrl);
+      assert.equal(await checkbox.isChecked(), false);
+
+      await dialog.getByRole('button', { name: /Close and return to checkout/i }).click();
+      await dialog.waitFor({ state: 'hidden' });
+      assert.equal(page.url(), startUrl);
+      assert.equal(await page.locator('#gift-purchaser-name').isVisible(), true);
+    } finally {
+      await context.close();
+    }
+  });
+}

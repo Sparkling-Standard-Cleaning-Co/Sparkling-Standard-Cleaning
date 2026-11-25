@@ -9,12 +9,14 @@ import { createOpsSession, enrollOwner, readOpsActor } from '../src/lib/admin/op
 import {
   cancelManualBooking,
   confirmManualBooking,
+  createCompletedService,
   createManualBooking,
   manualAvailability,
   quoteManualBooking,
 } from '../src/lib/admin/manual-booking.ts';
 import type { AvailabilityInput, AvailabilityServiceResult } from '../src/lib/booking/service.ts';
-import { onRequestPost as bookingsPost } from '../functions/api/admin/bookings.ts';
+import { onRequestGet as bookingsGet, onRequestPost as bookingsPost } from '../functions/api/admin/bookings.ts';
+import { createInvoice, getInvoice } from '../src/lib/admin/billing.ts';
 import {
   activeEntitlementForCustomer,
   applyCustomerEntitlement,
@@ -141,7 +143,7 @@ async function fixture() {
     addonIds: [],
     pets: 'none',
   };
-  return { db, actor, env, quoteInput };
+  return { db, actor, env, quoteInput, session };
 }
 
 test('manual quote uses the authoritative residential calculator and pricing version', async () => {
@@ -198,6 +200,23 @@ test('creating a manual booking persists a pending request, estimate, hold and c
   assert.equal(fields.preferred_date, '2026-12-15');
   assert.equal(fields.admin_notes, 'Key under the mat.');
   assert.equal(fields.quote_reference, created.reference);
+});
+
+test('repeating a manual booking submission is idempotent', async () => {
+  const { db, actor, env, quoteInput } = await fixture();
+  const input = { ...quoteInput, date: '2026-12-15', start: START, crewSize: 1 };
+  const first = await createManualBooking(env, db, actor, input, {
+    availability: slotAvailability([]),
+  });
+  const second = await createManualBooking(env, db, actor, input, {
+    availability: slotAvailability([]),
+  });
+  assert.equal(second.requestId, first.requestId, 'a repeat returns the existing pending booking');
+  assert.equal(second.reference, first.reference);
+  const count = db.raw
+    .prepare("SELECT COUNT(*) AS count FROM booking_requests WHERE hold_id LIKE 'manual_%'")
+    .get() as { count: number };
+  assert.equal(count.count, 1, 'no duplicate booking request is created');
 });
 
 test('confirming a manual booking writes appointment, crew, calendar link and commitment', async () => {
@@ -582,7 +601,8 @@ test('a selected database promotion carries through the manual quote', async () 
   db.raw.prepare(
     `UPDATE promotions SET name = 'Thanksgiving Special', kind = 'fixed', value_cents = 7500,
        services_json = '["deep"]', branches_json = '["branch_pensacola"]', min_purchase_cents = 20000,
-       first_visit_only = 1, status = 'active', terms_version = '2026-11-10.thanks75.v1'
+       first_visit_only = 1, status = 'active', terms_version = '2026-11-10.thanks75.v1',
+       booking_deadline_at = NULL, service_deadline_at = NULL, expires_at = '2099-12-31T23:59:59Z'
      WHERE code = 'THANKS75'`,
   ).run();
   const quote = await quoteManualBooking(env, db, actor, {
@@ -594,4 +614,306 @@ test('a selected database promotion carries through the manual quote', async () 
   assert.equal(quote.status, 'priced');
   assert.equal(quote.discountLabel, 'Promotion - Thanksgiving Special');
   assert.equal(quote.discountAmountCents, 7500);
+});
+
+test('a custom agreed price and discount are server-authoritative and persisted', async () => {
+  const { db, actor, env, quoteInput } = await fixture();
+  const quote = await quoteManualBooking(env, db, actor, {
+    ...quoteInput,
+    pricingMethod: 'custom',
+    customPrice: 275,
+    discountType: 'percent',
+    discountValue: 10,
+    discountReason: 'Owner-approved adjustment',
+  });
+  assert.equal(quote.status, 'priced');
+  assert.equal(quote.totalCents, 24750);
+  assert.equal(quote.discountAmountCents, 2750);
+  assert.equal(quote.fields.pricing_method, 'custom');
+  assert.equal(quote.fields.custom_price, '275.00');
+  assert.equal(quote.fields.admin_agreed_price, '247.50');
+  assert.equal(quote.fields.admin_discount_reason, 'Owner-approved adjustment');
+  const fixed = await quoteManualBooking(env, db, actor, {
+    ...quoteInput,
+    pricingMethod: 'custom',
+    customPrice: 275,
+    discountType: 'fixed',
+    discountValue: 25,
+  });
+  assert.equal(fixed.totalCents, 25000);
+  await assert.rejects(
+    () => quoteManualBooking(env, db, actor, {
+      ...quoteInput,
+      pricingMethod: 'custom',
+      customPrice: -10,
+    }),
+    /custom_price_invalid/,
+  );
+  await assert.rejects(
+    () => quoteManualBooking(env, db, actor, {
+      ...quoteInput,
+      pricingMethod: 'custom',
+      customPrice: 100,
+      discountType: 'percent',
+      discountValue: 150,
+    }),
+    /discount_percent_invalid/,
+  );
+});
+
+test('completed service today persists without availability or a calendar event and invoices at the agreed price', async () => {
+  const { db, actor, env, quoteInput, session } = await fixture();
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+  const headers = {
+    Cookie: `ss_ops=${session.token}`,
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': session.csrf,
+  };
+  const createdResponse = await bookingsPost({
+    request: new Request('https://example.test/api/admin/bookings', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'create_completed',
+        ...quoteInput,
+        serviceType: 'move_out',
+        serviceLabel: 'Move-Out Cleaning',
+        completedDate: today,
+        teamMemberIds: ['team_hayli'],
+        pricingMethod: 'custom',
+        customPrice: 275,
+        discountType: 'none',
+        notes: 'Cleaned while moving out.',
+      }),
+    }),
+    env,
+  } as never);
+  assert.equal(createdResponse.status, 201);
+  const created = (await createdResponse.json()) as {
+    appointmentId: string;
+    reference: string;
+    totalCents: number;
+    serviceDate: string;
+  };
+  assert.equal(created.totalCents, 27500);
+  assert.equal(created.serviceDate, today);
+  const appointment = db.raw.prepare('SELECT * FROM appointments WHERE id = ?').get(created.appointmentId) as Record<string, unknown>;
+  assert.equal(appointment.status, 'completed');
+  assert.equal(appointment.source, 'admin_completed');
+  assert.equal(appointment.booking_request_id, null);
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM calendar_links WHERE appointment_id = ?').get(created.appointmentId) as { n: number }).n, 0);
+  const estimate = db.raw.prepare('SELECT * FROM estimates WHERE id = ?').get(String(appointment.estimate_id)) as Record<string, unknown>;
+  assert.equal(estimate.total_cents, 27500);
+  assert.equal(estimate.service_code, 'move_in_out');
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM appointment_resources WHERE appointment_id = ?').get(created.appointmentId) as { n: number }).n, 1);
+  const fields = JSON.parse(String(estimate.input_snapshot_json)) as Record<string, string>;
+  assert.equal(fields.service_label, 'Move-Out Cleaning');
+  assert.equal(fields.completed_service_date, today);
+  assert.equal(fields.admin_agreed_price, '275.00');
+
+  const invoiceResponse = await bookingsPost({
+    request: new Request('https://example.test/api/admin/bookings', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'invoice_job', appointmentId: created.appointmentId, paymentLink: false }),
+    }),
+    env,
+  } as never);
+  if (invoiceResponse.status !== 200) {
+    assert.fail(`invoice_job failed: ${await invoiceResponse.text()}`);
+  }
+  const invoiceBody = (await invoiceResponse.json()) as { invoice: { id: string; number: string; totalCents: number } };
+  assert.equal(invoiceBody.invoice.totalCents, 27500);
+  const invoice = db.raw.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceBody.invoice.id) as Record<string, unknown>;
+  assert.equal(invoice.total_cents, 27500);
+  assert.equal(invoice.service_code, 'move_in_out');
+  assert.equal(invoice.service_label, 'Move-Out Cleaning');
+  assert.equal(invoice.service_date, today);
+  const retry = await bookingsPost({
+    request: new Request('https://example.test/api/admin/bookings', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'invoice_job', appointmentId: created.appointmentId }),
+    }),
+    env,
+  } as never);
+  assert.equal(retry.status, 200);
+  const retryBody = (await retry.json()) as { invoice: { id: string } };
+  assert.equal(retryBody.invoice.id, invoiceBody.invoice.id, 'invoice creation is idempotent per completed job');
+  assert.equal((db.raw.prepare('SELECT COUNT(*) AS n FROM invoices WHERE appointment_id = ?').get(created.appointmentId) as { n: number }).n, 1);
+});
+
+test('historical completed service accepts a past date, links executed evidence and rejects a future date', async () => {
+  const { db, actor, env, quoteInput, session } = await fixture();
+  db.raw
+    .prepare(
+      `INSERT INTO signing_requests
+       (id, subject_type, customer_id, property_id, status, booking_reference, service_code, requirement_snapshot_json)
+       VALUES ('sign_completed', 'customer', 'cust_manual', 'prop_manual', 'signed', 'OLD-REF', 'move_in_out', '[]')`,
+    )
+    .run();
+  const headers = {
+    Cookie: `ss_ops=${session.token}`,
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': session.csrf,
+  };
+  const past = await createCompletedService(env, db, actor, {
+    ...quoteInput,
+    serviceType: 'move_out',
+    serviceLabel: 'Move-Out Cleaning',
+    completedDate: '2026-11-23',
+    teamMemberIds: ['team_hayli'],
+    pricingMethod: 'custom',
+    customPrice: 275,
+    signingRequestId: 'sign_completed',
+  });
+  assert.equal(past.serviceDate, '2026-11-23');
+  const linked = db.raw.prepare('SELECT appointment_id FROM signing_requests WHERE id = ?').get('sign_completed') as { appointment_id: string };
+  assert.equal(linked.appointment_id, past.appointmentId);
+  const signatureEvidence = db.raw.prepare('SELECT COUNT(*) AS n FROM document_signatures WHERE signing_request_id = ?').get('sign_completed') as { n: number };
+  assert.equal(signatureEvidence.n, 0, 'linking does not create or alter signature evidence');
+  await assert.rejects(
+    () => createCompletedService(env, db, actor, {
+      ...quoteInput,
+      serviceType: 'move_out',
+      completedDate: '2099-01-01',
+      teamMemberIds: ['team_hayli'],
+      pricingMethod: 'custom',
+      customPrice: 275,
+    }),
+    /completed_date_in_future/,
+  );
+});
+
+test('manual invoices retain the selected canonical service, service label and performed date', async () => {
+  const { db, actor } = await fixture();
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+  const invoice = await createInvoice(db, actor, {
+    customerId: 'cust_manual',
+    serviceCode: 'move_in_out',
+    serviceLabel: 'Move-Out Cleaning',
+    serviceDate: today,
+    lines: [
+      { kind: 'service', description: 'Move-Out Cleaning', quantity: 1, unitAmountCents: 27500, totalCents: 27500 },
+    ],
+  });
+  const detail = await getInvoice(db, actor, invoice.id);
+  const row = detail?.invoice as Record<string, unknown>;
+  assert.equal(row.service_code, 'move_in_out');
+  assert.equal(row.service_name, 'Move-Out Cleaning');
+  assert.equal(row.service_date, today);
+  assert.equal(row.total_cents, 27500);
+  await assert.rejects(
+    () => createInvoice(db, actor, {
+      customerId: 'cust_manual',
+      serviceCode: 'not-a-real-service',
+      lines: [{ kind: 'service', description: 'Invalid', quantity: 1, unitAmountCents: 100, totalCents: 100 }],
+    }),
+    /invoice_service_invalid/,
+  );
+  await assert.rejects(
+    () => createInvoice(db, actor, {
+      customerId: 'cust_manual',
+      serviceCode: 'move_in_out',
+      serviceDate: '2099-01-01',
+      lines: [{ kind: 'service', description: 'Future date', quantity: 1, unitAmountCents: 100, totalCents: 100 }],
+    }),
+    /invoice_service_date_future/,
+  );
+});
+
+test('a scheduled booking honors the custom price and discount in its persisted estimate', async () => {
+  const { db, actor, env, quoteInput } = await fixture();
+  const created = await createManualBooking(
+    env,
+    db,
+    actor,
+    {
+      ...quoteInput,
+      date: '2026-12-15',
+      start: START,
+      crewSize: 1,
+      pricingMethod: 'custom',
+      customPrice: 275,
+      discountType: 'fixed',
+      discountValue: 25,
+      discountReason: 'Returning customer',
+    },
+    { availability: slotAvailability([]) },
+  );
+  assert.equal(created.quote.totalCents, 25000);
+  const estimate = db.raw.prepare('SELECT * FROM estimates WHERE quote_reference = ?').get(created.reference) as Record<string, unknown>;
+  assert.equal(estimate.total_cents, 25000);
+  assert.equal(estimate.discount_cents, 2500);
+  const fields = JSON.parse(String(estimate.input_snapshot_json)) as Record<string, string>;
+  assert.equal(fields.pricing_method, 'custom');
+  assert.equal(fields.custom_price, '275.00');
+  assert.equal(fields.admin_agreed_price, '250.00');
+  assert.equal(fields.admin_discount_reason, 'Returning customer');
+});
+
+test('a repeated completed-service submission reuses the job and its job invoice view exposes the linked invoice', async () => {
+  const { db, actor, env, quoteInput, session } = await fixture();
+  const input = {
+    ...quoteInput,
+    serviceType: 'move_out',
+    serviceLabel: 'Move-Out Cleaning',
+    completedDate: '2026-11-23',
+    teamMemberIds: ['team_hayli'],
+    pricingMethod: 'custom',
+    customPrice: 275,
+  };
+  const first = await createCompletedService(env, db, actor, input);
+  const second = await createCompletedService(env, db, actor, input);
+  assert.equal(second.existing, true);
+  assert.equal(second.appointmentId, first.appointmentId);
+  assert.equal(
+    (db.raw.prepare("SELECT COUNT(*) AS n FROM appointments WHERE source = 'admin_completed'").get() as { n: number }).n,
+    1,
+    'a retry never creates a second completed job',
+  );
+  const headers = { Cookie: `ss_ops=${session.token}` };
+  const before = await bookingsGet({
+    request: new Request(`https://example.test/api/admin/bookings?view=job&appointmentId=${encodeURIComponent(first.appointmentId)}`, { headers }),
+    env,
+  } as never);
+  assert.equal(before.status, 200);
+  const beforeBody = (await before.json()) as { invoice: unknown; job: Record<string, unknown> };
+  assert.equal(beforeBody.invoice, null);
+  assert.equal(beforeBody.job.total_cents, 27500);
+  const invoiceResponse = await bookingsPost({
+    request: new Request('https://example.test/api/admin/bookings', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json', 'X-CSRF-Token': session.csrf },
+      body: JSON.stringify({ action: 'invoice_job', appointmentId: first.appointmentId, paymentLink: false }),
+    }),
+    env,
+  } as never);
+  assert.equal(invoiceResponse.status, 200);
+  const invoiceBody = (await invoiceResponse.json()) as { invoice: { id: string; number: string } };
+  const after = await bookingsGet({
+    request: new Request(`https://example.test/api/admin/bookings?view=job&appointmentId=${encodeURIComponent(first.appointmentId)}`, { headers }),
+    env,
+  } as never);
+  assert.equal(after.status, 200);
+  const afterBody = (await after.json()) as { invoice: Record<string, unknown> };
+  assert.equal(afterBody.invoice.id, invoiceBody.invoice.id);
+  assert.equal(afterBody.invoice.balanceCents, 27500);
+  const retryService = await createCompletedService(env, db, actor, input);
+  assert.equal(retryService.appointmentId, first.appointmentId);
+  const retryInvoice = await bookingsPost({
+    request: new Request('https://example.test/api/admin/bookings', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json', 'X-CSRF-Token': session.csrf },
+      body: JSON.stringify({ action: 'invoice_job', appointmentId: retryService.appointmentId }),
+    }),
+    env,
+  } as never);
+  assert.equal(retryInvoice.status, 200);
+  const retryBody = (await retryInvoice.json()) as { invoice: { id: string } };
+  assert.equal(retryBody.invoice.id, invoiceBody.invoice.id);
 });

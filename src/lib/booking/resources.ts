@@ -113,9 +113,9 @@ export async function ensureOwnerStaffLink(db: D1Database | null | undefined): P
       .prepare(
         `INSERT INTO team_members
          (id, branch_id, admin_user_id, display_name, email, status, is_bookable,
-          booking_resource_id, is_solo, is_lead)
+          booking_resource_id, is_solo, is_lead, workday_start, workday_end)
          VALUES ('team_hayli', ?, ?, 'Hayli', 'owner@sparkling-standard.com', 'active', 1,
-                 'hayli', 1, 1)`,
+                 'hayli', 1, 1, '07:00', '19:00')`,
       )
       .bind(owner.branch_id, owner.id)
       .run();

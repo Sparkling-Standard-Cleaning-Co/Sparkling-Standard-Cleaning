@@ -1,3 +1,4 @@
+import './helpers/enable-signing.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,6 +13,7 @@ import { commitConfirmedBooking } from '../src/lib/booking/commitment.ts';
 import { autoConfirmPaidBooking } from '../src/lib/booking/auto-confirm.ts';
 import { FakeLedger } from './helpers/payment-fakes.ts';
 import {
+  acknowledgeDocumentUpdate,
   activeRequirements,
   addBundleItem,
   approveTemplate,
@@ -19,11 +21,15 @@ import {
   createSigningRequest,
   createTemplate,
   countersignSigningRequest,
+  findReusableSigningRequest,
   getExecutedCopy,
+  getSigningRequestDetails,
   employeeOnboardingStatus,
   evaluateDocumentGate,
+  listDocumentUpdates,
   listSigningRequests,
   removeBundleItem,
+  revokeSigningRequest,
   signSigningRequest,
   verifySignature,
 } from '../src/lib/documents/service.ts';
@@ -325,6 +331,13 @@ test('commercial and church services resolve their own bundles, not the resident
   });
   assert.equal(resolved.bundle?.code, 'customer.commercial');
   assert.deepEqual(resolved.requirements.map((item) => item.templateId), [commercialDoc]);
+  const weeklyCommercial = await activeRequirements(f.db, {
+    subjectType: 'customer',
+    customerId: f.customerId,
+    serviceCode: 'commercial-cleaning',
+    frequency: 'weekly',
+  });
+  assert.equal(weeklyCommercial.bundle?.code, 'customer.commercial', 'a weekly commercial job is not residential recurring');
   const church = await activeRequirements(f.db, {
     subjectType: 'customer',
     customerId: f.customerId,
@@ -652,4 +665,545 @@ test('signing requests bind the signer identity, carry branch ownership and prod
   assert.equal(status.status, 'verified');
   const finalCopy = await getExecutedCopy(f.db, String(request.requestId));
   assert.match(finalCopy?.text ?? '', /Synthetic Owner/);
+});
+
+import {
+  duplicateBundle,
+  duplicateTemplate,
+  getTemplate,
+  listBundles,
+  previewPacket,
+  restoreTemplate,
+  retireTemplate,
+  templateHistory,
+  updateDraftTemplate,
+} from '../src/lib/documents/service.ts';
+
+test('a packet resolves supported variables, stores instructions and keeps the issued snapshot immutable', async () => {
+  const f = await fixture();
+  f.db.raw
+    .prepare("INSERT INTO customer_contacts (id, customer_id, kind, value, normalized_value, is_primary) VALUES ('ct_packet', ?, 'email', 'packet@example.test', 'packet@example.test', 1)")
+    .run(f.customerId);
+  const created = await createTemplate(f.db, f.owner.id, {
+    title: 'Packet Variable Agreement',
+    category: 'residential',
+    version: '1.0',
+    contentText:
+      'Customer: {{customer.first_name}} {{customer.last_name}}\nProperty: {{property.address}}\nBooking: {{booking.reference}}\nCompany: {{company.name}}',
+    familyKey: 'packet-variable-agreement',
+  });
+  await approveTemplate(f.db, f.owner.id, created.id);
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'packet.variable_test',
+    name: 'Residential one-time packet',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+    purpose: 'customer',
+    packetType: 'residential_one_time',
+    instructions: 'Please review every document before signing.',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: created.id,
+    sortOrder: 0,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    frequency: 'one_time',
+    bookingReference: 'SS-20261201-PACKET',
+  };
+  const preview = await previewPacket(f.db, context, { bundleId: bundle.id });
+  assert.ok(preview);
+  assert.equal(preview.missingVariables.length, 0);
+  assert.equal(preview.instructions, 'Please review every document before signing.');
+  assert.equal(preview.requiredDocuments, 1);
+  const previewText = preview.requirements[0]?.contentText ?? '';
+  assert.match(previewText, /Customer: Synthetic Customer/);
+  assert.match(previewText, /1 Test Way, Pensacola, FL, 32502/);
+  assert.match(previewText, /Booking: SS-20261201-PACKET/);
+  assert.match(previewText, /Company: Sparkling Standard Cleaning Co\./);
+  assert.notEqual(preview.requirements[0]?.contentSha256, preview.requirements[0]?.templateSha256);
+
+  const request = await createSigningRequest(f.db, context, {
+    createdByAdminUserId: f.owner.id,
+    bundleId: bundle.id,
+    instructions: 'Bring access details to the appointment.',
+  });
+  assert.equal(request.required, true);
+  assert.equal(request.bundleName, 'Residential one-time packet');
+  assert.equal(request.instructions, 'Bring access details to the appointment.');
+  const stored = f.db.raw
+    .prepare('SELECT packet_instructions, packet_name, requirement_snapshot_json FROM signing_requests WHERE id = ?')
+    .get(String(request.requestId)) as { packet_instructions: string; packet_name: string; requirement_snapshot_json: string };
+  assert.equal(stored.packet_instructions, 'Bring access details to the appointment.');
+  assert.equal(stored.packet_name, 'Residential one-time packet');
+  const snapshot = JSON.parse(stored.requirement_snapshot_json) as Array<Record<string, unknown>>;
+  assert.match(String(snapshot[0]?.contentText), /Customer: Synthetic Customer/);
+  assert.match(String(snapshot[0]?.contentText), /SS-20261201-PACKET/);
+
+  await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'packet@example.test',
+    consent: true,
+    signatures: { [created.id]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  assert.equal((await evaluateDocumentGate(f.db, context, 'before_confirmation')).satisfied, true);
+
+  const nextVersion = await createTemplate(f.db, f.owner.id, {
+    title: 'Packet Variable Agreement',
+    category: 'residential',
+    version: '1.1',
+    contentText: 'Revised customer agreement for {{customer.first_name}}.',
+    familyKey: 'packet-variable-agreement',
+    supersedesTemplateId: created.id,
+  });
+  await approveTemplate(f.db, f.owner.id, nextVersion.id);
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: nextVersion.id,
+    sortOrder: 0,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  await removeBundleItem(f.db, f.owner.id, bundle.id, created.id);
+  const afterRevision = await evaluateDocumentGate(f.db, context, 'before_confirmation');
+  assert.equal(afterRevision.satisfied, false);
+  assert.deepEqual(afterRevision.missing.map((item) => item.templateId), [nextVersion.id]);
+  const oldSignature = f.db.raw
+    .prepare('SELECT signed_content_text FROM document_signatures WHERE signing_request_id = ?')
+    .get(String(request.requestId)) as { signed_content_text: string };
+  assert.match(oldSignature.signed_content_text, /SS-20261201-PACKET/);
+});
+
+test('unresolved packet variables block sending and remain visible in preview', async () => {
+  const f = await fixture();
+  const created = await createTemplate(f.db, f.owner.id, {
+    title: 'Unknown Variable Agreement',
+    category: 'residential',
+    version: '1.0',
+    contentText: 'Hello {{customer.first_name}} {{customer.unknown_value}}.',
+  });
+  await approveTemplate(f.db, f.owner.id, created.id);
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'packet.unknown_variable',
+    name: 'Unknown variable packet',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id, templateId: created.id, required: true, enforcementStage: 'before_confirmation',
+  });
+  const context = { subjectType: 'customer' as const, customerId: f.customerId, bookingReference: 'SS-20261202-UNKNOWN' };
+  const preview = await previewPacket(f.db, context, { bundleId: bundle.id });
+  assert.deepEqual(preview?.missingVariables, ['customer.unknown_value']);
+  await assert.rejects(
+    () => createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id, bundleId: bundle.id }),
+    /document_variables_missing:customer\.unknown_value/,
+  );
+  assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM signing_requests').get() as { n: number }).n, 0);
+});
+
+test('an empty active packet is never routed, previewed as ready or sent explicitly', async () => {
+  const f = await fixture();
+  const empty = await createBundle(f.db, f.owner.id, {
+    code: 'customer.move_in_out',
+    name: 'Move-In / Move-Out Packet',
+    serviceCategory: 'move_in_out',
+    subjectType: 'customer',
+  });
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Move-Out Agreement');
+  const ready = await createBundle(f.db, f.owner.id, {
+    code: 'customer.move_in_out_ready',
+    name: 'Move-In / Move-Out Approved Packet',
+    serviceCategory: 'move_in_out',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: ready.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_payment',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'move-in-move-out',
+    bookingReference: 'SS-20261203-MOVE',
+  };
+
+  const routed = await activeRequirements(f.db, context);
+  assert.equal(routed.bundle?.code, 'customer.move_in_out_ready');
+  assert.deepEqual(routed.requirements.map((item) => item.templateId), [templateId]);
+
+  const emptyPreview = await previewPacket(f.db, context, { bundleId: empty.id });
+  assert.equal(emptyPreview?.ready, false);
+  assert.equal(emptyPreview?.approvedDocumentCount, 0);
+  assert.equal(emptyPreview?.totalDocuments, 0);
+
+  await assert.rejects(
+    () =>
+      createSigningRequest(f.db, context, {
+        createdByAdminUserId: f.owner.id,
+        bundleId: empty.id,
+      }),
+    /packet_has_no_documents/,
+  );
+  const request = await createSigningRequest(f.db, context, {
+    createdByAdminUserId: f.owner.id,
+    bundleId: ready.id,
+  });
+  assert.equal(request.required, true);
+
+  const listed = await listBundles(f.db);
+  const emptyRow = listed.find((bundle) => bundle.id === empty.id);
+  const readyRow = listed.find((bundle) => bundle.id === ready.id);
+  assert.equal(Number(emptyRow?.approved_document_count), 0);
+  assert.equal(Number(readyRow?.approved_document_count), 1);
+  assert.equal(Number(readyRow?.required_document_count), 1);
+});
+
+test('customer access instructions are stored once and included in executed evidence', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Residential Access Authorization');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_payment',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    bookingReference: 'SS-20261204-ACCESS',
+  };
+  const request = await createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id });
+  assert.equal(request.required, true);
+  const signed = await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer', type: 'typed' } },
+    customerFields: {
+      access_method: 'customer_present',
+      access_instructions: 'Park in the driveway. The front door will be unlocked.',
+      pets_present: true,
+      pets_details: 'One friendly dog will be in the back room.',
+    },
+    request: signingRequest(),
+  });
+  assert.equal(signed.status, 'signed');
+
+  const stored = f.db.raw
+    .prepare('SELECT customer_fields_json FROM signing_requests WHERE id = ?')
+    .get(String(request.requestId)) as { customer_fields_json: string };
+  assert.match(stored.customer_fields_json, /customer_present/);
+  assert.match(stored.customer_fields_json, /Park in the driveway/);
+  const executed = await getExecutedCopy(f.db, String(request.requestId));
+  assert.match(executed?.text ?? '', /CUSTOMER INSTRUCTIONS AND ACCESS SCHEDULE/);
+  assert.match(executed?.text ?? '', /Access method: I will be present/);
+  assert.match(executed?.text ?? '', /Access and parking instructions: Park in the driveway/);
+  assert.match(executed?.text ?? '', /Pets: Yes/);
+  assert.match(executed?.text ?? '', /Signature: Synthetic Customer/);
+});
+
+test('draft templates can be edited, duplicated and restored without changing approved content', async () => {
+  const f = await fixture();
+  const draft = await createTemplate(f.db, f.owner.id, {
+    title: 'Editable Draft', category: 'residential', version: '1.0', contentText: 'Original draft text.',
+  });
+  await updateDraftTemplate(f.db, f.owner.id, draft.id, {
+    title: 'Editable Draft', category: 'residential', version: '1.0',
+    contentText: 'Updated draft text for {{customer.first_name}}.', legalReviewStatus: 'owner_review_required',
+  });
+  const updated = await getTemplate(f.db, draft.id);
+  assert.equal(updated?.content_text, 'Updated draft text for {{customer.first_name}}.');
+  assert.equal(updated?.legal_review_status, 'owner_review_required');
+  await approveTemplate(f.db, f.owner.id, draft.id);
+  await assert.rejects(
+    () => updateDraftTemplate(f.db, f.owner.id, draft.id, { title: 'Changed', contentText: 'Changed.' }),
+    /template_not_editable/,
+  );
+  const copy = await duplicateTemplate(f.db, f.owner.id, draft.id, { title: 'Editable Draft', version: '1.1' });
+  const copied = await getTemplate(f.db, copy.id);
+  assert.equal(copied?.status, 'draft');
+  assert.equal(copied?.version, '1.1');
+  assert.match(String(copied?.content_text), /Updated draft text/);
+  await retireTemplate(f.db, f.owner.id, draft.id);
+  assert.equal((await getTemplate(f.db, draft.id))?.status, 'retired');
+  await restoreTemplate(f.db, f.owner.id, draft.id);
+  assert.equal((await getTemplate(f.db, draft.id))?.status, 'draft');
+  const history = await templateHistory(f.db, draft.id);
+  assert.ok(history.some((entry) => entry.action === 'documents.template_restored'));
+  assert.ok(history.some((entry) => entry.action === 'documents.template_draft_updated'));
+});
+
+test('a reusable packet can be duplicated with its documents and archived without deleting history', async () => {
+  const f = await fixture();
+  const t1 = await approvedTemplate(f.db, f.owner.id, 'Packet Document One');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'packet.copy_source', name: 'Copy source packet', subjectType: 'customer', instructions: 'Original instructions.',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id, templateId: t1, sortOrder: 2, required: true, enforcementStage: 'before_confirmation',
+  });
+  const copy = await duplicateBundle(f.db, f.owner.id, bundle.id, { name: 'Copied packet' });
+  const copiedBundle = f.db.raw.prepare('SELECT * FROM document_bundles WHERE id = ?').get(copy.id) as Record<string, unknown>;
+  assert.equal(copiedBundle.name, 'Copied packet');
+  assert.match(String(copiedBundle.code), /^packet\.copy_source\.copy/);
+  assert.equal(copiedBundle.instructions, 'Original instructions.');
+  const copiedItems = f.db.raw.prepare('SELECT template_id, sort_order FROM document_bundle_items WHERE bundle_id = ?').all(copy.id) as Array<Record<string, unknown>>;
+  assert.deepEqual(copiedItems.map((item) => ({ templateId: item.template_id, order: item.sort_order })), [{ templateId: t1, order: 2 }]);
+  const { updateBundle } = await import('../src/lib/documents/service.ts');
+  await updateBundle(f.db, f.owner.id, copy.id, { status: 'inactive' });
+  assert.equal((f.db.raw.prepare('SELECT status FROM document_bundles WHERE id = ?').get(copy.id) as { status: string }).status, 'inactive');
+  assert.equal((f.db.raw.prepare('SELECT COUNT(*) AS n FROM document_bundle_items WHERE bundle_id = ?').get(copy.id) as { n: number }).n, 1);
+});
+
+test('required customer agreements are enforced before payment even when stored as before_confirmation', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Residential Booking Agreement');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    frequency: 'one_time',
+    bookingReference: 'SS-BEFORE-PAYMENT-1',
+  };
+  const requirements = await activeRequirements(f.db, context);
+  assert.equal(requirements.requirements[0]?.stage, 'before_payment');
+  const blocked = await evaluateDocumentGate(f.db, context, 'before_payment');
+  assert.equal(blocked.satisfied, false);
+  assert.deepEqual(blocked.missing.map((item) => item.templateId), [templateId]);
+});
+
+test('a per-booking signature cannot satisfy a different booking and only a matching request is reusable', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Booking-Specific Scope');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.deep',
+    name: 'Deep cleaning documents',
+    serviceCategory: 'deep',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_payment',
+    perBooking: true,
+  });
+  const firstBooking = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'deep-cleaning',
+    bookingReference: 'SS-BOOKING-A',
+  };
+  const first = await createSigningRequest(f.db, firstBooking, { createdByAdminUserId: f.owner.id });
+  await signSigningRequest(f.db, first.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  assert.equal((await evaluateDocumentGate(f.db, firstBooking, 'before_payment')).satisfied, true);
+
+  const secondBooking = { ...firstBooking, bookingReference: 'SS-BOOKING-B' };
+  const secondGate = await evaluateDocumentGate(f.db, secondBooking, 'before_payment');
+  assert.equal(secondGate.satisfied, false);
+  assert.equal(await findReusableSigningRequest(f.db, secondBooking, secondGate), null);
+
+  const second = await createSigningRequest(f.db, secondBooking, { createdByAdminUserId: f.owner.id });
+  const secondGateAfterCreation = await evaluateDocumentGate(f.db, secondBooking, 'before_payment');
+  const reusable = await findReusableSigningRequest(f.db, secondBooking, secondGateAfterCreation);
+  assert.equal(reusable?.id, second.requestId);
+
+  const stale = await createSigningRequest(f.db, firstBooking, { createdByAdminUserId: f.owner.id });
+  const firstGate = await evaluateDocumentGate(f.db, firstBooking, 'before_payment');
+  const reusableFirst = await findReusableSigningRequest(f.db, firstBooking, firstGate);
+  assert.equal(reusableFirst?.id, stale.requestId);
+});
+
+test('document revisions surface owner review, affected packets and a re-signing queue', async () => {
+  const f = await fixture();
+  const old = await createTemplate(f.db, f.owner.id, {
+    title: 'Revision Test Agreement',
+    category: 'residential',
+    version: '1.0',
+    contentText: 'Original agreement for {{customer.legal_name}}.',
+    familyKey: 'revision-test',
+  });
+  await approveTemplate(f.db, f.owner.id, old.id);
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: old.id,
+    required: true,
+    enforcementStage: 'before_payment',
+    perBooking: true,
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    bookingReference: 'SS-REVISION-1',
+  };
+  const request = await createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id });
+  await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [old.id]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+
+  const revision = await createTemplate(f.db, f.owner.id, {
+    title: 'Revision Test Agreement',
+    category: 'residential',
+    version: '1.1',
+    contentText: 'Revised agreement for {{customer.legal_name}}.',
+    familyKey: 'revision-test',
+    supersedesTemplateId: old.id,
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: revision.id,
+    required: true,
+    enforcementStage: 'before_payment',
+    perBooking: true,
+  });
+  const pending = await listDocumentUpdates(f.db);
+  const pendingUpdate = pending.find((entry) => entry.templateId === revision.id);
+  assert.equal(pendingUpdate?.status, 'pending_approval');
+  assert.equal(pendingUpdate?.affectedPackets.length, 1);
+  assert.equal(pendingUpdate?.affectedCustomers.length, 1);
+  assert.equal(pendingUpdate?.affectedCustomers[0]?.needsResigning, true);
+
+  await approveTemplate(f.db, f.owner.id, revision.id);
+  const review = (await listDocumentUpdates(f.db)).find((entry) => entry.templateId === revision.id);
+  assert.equal(review?.status, 'owner_review_required');
+
+  await acknowledgeDocumentUpdate(f.db, f.owner.id, revision.id, {
+    materialChange: true,
+    note: 'Synthetic material revision review.',
+  });
+  const material = (await listDocumentUpdates(f.db)).find((entry) => entry.templateId === revision.id);
+  assert.equal(material?.status, 'resigning_recommended');
+  assert.equal(material?.review.materialChange, true);
+  assert.equal(material?.review.note, 'Synthetic material revision review.');
+});
+
+test('a pending signing request can be revoked and still loads when its packet is missing or renamed', async () => {
+  const f = await fixture();
+  const templateId = await approvedTemplate(f.db, f.owner.id, 'Revocable Agreement');
+  const secondTemplateId = await approvedTemplate(f.db, f.owner.id, 'Revocable Agreement Two');
+  const bundle = await createBundle(f.db, f.owner.id, {
+    code: 'customer.residential',
+    name: 'Residential documents',
+    serviceCategory: 'residential',
+    subjectType: 'customer',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  await addBundleItem(f.db, f.owner.id, {
+    bundleId: bundle.id,
+    templateId: secondTemplateId,
+    sortOrder: 1,
+    required: true,
+    enforcementStage: 'before_confirmation',
+  });
+  const context = {
+    subjectType: 'customer' as const,
+    customerId: f.customerId,
+    propertyId: f.propertyId,
+    serviceCode: 'residential-cleaning',
+    frequency: 'one_time',
+    bookingReference: 'SS-20261124-REVOKE',
+  };
+  const request = await createSigningRequest(f.db, context, { createdByAdminUserId: f.owner.id });
+  assert.ok(request.token);
+  const before = await getSigningRequestDetails(f.db, String(request.requestId));
+  assert.equal((before?.request as Record<string, unknown>).packet_name, 'Residential documents');
+
+  const partial = await signSigningRequest(f.db, request.token!, {
+    signerName: 'Synthetic Customer',
+    signerEmail: 'customer@example.test',
+    consent: true,
+    signatures: { [templateId]: { value: 'Synthetic Customer' } },
+    request: signingRequest(),
+  });
+  assert.equal(partial.status, 'partially_signed');
+
+  const revoked = await revokeSigningRequest(f.db, f.owner.id, String(request.requestId), 'Synthetic revoke');
+  assert.equal(revoked.previousStatus, 'partially_signed');
+  const stored = f.db.raw
+    .prepare('SELECT status, token_hash, token_expires_at FROM signing_requests WHERE id = ?')
+    .get(String(request.requestId)) as { status: string; token_hash: string | null; token_expires_at: string | null };
+  assert.equal(stored.status, 'void');
+  assert.equal(stored.token_hash, null);
+  assert.ok(stored.token_expires_at);
+  await assert.rejects(
+    () =>
+      signSigningRequest(f.db, request.token!, {
+        signerName: 'Synthetic Customer',
+        signerEmail: 'customer@example.test',
+        consent: true,
+        signatures: { [templateId]: { value: 'Synthetic Customer' } },
+        request: signingRequest(),
+      }),
+    /signing_(link_invalid|request)/,
+  );
+
+  // A retired or renamed packet must not break the request detail view.
+  f.db.raw
+    .prepare("UPDATE signing_requests SET packet_name = '', bundle_code = '' WHERE id = ?")
+    .run(String(request.requestId));
+  const after = await getSigningRequestDetails(f.db, String(request.requestId));
+  const row = after?.request as Record<string, unknown>;
+  assert.equal(row.packet_name, '');
+  assert.equal(row.bundle_code, '');
+  assert.equal((after?.signatures as Array<Record<string, unknown>>).length, 1);
+  assert.equal(
+    (after?.signatures as Array<Record<string, unknown>>)[0]?.status,
+    'signed',
+    'captured evidence survives revocation',
+  );
 });

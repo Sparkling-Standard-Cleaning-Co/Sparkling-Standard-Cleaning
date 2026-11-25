@@ -4,7 +4,35 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-11-10** (repository reconciliation and production release).
+Last reviewed: **2026-11-20** (bookings/careers release and closeout implementation pass).
+
+**2026-11-21 corrections - these supersede any conflicting row below:**
+
+- Production code is **`84379cb`** on `production-safe`; final Cloudflare Pages
+  production deployment **`edc50a01`**. The live checkout repair was verified on
+  deployment `3f6ded04`.
+- **Live Pay Now checkout is repaired and production-verified.** The root cause
+  was Stripe `parameter_unknown` for `customer_update[email]`; the invalid
+  parameter was removed. A transient routing failure could also reject a
+  verified quote, so Google routing now retries and MapMap is used as fallback.
+  Failed attempts retain their generation so **Try Secure Payment Again** uses a
+  fresh Stripe idempotency key. Evidence:
+  `docs/verification/2026-11-21-CHECKOUT-RECOVERY.md`.
+- Migrations `0044`–`0047` are applied; production D1 has **47 migrations**.
+- Live: communications center, customer portal `/portal/`, retention registry and
+  legal holds, document reminder controls, branch-filtered Data Control exports.
+- `origin/main` remains behind `production-safe`; branch reconciliation still needs
+  owner approval.
+- Backup and document reminder Workers are implemented but staged until the owner
+  supplies Resend and monitor secrets.
+- Tampa remains publicly OFF. Dispatch remains analysis-only and paused.
+
+**2026-11-20 corrections - these supersede any conflicting row below:**
+
+- The release tip was `851a28b`; application code `e7f18c6` (bookings department
+  email and secure careers applications).
+- The staged closeout work described in `docs/implementation/MASTER-CLOSEOUT-STATUS.md`
+  has since been released as above.
 
 **2026-11-10 corrections - these supersede any conflicting row below:**
 

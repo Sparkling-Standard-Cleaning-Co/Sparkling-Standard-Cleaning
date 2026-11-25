@@ -6,10 +6,12 @@ import {
   type InvoiceLineItem,
 } from './invoice.ts';
 import { CUSTOMER_EMAIL_BUSINESS } from '../forms/customer-email.ts';
+import { EMAIL_ROUTING } from '../../config/email-routing.ts';
 
 export function buildAdminInvoice(input: {
   invoice: Record<string, unknown>;
   lines: Array<Record<string, unknown>>;
+  review?: { url: string; eligible: boolean; branchName?: string };
 }): BuiltInvoice {
   const invoice = input.invoice;
   const customerName = [invoice.first_name, invoice.last_name].filter(Boolean).join(' ').trim();
@@ -39,11 +41,15 @@ export function buildAdminInvoice(input: {
   }
 
   const dueDate = String(invoice.due_date ?? '').slice(0, 10);
+  const serviceDate = String(invoice.service_date ?? '').slice(0, 10);
+  const serviceName = String(invoice.service_name ?? '').trim();
   const paymentUrl = String(invoice.payment_url ?? '').trim();
   const data: InvoiceData = {
     invoiceNumber: String(invoice.number ?? ''),
     issueDate: String(invoice.issue_date ?? '').slice(0, 10),
     dueDate,
+    ...(serviceDate ? { serviceDate } : {}),
+    ...(serviceName ? { serviceName } : {}),
     billedTo: {
       company: companyName || customerName || 'Customer',
       ...(companyName && customerName ? { contact: customerName } : {}),
@@ -64,10 +70,11 @@ export function buildAdminInvoice(input: {
       ? `Payment is due by ${formatInvoiceDate(dueDate)}.`
       : 'Please contact us to arrange payment.',
     ...(paymentUrl && /^https:\/\//i.test(paymentUrl) ? { paymentUrl } : {}),
+    ...(input.review ? { review: input.review } : {}),
     contact: {
       name: CUSTOMER_EMAIL_BUSINESS.name,
       phone: CUSTOMER_EMAIL_BUSINESS.phone ?? '',
-      email: CUSTOMER_EMAIL_BUSINESS.email ?? '',
+      email: EMAIL_ROUTING.billing,
       website: CUSTOMER_EMAIL_BUSINESS.website,
       legalName: 'Sparkling Standard LLC',
     },

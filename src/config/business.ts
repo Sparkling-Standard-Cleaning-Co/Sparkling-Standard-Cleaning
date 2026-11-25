@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { schedulingConfig } from './scheduling.ts';
+import { EMAIL_ROUTING } from './email-routing.ts';
 
 export const PENDING = 'PENDING' as const;
 export type Pending = typeof PENDING;
@@ -96,7 +97,11 @@ export const business = {
   phone: phoneEnv ?? formatPhone('850-426-8479') ?? PENDING,
 
   /** Public contact email — owner-confirmed address. */
-  email: envFact(import.meta.env.PUBLIC_BUSINESS_EMAIL) ?? 'owner@sparkling-standard.com',
+  email: envFact(import.meta.env.PUBLIC_BUSINESS_EMAIL) ?? EMAIL_ROUTING.customerService,
+  customerServiceEmail: EMAIL_ROUTING.customerService,
+  hiringEmail: EMAIL_ROUTING.hiring,
+  adminEmail: EMAIL_ROUTING.admin,
+  ownerEmail: EMAIL_ROUTING.owner,
 
   // ── Founder (approved background from the owner's directive) ──────────────
   // Owner-approved for publication (October 2026). Never invent details.
@@ -240,10 +245,6 @@ export const business = {
      * modify, shorten or hand-build this URL.
      */
     submissionUrl: 'https://g.page/r/CXAcv1Pp7OI2ECE/review',
-    /**
-     * No review counts are ever displayed unless the owner supplies a verified
-     * figure AND real reviews exist in the reviews collection. Never invent.
-     */
   },
 
   // ── Payments (owner-approved methods; Stripe confirmed 2026-10-21) ────────

@@ -1,23 +1,35 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
-import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { AdminAuthError, audit, requireActor, requireCsrf, requireStepUp } from '../../../src/lib/admin/operations.ts';
 import { verifyPassword } from '../../../src/lib/admin/auth.ts';
 import {
   applyCreditToInvoice,
+  countInvoices,
   createCredit,
   createInvoice,
   financeSummary,
   getInvoice,
+  invoicePageBounds,
   listCustomerCredits,
   listInvoices,
   recordPayment,
   recordRefund,
   updateInvoiceStatus,
 } from '../../../src/lib/admin/billing.ts';
-import { createInvoicePaymentLink, refundStripePayment, type StripeBillingEnv } from '../../../src/lib/admin/stripe-billing.ts';
+import {
+  createCustomerBillingPortalSession,
+  createInvoicePaymentLink,
+  createInvoicePaymentPageLink,
+  refundStripePayment,
+  tipLinkForInvoice,
+  type StripeBillingEnv,
+} from '../../../src/lib/admin/stripe-billing.ts';
+import { assignTipParticipants } from '../../../src/lib/tips/service.ts';
 import { buildAdminInvoice } from '../../../src/lib/invoicing/admin-invoice.ts';
 import { buildInvoicePdf } from '../../../src/lib/invoicing/pdf.ts';
 import { buildInvoiceEmail, sendInvoiceEmail, type InvoiceEmailEnv } from '../../../src/lib/invoicing/invoice-email.ts';
 import { deliverInvoiceReceipt } from '../../../src/lib/invoicing/invoice-receipt.ts';
+import { invoiceReviewInvitation, reviewContextForInvoice } from '../../../src/lib/reviews/service.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../../../src/lib/admin/communications.ts';
 
 interface Env extends AdminDbEnv, StripeBillingEnv, InvoiceEmailEnv {}
 
@@ -48,13 +60,31 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       if (!customerId) return json({ ok: false, error: 'customer_required' }, 400);
       return json({ ok: true, credits: await listCustomerCredits(db, actor, customerId) });
     }
+    const input = {
+      status: url.searchParams.get('status') ?? '',
+      q: url.searchParams.get('q') ?? '',
+      limit: Number(url.searchParams.get('limit') ?? 25),
+      offset: Number(url.searchParams.get('offset') ?? 0),
+      sort: url.searchParams.get('sort') ?? 'created_at',
+    };
+    const [invoices, total, summary, services] = await Promise.all([
+      listInvoices(db, actor, input),
+      countInvoices(db, actor, input),
+      financeSummary(db, actor),
+      db
+        .prepare("SELECT code, name, category, taxable FROM services WHERE active = 1 ORDER BY category, name")
+        .all<Record<string, unknown>>(),
+    ]);
+    const bounds = invoicePageBounds(input);
     return json({
       ok: true,
-      invoices: await listInvoices(db, actor, {
-        status: url.searchParams.get('status') ?? '',
-        q: url.searchParams.get('q') ?? '',
-      }),
-      summary: await financeSummary(db, actor),
+      invoices,
+      total,
+      limit: bounds.limit,
+      offset: bounds.offset,
+      sort: bounds.sort,
+      summary,
+      services: services.results ?? [],
     });
   } catch (error) {
     return json(
@@ -72,6 +102,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     requireCsrf(context.request, actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(body.action ?? '');
+    if (
+      action !== 'preview_invoice_email' &&
+      ['create_invoice', 'invoice_status', 'record_payment', 'record_refund', 'create_credit', 'apply_credit', 'payment_link', 'billing_portal', 'resend_invoice_receipt', 'stripe_refund'].includes(action)
+    ) {
+      requireStepUp(actor);
+    }
     if (action === 'create_invoice') return json({ ok: true, ...(await createInvoice(db, actor, body)) });
     if (action === 'invoice_status') {
       await updateInvoiceStatus(db, actor, String(body.invoiceId ?? ''), String(body.status ?? ''));
@@ -83,6 +119,28 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'apply_credit') return json({ ok: true, ...(await applyCreditToInvoice(db, actor, body)) });
     if (action === 'payment_link') {
       return json({ ok: true, ...(await createInvoicePaymentLink(db, actor, String(body.invoiceId ?? ''), context.env)) });
+    }
+    if (action === 'payment_page_link') {
+      return json({ ok: true, ...(await createInvoicePaymentPageLink(db, actor, String(body.invoiceId ?? ''), context.env, 'invoice')) });
+    }
+    if (action === 'tip_link') {
+      const invoiceId = String(body.invoiceId ?? '');
+      const invoice = await getInvoice(db, actor, invoiceId);
+      if (!invoice) return json({ ok: false, error: 'invoice_not_found' }, 404);
+      return json({ ok: true, ...(await tipLinkForInvoice(db, invoiceId, context.env)) });
+    }
+    if (action === 'allocate_tip') {
+      const paymentId = String(body.paymentId ?? '');
+      const teamMemberIds = Array.isArray(body.teamMemberIds)
+        ? body.teamMemberIds.filter((value): value is string => typeof value === 'string')
+        : [];
+      return json({ ok: true, ...(await assignTipParticipants(db, actor, paymentId, teamMemberIds)) });
+    }
+    if (action === 'billing_portal') {
+      return json({
+        ok: true,
+        ...(await createCustomerBillingPortalSession(db, actor, String(body.customerId ?? ''), context.env)),
+      });
     }
     if (action === 'resend_invoice_receipt') {
       const invoiceId = String(body.invoiceId ?? '');
@@ -104,9 +162,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const result = await getInvoice(db, actor, invoiceId);
       if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
       const invoice = result.invoice as Record<string, unknown>;
+      const review = invoiceReviewInvitation(await reviewContextForInvoice(db, invoiceId).catch(() => null));
       const document = buildAdminInvoice({
         invoice,
         lines: (result.lines as Array<Record<string, unknown>>) ?? [],
+        ...(review ? { review } : {}),
       });
       const email = buildInvoiceEmail(document.data, document.totals);
       return json({
@@ -136,7 +196,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       }
       if (body.includePaymentLink === true) {
         try {
-          await createInvoicePaymentLink(db, actor, invoiceId, context.env);
+          await createInvoicePaymentPageLink(db, actor, invoiceId, context.env, 'invoice');
           result = await getInvoice(db, actor, invoiceId);
           if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
           invoice = result.invoice as Record<string, unknown>;
@@ -147,17 +207,26 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           );
         }
       }
+      const review = invoiceReviewInvitation(await reviewContextForInvoice(db, invoiceId).catch(() => null));
       const document = buildAdminInvoice({
         invoice,
         lines: (result.lines as Array<Record<string, unknown>>) ?? [],
+        ...(review ? { review } : {}),
       });
       const pdf = buildInvoicePdf(document.data, document.totals);
+      const communication = await readCommunicationSettings(db).catch(() => null);
+      const invoiceReplyTo = communication
+        ? DEPARTMENT_ADDRESSES[communication.settings.replyTo.invoices]
+        : undefined;
       const outcome = await sendInvoiceEmail({
         to,
         data: document.data,
         totals: document.totals,
         pdf,
-        env: context.env,
+        env: {
+          ...context.env,
+          ...(invoiceReplyTo ? { RESEND_BILLING_REPLY_TO: invoiceReplyTo } : {}),
+        },
         idempotencyKey:
           String(body.idempotencyKey ?? '').trim() || `invoice-email-${invoiceId}-${crypto.randomUUID()}`,
       });

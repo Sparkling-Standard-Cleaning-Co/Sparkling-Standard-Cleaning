@@ -42,6 +42,7 @@ async function open(width, height = 900, options = {}) {
   const context = await browser.newContext({ viewport: { width, height }, ...options });
   const page = await context.newPage();
   await page.goto(BASE + '/', { waitUntil: 'load' });
+  await page.evaluate(() => document.fonts.ready);
   await page.locator('#reviews').scrollIntoViewIfNeeded();
   return { context, page };
 }
@@ -50,25 +51,40 @@ const quotes = [
   'did an amazing job',
   'Very respectful, AMAZING cleaning',
   'Quality, affordable, attention to detail',
+  'crispy couch',
+  'I recently hired Sparkling Standard for a deep clean',
+  'Excellent office cleaning service',
+  'outstanding job every week',
 ];
 
-test('all three authentic reviews render with first-name-only attributions', async () => {
+test('all seven verified reviews render with owner-approved attributions', async () => {
   const { context, page } = await open(1280);
   try {
     const cards = page.locator('[data-review-card]');
-    assert.equal(await cards.count(), 3, 'three reviews');
-    const text = await page.locator('#reviews').innerText();
+    assert.equal(await cards.count(), 7, 'seven verified reviews');
+    const text = (await page.locator('#reviews').textContent()) ?? '';
     for (const fragment of quotes) assert.ok(text.includes(fragment), `quote preserved: ${fragment}`);
     const authors = await page.locator('[data-review-card] footer strong').allTextContents();
-    assert.deepEqual(authors.map((a) => a.trim()), ['Christina', 'Richard', 'Laura']);
-    for (const surname of ['Sherwin', 'Lionhart', 'Harman']) {
+    assert.deepEqual(authors.map((a) => a.trim()), ['Christina', 'Richard', 'Laura', 'Dennis D', 'K V', 'S Ismail', 'Rob & Christi Moore']);
+    for (const surname of ['Sherwin', 'Lionhart', 'Harman', 'Larsh', 'Wood']) {
       assert.ok(!text.includes(surname), `surname not published: ${surname}`);
     }
+    assert.equal(await page.locator('.reviews-summary').count(), 0, 'owner requested no summary text');
+    assert.equal(await page.locator('.reviews-summary__note').count(), 0, 'owner requested no disclaimer text');
+    for (const excluded of ['Bob', 'Amanda', 'Elizabeth']) {
+      assert.ok(!text.includes(excluded), `${excluded} is excluded from the carousel`);
+    }
+    const dennis = page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: 'Dennis D' }) });
+    assert.equal(await dennis.locator('.review-carousel__photos img').count(), 2, 'Dennis has two review photos');
+    const laura = page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: 'Laura' }) });
+    assert.equal(await laura.locator('.review-carousel__photos img').count(), 1, 'Laura has one review photo');
+    assert.match(await dennis.locator('.review-carousel__photos img').first().getAttribute('alt'), /sofa|living room/i);
+
     // Laura's five-star rating is verified (Google Maps contributor profile),
     // so every review presents the same intentional star row.
     const starRows = page.locator('[data-review-card] [aria-label="Rated 5 out of 5 stars"]');
-    assert.equal(await starRows.count(), 3, 'all reviews present five gold stars');
-    for (let index = 0; index < 3; index += 1) {
+    assert.equal(await starRows.count(), 7, 'all reviews present five gold stars');
+    for (let index = 0; index < 7; index += 1) {
       assert.equal(await starRows.nth(index).locator('svg').count(), 5, `review ${index + 1} has five stars`);
     }
   } finally {
@@ -97,26 +113,95 @@ test('stars are centered in authentic Google gold and reviewer names sit at the 
       .evaluate((el) => getComputedStyle(el).justifyContent);
     assert.equal(footerJustify, 'center', 'reviewer name is centered');
 
-    const bottoms = await page.locator('[data-review-card]').evaluateAll((cards) =>
-      cards.map((card) => {
-        const footer = card.querySelector('footer');
-        return footer ? card.offsetTop + card.offsetHeight - (footer.offsetTop + footer.offsetHeight) : -1;
-      }),
+    const gaps = await page.locator('[data-review-card]').evaluateAll((cards) =>
+      cards
+        .filter((card) => card.getClientRects().length > 0)
+        .map((card) => {
+          const footer = card.querySelector('footer');
+          if (!footer) return -1;
+          return Math.round(card.getBoundingClientRect().bottom - footer.getBoundingClientRect().bottom);
+        }),
     );
-    assert.equal(new Set(bottoms.map((value) => Math.round(value))).size, 1, 'names share one bottom rhythm');
+    assert.ok(gaps.every((gap) => gap >= 15 && gap <= 40), `names sit at the card bottom (${gaps.join(', ')})`);
   } finally {
     await context.close();
   }
 });
 
-test('all cards share one height so the stage never jumps between reviews', async () => {
+test('cards share a consistent height and long review text scrolls inside the card from the top', async () => {
   const { context, page } = await open(1280);
   try {
     await page.waitForFunction(() => document.querySelector('[data-review-carousel]')?.dataset.enhanced === 'true');
-    const heights = await page
-      .locator('[data-review-card]')
-      .evaluateAll((nodes) => nodes.map((node) => node.offsetHeight));
-    assert.equal(new Set(heights).size, 1, `cards are equal height (${heights.join(', ')})`);
+    const card = (author) =>
+      page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: author }) });
+    const heights = await page.locator('[data-review-card]').evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length > 0).map((node) => node.offsetHeight));
+    assert.equal(new Set(heights).size, 1, 'all cards share a consistent height');
+
+    await page.locator('[data-review-dot][data-index="4"]').click();
+    await page.waitForTimeout(1400);
+    const active = page.locator('[data-review-card][aria-current="true"]');
+    assert.equal((await active.locator('footer strong').innerText()).trim(), 'K V');
+    const quote = active.locator('[data-review-quote]');
+    assert.equal(await quote.evaluate((el) => getComputedStyle(el).overflowY), 'auto', 'the review text has an internal scroller');
+    assert.equal(await quote.evaluate((el) => el.scrollTop), 0, 'the active review begins at the top');
+    assert.equal(await quote.getAttribute('data-scrollable'), 'true', 'overflow is signalled with a scroll cue');
+    assert.equal(await quote.getAttribute('data-at-end'), 'false');
+    assert.match(await quote.innerText(), /I recently hired Sparkling Standard for a deep clean/);
+    const scrollable = await quote.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+      return { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight };
+    });
+    assert.ok(scrollable.height > scrollable.client && scrollable.top > 0, 'long text can scroll internally');
+    await page.waitForFunction(() => {
+      const element = document.querySelector('[data-review-card][aria-current="true"] [data-review-quote]');
+      return element?.getAttribute('data-at-end') === 'true';
+    });
+    assert.equal(await page.locator('[data-review-expand]').count(), 0, 'no repeated Read full review links');
+    assert.equal(await page.locator('[data-review-full]').count(), 0, 'no duplicated hidden review body');
+    assert.equal(await page.locator('[data-review-dialog]').count(), 0, 'the card itself is the review experience');
+
+    await page.locator('[data-review-dot][data-index="0"]').click();
+    await page.waitForTimeout(900);
+    await page.locator('[data-review-dot][data-index="4"]').click();
+    await page.waitForTimeout(900);
+    assert.equal(await quote.evaluate((el) => el.scrollTop), 0, 'returning to a review resets it to the top');
+    assert.equal(await quote.getAttribute('data-at-end'), 'false', 'the cue returns until the review is read to the end');
+    const activeBox = await active.boundingBox();
+    const sectionBox = await page.locator('#reviews').boundingBox();
+    assert.ok(activeBox && sectionBox && activeBox.y >= sectionBox.y, 'card top is not clipped');
+    assert.equal(await card('Dennis D').locator('.review-carousel__photos img').count(), 2);
+  } finally {
+    await context.close();
+  }
+});
+
+test('reviews with photographs keep photos and attribution inside the card', async () => {
+  const { context, page } = await open(1280);
+  try {
+    await page.locator('[data-review-dot][data-index="3"]').click();
+    await page.waitForTimeout(1200);
+    const active = page.locator('[data-review-card][aria-current="true"]');
+    assert.equal((await active.locator('footer strong').innerText()).trim(), 'Dennis D');
+    const bounds = await active.evaluate((card) => {
+      const cardBox = card.getBoundingClientRect();
+      const images = [...card.querySelectorAll('.review-carousel__photos img')].map((image) => image.getBoundingClientRect());
+      const footer = card.querySelector('footer')?.getBoundingClientRect();
+      return {
+        cardBottom: cardBox.bottom,
+        imageBottoms: images.map((image) => image.bottom),
+        footerBottom: footer?.bottom ?? 0,
+        scrollbars: [...card.querySelectorAll('[data-review-quote]')].map((quote) => getComputedStyle(quote).overflowY),
+      };
+    });
+    assert.equal(bounds.imageBottoms.length, 2);
+    assert.ok(bounds.imageBottoms.every((bottom) => bottom <= bounds.cardBottom), 'photos stay inside the card');
+    assert.ok(bounds.footerBottom <= bounds.cardBottom, 'attribution stays inside the card');
+    assert.deepEqual(bounds.scrollbars, ['auto']);
+    assert.equal(await active.locator('[data-review-expand]').count(), 0);
+    const fits = await active.locator('.review-carousel__photos img').evaluateAll((images) =>
+      images.map((image) => getComputedStyle(image).objectFit),
+    );
+    assert.deepEqual(fits, ['contain', 'contain'], 'photographs display fully without cropping');
   } finally {
     await context.close();
   }
@@ -129,8 +214,12 @@ test('the center card is prominent and the neighbours are recessed', async () =>
       page.locator('[data-review-card]', { has: page.locator('footer strong', { hasText: author }) });
     const christina = card('Christina');
     const richard = card('Richard');
-    const laura = card('Laura');
+    const rob = card('Rob & Christi');
     await page.waitForFunction(() => document.querySelector('[data-review-carousel]')?.dataset.enhanced === 'true');
+    await page.waitForFunction(() => {
+      const side = document.querySelector('[data-review-card][data-offset="1"]');
+      return side && Number.parseFloat(getComputedStyle(side).opacity) >= 0.9;
+    });
 
     assert.equal(await christina.getAttribute('data-offset'), '0');
     assert.equal(await christina.getAttribute('aria-current'), 'true');
@@ -138,11 +227,14 @@ test('the center card is prominent and the neighbours are recessed', async () =>
     const offsets = await page.locator('[data-review-card]').evaluateAll((nodes) =>
       nodes.map((node) => node.dataset.offset),
     );
-    assert.deepEqual(offsets.sort(), ['-1', '0', '1'].sort());
+    assert.equal(offsets.filter((value) => value === '0').length, 1, 'one active card');
+    assert.equal(offsets.filter((value) => value === '-1').length, 1, 'one left neighbour');
+    assert.equal(offsets.filter((value) => value === '1').length, 1, 'one right neighbour');
+    assert.equal(offsets.length, 7, 'every review has a position');
 
     // Neighbours remain visible (not blurred/hidden) on desktop.
-    for (const side of [richard, laura]) {
-      assert.ok((await side.evaluate((el) => getComputedStyle(el).opacity)) >= '0.9');
+    for (const side of [richard, rob]) {
+      assert.ok(Number(await side.evaluate((el) => getComputedStyle(el).opacity)) >= 0.9, 'neighbour remains readable');
     }
     // The front card is the top layer.
     assert.equal(
@@ -166,7 +258,7 @@ test('next/previous, dots, card click, keyboard and status announcement work', a
     assert.equal((await activeAuthor()).trim(), 'Christina');
     await page.locator('[data-review-next]').click();
     assert.equal((await activeAuthor()).trim(), 'Richard');
-    assert.match(await status.innerText(), /Review 2 of 3 — Richard/);
+    assert.match(await status.innerText(), /Review 2 of 7/);
     await page.locator('[data-review-prev]').click();
     assert.equal((await activeAuthor()).trim(), 'Christina');
     await page.locator('[data-review-dot][data-index="2"]').click();
@@ -209,7 +301,7 @@ test('mobile keeps one fully readable card with touch-friendly controls and no o
     const front = page.locator('[data-review-card][aria-current="true"]');
     assert.ok(await front.isVisible(), 'front card visible');
     const side = page.locator('[data-review-card][data-offset="-1"]');
-    assert.equal(await side.evaluate((el) => getComputedStyle(el).pointerEvents), 'none');
+    assert.equal(await side.evaluate((el) => getComputedStyle(el).display), 'none');
     const nextBox = await page.locator('[data-review-next]').boundingBox();
     assert.ok(nextBox && nextBox.height >= 44, 'touch target >= 44px');
     const stageHeight = await page
@@ -247,7 +339,7 @@ test('reduced motion removes transitions', async () => {
 test('without JavaScript every review remains readable', async () => {
   const { context, page } = await open(1280, 900, { javaScriptEnabled: false });
   try {
-    assert.equal(await page.locator('[data-review-card]').count(), 3);
+    assert.equal(await page.locator('[data-review-card]').count(), 7);
     const text = await page.locator('#reviews').innerText();
     for (const fragment of quotes) assert.ok(text.includes(fragment), `no-JS review readable: ${fragment}`);
     assert.equal(await page.locator('[data-review-carousel]').getAttribute('data-enhanced'), null);

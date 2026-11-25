@@ -138,9 +138,9 @@ async function openAdmin() {
             start_at: '2026-10-30T13:45:00.000Z',
             end_at: '2026-10-30T21:03:00.000Z',
             duration_minutes: 438,
-            payload_json: JSON.stringify({ locationText: '6360 Haupert Ln, Molino, FL 32577' }),
+            payload_json: JSON.stringify({ locationText: '100 S Baylen St, Pensacola, FL 32502' }),
           },
-          payload: { locationText: '6360 Haupert Ln, Molino, FL 32577' },
+          payload: { locationText: '100 S Baylen St, Pensacola, FL 32502' },
           contacts: [],
           properties: [],
           notifications: [],
@@ -160,7 +160,7 @@ async function openAdmin() {
           requests: [{
             id: 'BR-LEGACY-1', customer_id: null, status: 'pending', quote_reference: 'SS-LEGACY-ONE',
             start_at: '2026-10-30T13:45:00.000Z', end_at: '2026-10-30T21:03:00.000Z',
-            payload_json: JSON.stringify({ locationText: '6360 Haupert Ln, Molino, FL 32577' }),
+            payload_json: JSON.stringify({ locationText: '100 S Baylen St, Pensacola, FL 32502' }),
           }],
           appointments: [],
           reservationLeads: [],
@@ -263,7 +263,7 @@ test('a legacy request can be opened, reviewed and confirmed from the admin', as
     await detail.waitFor({ state: 'visible' });
     const text = await detail.innerText();
     assert.match(text, /SS-LEGACY-ONE/);
-    assert.match(text, /6360 Haupert Ln/);
+    assert.match(text, /100 S Baylen St/);
     assert.match(text, /Possible duplicate requests/);
     assert.match(text, /Link this request to a customer/);
     assert.match(text, /Accept \/ Confirm Booking/);
@@ -292,7 +292,10 @@ test('an invoice can be downloaded as PDF and emailed from the admin', async () 
     const download = await controls.getByRole('link', { name: 'Download invoice PDF' }).getAttribute('href');
     assert.match(download, /\/api\/admin\/invoice-document\?id=invoice_1/);
     await controls.getByRole('button', { name: 'Email invoice PDF' }).click();
-    await page.waitForFunction(() => document.querySelector('[data-admin-success]')?.textContent?.includes('Invoice emailed'));
+    await page.locator('[data-admin-dialog][open]').waitFor({ state: 'visible' });
+    assert.match((await page.locator('[data-admin-dialog-body]').textContent()) ?? '', /invoice_1|customer@example\.test|\$125\.00/);
+    await page.locator('[data-admin-dialog-confirm]').click();
+    await page.waitForFunction(() => document.querySelector('[data-admin-success]')?.textContent?.includes('PDF attached'));
     assert.equal(financePosts.some((post) => post.action === 'email_invoice' && post.invoiceId === 'invoice_1'), true);
     assert.equal(await page.locator('[data-admin-app-error]').innerText(), '');
   } finally {

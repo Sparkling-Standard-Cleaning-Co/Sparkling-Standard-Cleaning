@@ -239,8 +239,14 @@ fee and no invented availability.
 - Tax is disclosed from the category policy in `TAX-TREATMENT.md`; no server
   or client path invents a numeric tax rate or amount.
 - Pay Now uses the same server-recalculated quote and is available only when the exact amount is
-  known. Residential/STR quotes are re-verified and re-routed; facility payments are Tier A only.
-  See `ESTIMATE-PAYMENTS.md`. Custom/range quotes remain reservation-only.
+  known. Residential/STR quotes are re-verified and re-routed.
+- **Facility online payment is disabled** by
+  `commercialTierConfig.facilityOnlinePaymentEnabled = false` until the commercial/church document
+  packets and their payment workflows pass a dedicated acceptance run. The facility forms still
+  show preliminary Tier A/B numbers and the working **Request to Reserve (Pay Later)** path; Pay
+  Now is hidden and the server rejects direct facility checkout attempts with
+  `facility_payment_not_activated`. See `ESTIMATE-PAYMENTS.md`. Custom/range quotes remain
+  reservation-only.
 
 ## 9. Owner controls
 
@@ -262,6 +268,9 @@ fee and no invented availability.
   selected, use the same single-discount policy and never discount specialty work.
 - **Pay Now switch**: `src/config/payments.ts`; live checkout also requires Cloudflare
   `STRIPE_SECRET_KEY` and a configured `STRIPE_WEBHOOK_SECRET`.
+- **Facility Pay Now switch**: `src/config/estimators/commercial.ts`
+  (`facilityOnlinePaymentEnabled`), enforced in both the browser form and
+  `/api/estimate-checkout`. Keep false until the facility acceptance run passes.
 - **Calibration**: `npm run commercial:calibration` (hypothetical scenarios;
 - **Calibration report**: `npm run calibration:report` regenerates `FACILITY-CALIBRATION.md` and the full-field CSV; 26 commercial + 20 church scenarios completed (`FACILITY-CALIBRATION.md`).
   intended for internal financial review, never published to customers).

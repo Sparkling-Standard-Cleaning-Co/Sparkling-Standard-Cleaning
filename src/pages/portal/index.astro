@@ -1,0 +1,111 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import '../../styles/admin.css';
+---
+
+<BaseLayout
+  title="Customer Portal | Sparkling Standard"
+  description="Secure access to your Sparkling Standard bookings, recurring plan, invoices, documents and customer-service requests."
+  noindex
+  analytics={false}
+>
+  <section class="section">
+    <div class="container container--narrow">
+      <p class="eyebrow">Customer Portal</p>
+      <h1>Your cleaning, organized.</h1>
+      <p class="lead">
+        Sign in securely with your email to view appointments, your recurring plan, invoices, signed
+        documents and customer-service requests. No password is needed.
+      </p>
+
+      <div data-portal-loading class="admin-status-message" role="status">Checking your secure session…</div>
+
+      <div data-portal-login hidden>
+        <form class="admin-form admin-form--grid" data-portal-login-form style="max-width:none;">
+          <label class="admin-field--wide">Email address
+            <input name="email" type="email" autocomplete="email" required maxlength="254" placeholder="The email on your Sparkling Standard account" />
+          </label>
+          <div class="admin-field--wide">
+            <button class="btn btn--primary" type="submit">Email me a secure sign-in link</button>
+          </div>
+        </form>
+        <p class="admin-muted" data-portal-login-status role="status" aria-live="polite"></p>
+        <p class="small text-muted">
+          For your privacy, we do not confirm whether an email is on file. The link expires in 15 minutes
+          and can be used once. If you need help, email
+          <a href="mailto:customer-service@sparkling-standard.com">customer-service@sparkling-standard.com</a>.
+        </p>
+      </div>
+
+      <div data-portal-dashboard hidden>
+        <div class="admin-detail-head" style="margin-top:1.5rem;">
+          <div>
+            <h2 class="admin-section-title" data-portal-welcome>Welcome</h2>
+            <p class="admin-muted" data-portal-branch></p>
+          </div>
+          <button class="btn btn--ghost btn--small" type="button" data-portal-action="logout">Sign out</button>
+        </div>
+
+        <div class="admin-grid" data-portal-kpis style="margin-top:1rem;"></div>
+
+        <div class="admin-card" style="margin-top:1rem;">
+          <h2 class="admin-section-title">Appointments</h2>
+          <div data-portal-appointments></div>
+        </div>
+
+        <div class="admin-card" style="margin-top:1rem;">
+          <h2 class="admin-section-title">Recurring plan</h2>
+          <div data-portal-recurring></div>
+        </div>
+
+        <div class="admin-card" style="margin-top:1rem;">
+          <h2 class="admin-section-title">Invoices and billing</h2>
+          <div data-portal-invoices></div>
+          <div class="admin-actions" style="margin-top:.75rem;">
+            <button class="btn btn--secondary btn--small" type="button" data-portal-action="billing">Open secure billing portal</button>
+          </div>
+          <p class="admin-muted">Stripe sends the official card receipts and handles secure payment-method updates. Sparkling Standard never stores card numbers.</p>
+        </div>
+
+        <div class="admin-card" style="margin-top:1rem;">
+          <h2 class="admin-section-title">Documents</h2>
+          <div data-portal-documents></div>
+        </div>
+
+        <div class="admin-card" style="margin-top:1rem;">
+          <h2 class="admin-section-title">Request help</h2>
+          <p class="admin-muted">Ask about a booking, rescheduling, billing, your service or documents. The customer-service team reviews every request.</p>
+          <form class="admin-form admin-form--grid" data-portal-request-form style="max-width:none;">
+            <label>Topic
+              <select name="kind">
+                <option value="question">General question</option>
+                <option value="reschedule">Rescheduling</option>
+                <option value="billing">Billing</option>
+                <option value="service">Cleaning service</option>
+                <option value="documents">Documents</option>
+              </select>
+            </label>
+            <label class="admin-field--wide">Message
+              <textarea name="message" rows="4" minlength="5" maxlength="2000" required placeholder="Tell us what you need. Do not include card numbers or sensitive documents."></textarea>
+            </label>
+            <div class="admin-field--wide">
+              <button class="btn btn--primary btn--small" type="submit">Send request</button>
+            </div>
+          </form>
+          <p class="admin-status-message" data-portal-request-status role="status" aria-live="polite"></p>
+          <div data-portal-requests style="margin-top:1rem;"></div>
+        </div>
+
+        <div class="admin-card" style="margin-top:1rem;">
+          <h2 class="admin-section-title">Profile and properties</h2>
+          <div data-portal-profile></div>
+        </div>
+      </div>
+
+      <p class="admin-error" data-portal-error role="alert"></p>
+    </div>
+  </section>
+  <script>
+    import '../../scripts/portal';
+  </script>
+</BaseLayout>

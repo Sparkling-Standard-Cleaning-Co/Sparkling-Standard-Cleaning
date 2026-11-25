@@ -15,9 +15,14 @@
 // Responses: 200 | 400 | 405 | 500 | 503
 
 import { verifyStripeSignature } from '../../src/lib/gift/stripe-signature.ts';
+import {
+  resolveStripeSecret,
+  resolveStripeWebhookSecret,
+} from '../../src/lib/payments/stripe-secret.ts';
 import { buildGiftFulfillment, giftCertificateCodeFor } from '../../src/lib/gift/fulfillment.ts';
 import { commitGiftReservation, giftBucket, issueGiftCertificate, releaseGiftReservation, remainingCents } from '../../src/lib/gift/ledger.ts';
 import { buildGiftCertificateEmail } from '../../src/lib/gift/delivery.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings, sendOperationalNotification } from '../../src/lib/admin/communications.ts';
 import { activationInstant, centralToday, isValidCalendarDate } from '../../src/lib/gift/activation.ts';
 import {
   completePaymentEvent,
@@ -39,6 +44,7 @@ import type { BookingEnv } from '../../src/lib/booking/service.ts';
 import type { D1Database } from '../../src/lib/admin/d1.ts';
 import { applyInvoiceCheckoutPayment } from '../../src/lib/admin/stripe-reconcile.ts';
 import { deliverInvoiceReceipt } from '../../src/lib/invoicing/invoice-receipt.ts';
+import { queueReviewForAppointment } from '../../src/lib/reviews/service.ts';
 import { completeCheckoutSlotByAttempt, expireCheckoutSlotByAttempt } from '../../src/lib/payments/checkout-registry.ts';
 import { sendSigningEmail } from '../../src/lib/documents/service.ts';
 import { recordSavedCardSetup } from '../../src/lib/admin/stripe-billing.ts';
@@ -58,12 +64,16 @@ import type { ReceiptData, ReceiptLine } from '../../src/lib/payments/receipt.ts
 interface Env extends PaymentStorageEnv, BookingEnv {
   DB?: D1Database;
   STRIPE_SECRET_KEY?: string;
+  STRIPE_TEST_SECRET?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_TEST_WEBHOOK_SECRET?: string;
   WEB3FORMS_ACCESS_KEY?: string;
   WEB3FORMS_ENDPOINT?: string;
   PUBLIC_SITE_URL?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  RESEND_REPLY_TO?: string;
+  RESEND_BILLING_REPLY_TO?: string;
 }
 
 interface StripeEvent {
@@ -366,6 +376,7 @@ async function sendCustomerGiftEmail(
   html: string,
   text: string,
   idempotencyKey: string,
+  replyTo = 'customer-service@sparkling-standard.com',
 ): Promise<boolean> {
   if (!env.RESEND_API_KEY?.trim()) return false;
   try {
@@ -379,6 +390,7 @@ async function sendCustomerGiftEmail(
       body: JSON.stringify({
         from: env.RESEND_FROM_EMAIL?.trim() || 'Sparkling Standard <notifications@sparkling-standard.com>',
         to: [to],
+        reply_to: replyTo,
         subject,
         html,
         text,
@@ -465,7 +477,10 @@ async function deliverEstimateReceipt(
 
 export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
   const { request, env } = context;
-  const secret = env.STRIPE_WEBHOOK_SECRET?.trim();
+  const production =
+    (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '') ===
+    'https://sparkling-standard.com';
+  const secret = resolveStripeWebhookSecret(env, production);
   if (!secret) return json({ ok: false, error: 'not_configured' }, 503);
 
   const payload = await request.text();
@@ -486,9 +501,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const expired = event.data?.object;
     const attempt = expired?.metadata?.checkout_attempt ?? '';
     const expiredKind = expired?.metadata?.checkout_kind;
-    if (expiredKind === 'invoice_payment' && env.DB && expired?.metadata?.invoice_id) {
+    if (
+      (expiredKind === 'invoice_payment' || expiredKind === 'invoice_tip') &&
+      env.DB &&
+      expired?.metadata?.invoice_id
+    ) {
       await env.DB
-        .prepare('UPDATE invoices SET payment_url = NULL, stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stripe_checkout_session_id = ?')
+        .prepare('UPDATE invoices SET stripe_checkout_session_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stripe_checkout_session_id = ?')
         .bind(expired.metadata.invoice_id, String(expired.id ?? ''))
         .run()
         .catch(() => undefined);
@@ -527,7 +546,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     event.type === 'checkout.session.completed' &&
     checkoutObject?.metadata?.checkout_kind === 'saved_card_setup'
   ) {
-    if (!env.DB || !env.STRIPE_SECRET_KEY) {
+    if (!env.DB || !resolveStripeSecret(env, production)) {
       return json({ ok: false, error: 'saved_card_setup_not_configured' }, 503);
     }
     try {
@@ -555,7 +574,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
 
   const metadata = session.metadata ?? {};
-  if (metadata.checkout_kind === 'invoice_payment') {
+  if (metadata.checkout_kind === 'invoice_payment' || metadata.checkout_kind === 'invoice_tip') {
     if (!env.DB) return json({ ok: false, error: 'database_not_configured' }, 503);
     try {
       const result = await applyInvoiceCheckoutPayment(env.DB, {
@@ -568,6 +587,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const receipt = await deliverInvoiceReceipt(env.DB, env, { invoiceId: result.invoiceId }).catch(() => ({
         status: "failed" as const,
       }));
+      if (result.kind === 'invoice_payment') {
+        const paidInvoice = await env.DB
+          .prepare('SELECT appointment_id FROM invoices WHERE id = ? LIMIT 1')
+          .bind(result.invoiceId)
+          .first<{ appointment_id: string | null }>();
+        const appointmentId = String(paidInvoice?.appointment_id ?? '');
+        if (appointmentId) {
+          const appointment = await env.DB
+            .prepare('SELECT status FROM appointments WHERE id = ? LIMIT 1')
+            .bind(appointmentId)
+            .first<{ status: string }>();
+          if (appointment?.status === 'completed') {
+            await queueReviewForAppointment(env.DB, appointmentId).catch(() => undefined);
+          }
+        }
+      }
       return json({ ok: true, received: true, invoice: result, receipt: receipt.status });
     } catch {
       return json({ ok: false, error: 'invoice_payment_reconciliation_failed' }, 500);
@@ -952,11 +987,23 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (!receipt.sent && receipt.status.startsWith('failed')) {
       console.error(receipt.status);
     }
-    const sent = await notifyOwner(
-      env,
-      `PAID estimate - $${amount} - ${reference || 'reference unavailable'}`,
-      fields,
-    );
+    const paymentNotice = await sendOperationalNotification(env.DB ?? null, env, {
+      eventKey: duplicateBookingPayment ? 'payment_failed' : 'booking_paid',
+      subject: `PAID estimate - $${amount} - ${reference || 'reference unavailable'}`,
+      text: Object.entries(fields)
+        .map(([label, value]) => `${label}: ${value}`)
+        .join('\n'),
+      replyTo: DEPARTMENT_ADDRESSES.admin,
+      idempotencyKey: `stripe-paid-estimate-${eventId}`,
+      relatedType: 'stripe_event',
+      relatedId: eventId,
+    }).catch(() => ({ sent: 0 }));
+    const sent =
+      (await notifyOwner(
+        env,
+        `PAID estimate - $${amount} - ${reference || 'reference unavailable'}`,
+        fields,
+      )) || paymentNotice.sent > 0;
     if (!sent) {
       if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'notification_failed');
       return json({ ok: false, error: 'notification_failed' }, 500);
@@ -1061,6 +1108,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   fulfillment['Ledger status'] = issued.created ? 'Created once' : 'Existing record reused';
   fulfillment['Remaining value'] = `$${(remainingCents(issued.record) / 100).toFixed(2)}`;
   const siteUrl = env.PUBLIC_SITE_URL?.replace(/\/+$/, '') || 'https://sparkling-standard.com';
+  const communication = env.DB ? await readCommunicationSettings(env.DB).catch(() => null) : null;
+  const giftReplyTo = communication
+    ? DEPARTMENT_ADDRESSES[communication.settings.replyTo.contact]
+    : 'customer-service@sparkling-standard.com';
   const email = buildGiftCertificateEmail({
     code,
     valueUsd: seed.gift.valueUsd,
@@ -1079,6 +1130,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     email.html,
     email.text,
     `gift-${eventId}-purchaser`,
+    giftReplyTo,
   );
   let recipientDelivered = true;
   if (seed.gift.deliveryMethod === 'recipient_email' && seed.gift.recipientEmail) {
@@ -1100,6 +1152,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       recipientEmail.html,
       recipientEmail.text,
       `gift-${eventId}-recipient`,
+      giftReplyTo,
     );
   }
   fulfillment['Customer delivery'] =
@@ -1128,11 +1181,23 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({ ok: false, error: 'customer_delivery_failed' }, 500);
   }
 
-  const sent = await notifyOwner(
-    env,
-    `PAID gift certificate - ${fulfillment['Gift value']} - ${seed.gift.recipientName}`,
-    fulfillment,
-  );
+  const giftNotice = await sendOperationalNotification(env.DB ?? null, env, {
+    eventKey: 'payment_received',
+    subject: `PAID gift certificate - ${fulfillment['Gift value']} - ${seed.gift.recipientName}`,
+    text: Object.entries(fulfillment)
+      .map(([label, value]) => `${label}: ${value}`)
+      .join('\n'),
+    replyTo: DEPARTMENT_ADDRESSES.admin,
+    idempotencyKey: `stripe-gift-paid-${eventId}`,
+    relatedType: 'stripe_event',
+    relatedId: eventId,
+  }).catch(() => ({ sent: 0 }));
+  const sent =
+    (await notifyOwner(
+      env,
+      `PAID gift certificate - ${fulfillment['Gift value']} - ${seed.gift.recipientName}`,
+      fulfillment,
+    )) || giftNotice.sent > 0;
   if (!sent) {
     if (bucket && record) await failPaymentEvent(bucket, eventId, record, 'notification_failed');
     return json({ ok: false, error: 'notification_failed' }, 500);

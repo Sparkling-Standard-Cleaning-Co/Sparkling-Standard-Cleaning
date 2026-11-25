@@ -1,8 +1,9 @@
 // Owner-approved premium appointment calendar (2026-10-28).
 //
 // Residential/STR rules: the customer first chooses First Appointment
-// (7:00–8:30 AM) or Afternoon Appointment (12:30–2:30 PM), then a compact
-// hour-and-minute start in 15-minute increments. No large list of time buttons.
+// (7:00-8:30 AM) or Afternoon Appointment (12:30-2:30 PM), then a compact
+// hour-and-minute start in 15-minute increments. Valid combinations are shown;
+// unavailable starts are disabled and no time is silently auto-selected.
 //
 // The choice is provisional. The final step revalidates the real duration and
 // destination against the two-resource scheduler, creates the temporary hold,
@@ -122,7 +123,19 @@ function minutesToLabel(minutes: number): string {
   const hour24 = Math.floor(minutes / 60);
   const minute = minutes % 60;
   const hour12 = ((hour24 + 11) % 12) + 1;
+
   return `${hour12}:${String(minute).padStart(2, '0')} ${hour24 >= 12 ? 'PM' : 'AM'}`;
+}
+
+function labelToMinutes(label: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(label.trim());
+  if (!match) return null;
+  const hour12 = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour12) || !Number.isFinite(minute)) return null;
+  const pm = match[3]!.toUpperCase() === 'PM';
+  const hour24 = (hour12 % 12) + (pm ? 12 : 0);
+  return hour24 * 60 + minute;
 }
 
 function periodMinutes(period: Period): number[] {
@@ -130,10 +143,6 @@ function periodMinutes(period: Period): number[] {
   const values: number[] = [];
   for (let minutes = startMinutes; minutes <= endMinutes; minutes += 15) values.push(minutes);
   return values;
-}
-
-function hour12(hour24: number): number {
-  return ((hour24 + 11) % 12) + 1;
 }
 
 export function initBookingCalendar(
@@ -179,6 +188,7 @@ export function initBookingCalendar(
   let viewMonth = Number(initialMonth.slice(5, 7)) - 1;
   let selectedDate = '';
   let selectedTime: BookingCalendarSelection | null = null;
+  let selectedMinutes: number | null = null;
   let selectedPeriod: Period | null = null;
   let availableSlots: Slot[] = [];
   let liveAvailability = false;
@@ -260,67 +270,100 @@ export function initBookingCalendar(
       button.setAttribute('aria-pressed', String(pressed));
       button.classList.toggle('is-selected', pressed);
     }
+    if (selectedMinutes !== null && !periodMinutes(period).includes(selectedMinutes)) {
+      selectedMinutes = null;
+      selectedTime = null;
+      setInputs();
+    }
     populatePicker();
     revealPicker();
   }
 
+  function updateEmptyPickerState(message: string): void {
+    selectedTime = null;
+    setInputs();
+    if (selectedLabel && selectedDate) selectedLabel.textContent = shortDateLabel(selectedDate);
+    setStatus(message, 'info');
+    notify();
+  }
+
   function populatePicker(): void {
     if (!selectedPeriod || !picker || !hourSelect || !minuteSelect) return;
-    const times = periodMinutes(selectedPeriod).filter(timeIsEnabled);
-    if (times.length === 0) {
+    const times = periodMinutes(selectedPeriod);
+    if (liveAvailability && !times.some(timeIsEnabled)) {
       picker.hidden = true;
       selectedTime = null;
+      selectedMinutes = null;
+      setInputs();
       if (selectedLabel && selectedDate) selectedLabel.textContent = shortDateLabel(selectedDate);
       setStatus('No online times are available in that window. Choose another window or date.', 'error');
       notify();
       return;
     }
     picker.hidden = false;
+    if (meridiemEl) meridiemEl.textContent = selectedPeriod === 'first' ? 'AM' : 'PM';
+    const currentHour = selectedMinutes === null ? null : Math.floor(selectedMinutes / 60);
     const hours = [...new Set(times.map((minutes) => Math.floor(minutes / 60)))];
-    const previousHour = Number(hourSelect.value);
-    const targetHour = hours.includes(previousHour) ? previousHour : hours[0]!;
-    hourSelect.innerHTML = '';
+    hourSelect.innerHTML = '<option value="">Hour</option>';
     for (const hour of hours) {
       const option = document.createElement('option');
       option.value = String(hour);
-      option.textContent = String(hour12(hour)).padStart(2, '0');
+      option.textContent = String(((hour + 11) % 12) + 1).padStart(2, '0');
+      option.disabled =
+        liveAvailability &&
+        !times.some((minutes) => Math.floor(minutes / 60) === hour && timeIsEnabled(minutes));
       hourSelect.appendChild(option);
     }
-    hourSelect.value = String(targetHour);
-    populateMinutes(targetHour);
-    updateSelectedTime();
+    hourSelect.disabled = hours.length === 0;
+    hourSelect.value = currentHour !== null ? String(currentHour) : '';
+    populateMinutes();
   }
 
-  function populateMinutes(hour: number): void {
-    if (!minuteSelect || !selectedPeriod) return;
-    const times = periodMinutes(selectedPeriod).filter(
-      (minutes) => Math.floor(minutes / 60) === hour && timeIsEnabled(minutes),
-    );
-    const previousMinute = Number(minuteSelect.value);
-    minuteSelect.innerHTML = '';
+  function populateMinutes(): void {
+    if (!selectedPeriod || !hourSelect || !minuteSelect) return;
+    const hourValue = hourSelect.value;
+    minuteSelect.innerHTML = '<option value="">Minute</option>';
+    if (!hourValue) {
+      minuteSelect.disabled = true;
+      if (selectedMinutes !== null) selectedMinutes = null;
+      updateEmptyPickerState('Choose an hour and minute from the available options.');
+      return;
+    }
+    const hour = Number(hourValue);
+    const times = periodMinutes(selectedPeriod).filter((minutes) => Math.floor(minutes / 60) === hour);
+    minuteSelect.disabled = false;
     for (const minutes of times) {
-      const minute = minutes % 60;
       const option = document.createElement('option');
-      option.value = String(minute);
-      option.textContent = String(minute).padStart(2, '0');
+      option.value = String(minutes);
+      option.textContent = String(minutes % 60).padStart(2, '0');
+      option.disabled = liveAvailability && !timeIsEnabled(minutes);
       minuteSelect.appendChild(option);
     }
-    if (times.length === 0) return;
-    const previousAvailable = times.some((minutes) => minutes % 60 === previousMinute);
-    minuteSelect.value = String(
-      previousAvailable ? previousMinute : times[0]! % 60,
-    );
+    const keep =
+      selectedMinutes !== null &&
+      Math.floor(selectedMinutes / 60) === hour &&
+      (!liveAvailability || timeIsEnabled(selectedMinutes));
+    if (keep) {
+      minuteSelect.value = String(selectedMinutes);
+      updateSelectedTime();
+      return;
+    }
+    minuteSelect.value = '';
+    if (selectedMinutes !== null) selectedMinutes = null;
+    updateEmptyPickerState('Choose an hour and minute from the available options.');
   }
 
   function updateSelectedTime(): void {
-    if (!selectedPeriod || !hourSelect || !minuteSelect || !selectedDate) return;
-    const hour = Number(hourSelect.value);
-    const minute = Number(minuteSelect.value);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return;
-    const minutes = hour * 60 + minute;
-    const label = minutesToLabel(minutes);
-    if (meridiemEl) meridiemEl.textContent = hour >= 12 ? 'PM' : 'AM';
-    const slot = slotForMinutes(minutes);
+    if (!selectedPeriod || selectedMinutes === null || !selectedDate) return;
+    const label = minutesToLabel(selectedMinutes);
+    const slot = slotForMinutes(selectedMinutes);
+    if (liveAvailability && !slot) {
+      selectedTime = null;
+      setInputs();
+      setStatus('That start time is no longer available. Choose another available time.', 'error');
+      notify();
+      return;
+    }
     selectedTime = {
       date: selectedDate,
       timeLabel: label,
@@ -407,6 +450,7 @@ export function initBookingCalendar(
     if (timesRetryButton) timesRetryButton.hidden = true;
     selectedPeriod = null;
     selectedTime = null;
+    selectedMinutes = null;
     if (picker) picker.hidden = true;
     renderPeriods();
     setStatus(message);
@@ -434,6 +478,7 @@ export function initBookingCalendar(
     if (dateChanged) {
       selectedPeriod = null;
       selectedTime = null;
+      selectedMinutes = null;
       if (picker) picker.hidden = true;
     }
     setTimesLoading(true);
@@ -459,6 +504,7 @@ export function initBookingCalendar(
         durationMinutes: String(PROVISIONAL_DURATION),
         lat: String(point.lat),
         lng: String(point.lng),
+        ...(context.zip ? { zip: context.zip } : {}),
       });
       const response = await fetch(`/api/availability?${params}`, {
         headers: { Accept: 'application/json' },
@@ -546,6 +592,7 @@ export function initBookingCalendar(
         to: range.to,
         durationMinutes: String(PROVISIONAL_DURATION),
         ...(point ? { lat: String(point.lat), lng: String(point.lng) } : {}),
+        ...(context.zip ? { zip: context.zip } : {}),
       });
       const response = await fetch(`/api/availability-month?${params}`, {
         headers: { Accept: 'application/json' },
@@ -689,6 +736,36 @@ export function initBookingCalendar(
       setPeriod(period);
     });
   }
+  hourSelect?.addEventListener('change', () => {
+    if (!selectedPeriod) return;
+    populateMinutes();
+  });
+  minuteSelect?.addEventListener('change', () => {
+    if (!selectedPeriod || !minuteSelect) return;
+    if (!minuteSelect.value) {
+      selectedMinutes = null;
+      updateEmptyPickerState('Choose an hour and minute from the available options.');
+      return;
+    }
+    const minutes = Number(minuteSelect.value);
+    if (
+      !Number.isFinite(minutes) ||
+      !periodMinutes(selectedPeriod).includes(minutes)
+    ) {
+      selectedMinutes = null;
+      updateEmptyPickerState('Choose an hour and minute from the available options.');
+      return;
+    }
+    if (liveAvailability && !timeIsEnabled(minutes)) {
+      selectedMinutes = null;
+      updateEmptyPickerState(
+        'That start time is no longer available. Choose another available time.',
+      );
+      return;
+    }
+    selectedMinutes = minutes;
+    updateSelectedTime();
+  });
   retryButton?.addEventListener('click', () => {
     if (retryButton) retryButton.hidden = true;
     void loadMonthAvailability(true);
@@ -698,14 +775,6 @@ export function initBookingCalendar(
     if (timesRetryButton) timesRetryButton.hidden = true;
     void refreshTimes();
   });
-  hourSelect?.addEventListener('change', () => {
-    populateMinutes(Number(hourSelect.value));
-    updateSelectedTime();
-  });
-  minuteSelect?.addEventListener('change', () => {
-    updateSelectedTime();
-  });
-
   if (dateInput) {
     dateInput.min = today;
     dateInput.max = latest;
@@ -743,6 +812,12 @@ export function initBookingCalendar(
     },
     selectSlot(start, end, startLabel) {
       if (!selectedDate) return;
+      const minutes = labelToMinutes(startLabel);
+      if (minutes !== null) {
+        selectedMinutes = minutes;
+        selectedPeriod = minutes <= 8 * 60 + 30 ? 'first' : 'afternoon';
+        populatePicker();
+      }
       selectedTime = {
         date: selectedDate,
         timeLabel: startLabel,
@@ -828,6 +903,7 @@ export function initBookingCalendar(
             destination: input.destination,
             reference: input.reference,
             location: input.location,
+            ...(context.zip ? { zip: context.zip } : {}),
           }),
         });
         const holdData = (await hold.json().catch(() => ({}))) as {

@@ -101,7 +101,7 @@ test('the owner can open Pricing & Estimator Control, edit, save and simulate', 
         },
       }),
     );
-    await page.route('**/api/admin/pricing', async (route) => {
+    await page.route('**/api/admin/pricing*', async (route) => {
       const request = route.request();
       if (request.method() === 'GET') {
         return route.fulfill({

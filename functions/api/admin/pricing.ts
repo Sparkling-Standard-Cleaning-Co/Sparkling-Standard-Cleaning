@@ -1,4 +1,4 @@
-// Admin Pricing & Estimator Control API.
+﻿// Admin Pricing & Estimator Control API.
 //
 // Every mutation requires the owner-level settings.write permission and a CSRF
 // token. Drafts never affect customer prices; publishing is the only action
@@ -32,6 +32,8 @@ import {
   type PricingSnapshot,
 } from '../../../src/lib/pricing/snapshot.ts';
 import { pricingCatalog } from '../../../src/lib/pricing/catalog.ts';
+import { effectiveBranch, effectiveBranches } from '../../../src/lib/branches/registry.ts';
+import { BRANCH_PENSACOLA } from '../../../src/config/branches.ts';
 import { simulatePricing, type SimulatorInput } from '../../../src/lib/pricing/simulate.ts';
 
 interface Env extends AdminDbEnv {}
@@ -49,6 +51,7 @@ function versionPayload(record: Awaited<ReturnType<typeof getPricingVersion>>): 
   if (!record) return null;
   return {
     id: record.id,
+    branchId: record.branchId,
     version: record.version,
     status: record.status,
     fingerprint: record.fingerprint,
@@ -74,6 +77,25 @@ async function baseline() {
   };
 }
 
+async function selectedBranchId(
+  db: D1Database,
+  actor: AdminActor,
+  requested: string | null | undefined,
+): Promise<string> {
+  const branchId = actor.branchId ?? (requested?.trim() || BRANCH_PENSACOLA);
+  const branch = await effectiveBranch(db, branchId);
+  if (!branch) throw new PricingStoreError('branch_not_found', 404);
+  return branch.id;
+}
+
+async function publishableBranch(db: D1Database, branchId: string): Promise<void> {
+  const branch = await effectiveBranch(db, branchId);
+  if (!branch) throw new PricingStoreError('branch_not_found', 404);
+  if (!branch.publishedPricingAllowed) {
+    throw new PricingStoreError('branch_pricing_not_publishable', 409);
+  }
+}
+
 export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
   const db = adminDb(context.env);
   if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
@@ -89,23 +111,32 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
 
   try {
     const url = new URL(context.request.url);
+    const branchId = await selectedBranchId(db, actor, url.searchParams.get('branch'));
     const view = url.searchParams.get('view');
     if (view === 'version') {
       const id = url.searchParams.get('id') ?? '';
-      const record = id ? await getPricingVersion(db, id) : null;
+      const record = id ? await getPricingVersion(db, id, branchId) : null;
       if (!record) return json({ ok: false, error: 'pricing_version_not_found' }, 404);
       return json({ ok: true, version: versionPayload(record) });
     }
 
-    const [published, draft, versions, source] = await Promise.all([
-      getPublishedPricing(db),
-      getLatestDraft(db),
-      listPricingVersions(db),
+    const [published, draft, versions, source, branches] = await Promise.all([
+      getPublishedPricing(db, branchId),
+      getLatestDraft(db, branchId),
+      listPricingVersions(db, branchId),
       baseline(),
+      effectiveBranches(db),
     ]);
     return json({
       ok: true,
-      actor: { name: actor.name, role: actor.role },
+      actor: { name: actor.name, role: actor.role, branchId: actor.branchId },
+      branchId,
+      branches: branches.map((branch) => ({
+        id: branch.id,
+        name: branch.publicName,
+        lifecycle: branch.lifecycle,
+        publishedPricingAllowed: branch.publishedPricingAllowed,
+      })),
       published: versionPayload(published),
       draft: versionPayload(draft),
       versions,
@@ -136,22 +167,22 @@ function snapshotFrom(value: unknown): PricingSnapshot {
   return normalized.snapshot;
 }
 
-async function simulate(db: D1Database, body: Record<string, unknown>): Promise<Response> {
+async function simulate(db: D1Database, body: Record<string, unknown>, branchId: string): Promise<Response> {
   const input = body.input as SimulatorInput | undefined;
   if (!input || typeof input !== 'object' || !['residential', 'str', 'commercial', 'church'].includes(String(input.engine))) {
     return json({ ok: false, error: 'simulator_input_required' }, 400);
   }
-  const publishedRecord = await getPublishedPricing(db);
+  const publishedRecord = await getPublishedPricing(db, branchId);
   const published = publishedRecord?.snapshot ?? sourcePricingSnapshot();
   let draft = published;
   if (typeof body.draftId === 'string' && body.draftId.trim()) {
-    const record = await getPricingVersion(db, body.draftId.trim());
+    const record = await getPricingVersion(db, body.draftId.trim(), branchId);
     if (!record || record.status !== 'draft') return json({ ok: false, error: 'pricing_draft_not_found' }, 404);
     draft = record.snapshot;
   } else if (body.draftSnapshot !== undefined) {
     draft = snapshotFrom(body.draftSnapshot);
   } else {
-    const latest = await getLatestDraft(db);
+    const latest = await getLatestDraft(db, branchId);
     draft = latest?.snapshot ?? published;
   }
   const comparison = simulatePricing(published, draft, input);
@@ -187,11 +218,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const action = text(body.action, 40);
     const pricingActor = { id: actor.id, email: actor.email };
 
-    if (action === 'simulate') return simulate(db, body);
+    const branchId = await selectedBranchId(db, actor, text(body.branchId, 80));
+    if (action === 'simulate') return simulate(db, body, branchId);
 
     if (action === 'create_draft') {
       const snapshot = body.snapshot === undefined ? undefined : snapshotFrom(body.snapshot);
       const draft = await createPricingDraft(db, {
+        branchId,
         ...(snapshot ? { snapshot } : {}),
         note: text(body.note),
         actor: pricingActor,
@@ -211,6 +244,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (!id) return json({ ok: false, error: 'pricing_draft_required' }, 400);
       const draft = await updatePricingDraft(db, {
         id,
+        branchId,
         snapshot: snapshotFrom(body.snapshot),
         note: text(body.note),
         ...(text(body.expectedUpdatedAt, 40) ? { expectedUpdatedAt: text(body.expectedUpdatedAt, 40) } : {}),
@@ -229,8 +263,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'publish') {
       const id = text(body.id, 120);
       if (!id) return json({ ok: false, error: 'pricing_draft_required' }, 400);
+      await publishableBranch(db, branchId);
       const published = await publishPricingVersion(db, {
         id,
+        branchId,
         note: text(body.note),
         ...(text(body.expectedUpdatedAt, 40) ? { expectedUpdatedAt: text(body.expectedUpdatedAt, 40) } : {}),
         actor: pricingActor,
@@ -248,7 +284,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'rollback') {
       const id = text(body.id, 120);
       if (!id) return json({ ok: false, error: 'pricing_version_required' }, 400);
-      const published = await rollbackPricingVersion(db, { id, note: text(body.note), actor: pricingActor });
+      await publishableBranch(db, branchId);
+      const published = await rollbackPricingVersion(db, { id, branchId, note: text(body.note), actor: pricingActor });
       await audit(db, {
         actorUserId: actor.id,
         action: 'pricing.rolled_back',
@@ -262,7 +299,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'discard_draft') {
       const id = text(body.id, 120);
       if (!id) return json({ ok: false, error: 'pricing_draft_required' }, 400);
-      await discardPricingDraft(db, { id, actor: pricingActor });
+      await discardPricingDraft(db, { id, branchId, actor: pricingActor });
       await audit(db, {
         actorUserId: actor.id,
         action: 'pricing.draft_discarded',

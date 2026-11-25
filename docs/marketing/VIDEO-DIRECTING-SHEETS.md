@@ -28,7 +28,7 @@ light, phone at eye level, close enough for clean audio.
 3. Hayli to camera — why she started (approved background: learned the trade through her
    grandmother's cleaning business; worked for established local companies; saw rushed production
    cleaning leave the small things undone; studies interior design).
-4. Closing line: what "Standards That Make Your Space Sparkle." means to her.
+4. Closing line: what "Standards That Sparkle." means to her.
 
 **Suggested lines (adapt, do not add facts):**
 
@@ -37,7 +37,7 @@ light, phone at eye level, close enough for clean audio.
 - "The toothbrush holder. The fingerprints. The corners nobody thinks about. Those are the job."
 - "Every request comes to me. I confirm it, I clean it, and I stand behind it."
 
-**On-screen text:** name + role at first frame; "Standards That Make Your Space Sparkle." at the close.
+**On-screen text:** name + role at first frame; "Standards That Sparkle." at the close.
 **CTA:** "Pensacola & Cantonment — estimate link in bio."
 **Success measure:** profile visits and tracked-link clicks (not views).
 

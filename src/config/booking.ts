@@ -52,9 +52,10 @@ export const bookingConfig = {
    */
   slotMinutes: 15,
 
-  /** Public working window (local Central Time). Normal cleaning ends by 6:00 PM. */
+  /** Published operating window (local Central Time): 7:00 AM to 7:00 PM. */
   workdayStart: '07:00',
-  workdayEnd: '18:00',
+  workdayEnd: '19:00',
+
   /** 0=Sunday … 6=Saturday. The published service days are seven days. */
   workdays: [0, 1, 2, 3, 4, 5, 6] as ReadonlyArray<number>,
 
@@ -85,6 +86,21 @@ export const bookingConfig = {
   /** Gate for automatic confirmation of fully verified paid bookings. */
   autoConfirmAllowed: true,
 } as const;
+
+/**
+ * Public customer-facing start windows. These are start-time windows, not
+ * completion promises. A slot must begin inside one of them.
+ */
+export const publicBookingWindows = [
+  { period: 'first', label: 'Morning - First Appointment', startMinutes: 7 * 60, endMinutes: 8 * 60 + 30 },
+  { period: 'afternoon', label: 'Afternoon Appointment', startMinutes: 12 * 60 + 30, endMinutes: 14 * 60 + 30 },
+] as const;
+
+export function isPublicBookingStartMinutes(minutes: number): boolean {
+  return publicBookingWindows.some(
+    (window) => minutes >= window.startMinutes && minutes <= window.endMinutes,
+  );
+}
 
 /** The active resources that may receive work. */
 export function activeBookingResources(): ReadonlyArray<BookingResource> {

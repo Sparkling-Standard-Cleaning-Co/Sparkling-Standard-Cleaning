@@ -62,6 +62,17 @@ function localToday(): string {
   }).format(new Date());
 }
 
+function timeZoneForPlan(plan: { branch_id?: string | null }): string {
+  return plan.branch_id === 'branch_tampa' ? 'America/New_York' : bookingConfig.timeZone;
+}
+
+function todayForTimeZone(timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+}
+
 export function monthAnchored(startDate: string, months: number): string {
   const [year, month, day] = startDate.slice(0, 10).split('-').map(Number);
   const targetMonth = (month ?? 1) - 1 + months;
@@ -1045,7 +1056,8 @@ export async function updateRecurringOccurrence(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(startTime)) {
     throw new AdminAuthError(400, 'recurring_occurrence_time_required');
   }
-  if (date < localToday()) throw new AdminAuthError(400, 'recurring_occurrence_in_past');
+  const planTimeZone = timeZoneForPlan(plan);
+  if (date < todayForTimeZone(planTimeZone)) throw new AdminAuthError(400, 'recurring_occurrence_in_past');
   const existing = await db
     .prepare('SELECT id FROM recurring_occurrences WHERE plan_id = ? AND occurrence_date = ? LIMIT 1')
     .bind(planId, date)
@@ -1059,12 +1071,26 @@ export async function updateRecurringOccurrence(
     occurrence.occurrence_date === plan.start_date
       ? Number(plan.first_duration_minutes) || Number(plan.duration_minutes) || 120
       : Number(plan.duration_minutes) || 120;
-  const start = zonedTimeToUtc(date, startTime, bookingConfig.timeZone);
+  const start = zonedTimeToUtc(date, startTime, planTimeZone);
+  const assignedResources = occurrence.appointment_id
+    ? (
+        await db
+          .prepare(
+            `SELECT tm.booking_resource_id FROM appointment_resources ar
+             JOIN team_members tm ON tm.id = ar.team_member_id
+             WHERE ar.appointment_id = ? AND tm.booking_resource_id <> ''`,
+          )
+          .bind(occurrence.appointment_id)
+          .all<{ booking_resource_id: string }>()
+      ).results?.map((row) => row.booking_resource_id).filter(Boolean) ?? []
+    : [];
   const availability = await deps.availability(env, {
     date,
     durationMinutes: duration,
     destination,
     crewSize: Number(plan.crew_size) || 1,
+    ...(plan.branch_id ? { branchId: plan.branch_id as 'branch_pensacola' | 'branch_tampa' } : {}),
+    ...(assignedResources.length > 0 ? { requiredResourceIds: assignedResources } : {}),
     ...(occurrence.calendar_event_id ? { excludeEventIds: [occurrence.calendar_event_id] } : {}),
   });
   if (!availability.ok) throw new AdminAuthError(409, availability.reason);
@@ -1074,7 +1100,7 @@ export async function updateRecurringOccurrence(
     const updated = await deps.updateEvent(env, occurrence.calendar_event_id, {
       start: exact.start,
       end: exact.end,
-      timeZone: bookingConfig.timeZone,
+      timeZone: planTimeZone,
       resourceIds: exact.resourceIds,
     });
     if (!updated.ok) throw new AdminAuthError(502, updated.reason ?? 'calendar_write_failed');
@@ -1114,7 +1140,7 @@ export async function updateRecurringOccurrence(
       await deps.updateEvent(env, occurrence.calendar_event_id, {
         start: occurrence.start_at,
         end: occurrence.end_at,
-        timeZone: bookingConfig.timeZone,
+        timeZone: planTimeZone,
       }).catch(() => undefined);
     }
     throw new AdminAuthError(502, 'recurring_occurrence_recovery_required');

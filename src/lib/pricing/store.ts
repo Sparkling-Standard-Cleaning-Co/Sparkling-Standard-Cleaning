@@ -1,4 +1,4 @@
-// Versioned pricing store (Cloudflare D1).
+﻿// Versioned pricing store (Cloudflare D1).
 //
 // Drafts are editable; published versions are immutable snapshots. Publishing
 // archives the previous published version and activates the new one in one D1
@@ -13,14 +13,17 @@ import {
   type PricingSnapshotMeta,
 } from './snapshot.ts';
 import { PRICING_CALCULATION_SCHEMA_VERSION } from '../../config/estimators/calculation-schema.ts';
+import { BRANCH_PENSACOLA } from '../../config/branches.ts';
 
 export interface PricingVersionRecord extends PricingSnapshotMeta {
+  branchId: string;
   snapshot: PricingSnapshot;
   schemaVersion: string;
   configJson: string;
 }
 
 export interface PricingVersionSummary extends PricingSnapshotMeta {
+  branchId: string;
   schemaVersion: string;
   changedValues: number | null;
 }
@@ -39,6 +42,7 @@ export class PricingStoreError extends Error {
 
 interface PricingRow {
   id: string;
+  branch_id: string;
   version: number;
   status: 'draft' | 'published' | 'archived';
   config_json: string;
@@ -55,7 +59,7 @@ interface PricingRow {
   published_at: string | null;
 }
 
-const COLUMNS = `id, version, status, config_json, fingerprint, schema_version, based_on_version,
+const COLUMNS = `id, branch_id, version, status, config_json, fingerprint, schema_version, based_on_version,
   note, created_by, created_by_email, created_at, updated_at,
   published_by, published_by_email, published_at`;
 
@@ -75,6 +79,7 @@ function rowToRecord(row: PricingRow): PricingVersionRecord {
   }
   return {
     id: row.id,
+    branchId: row.branch_id,
     version: Number(row.version),
     status: row.status,
     fingerprint: row.fingerprint,
@@ -93,38 +98,62 @@ function rowToRecord(row: PricingRow): PricingVersionRecord {
   };
 }
 
-export async function getPricingVersion(db: D1Database, id: string): Promise<PricingVersionRecord | null> {
+export async function getPricingVersion(
+  db: D1Database,
+  id: string,
+  branchId: string = BRANCH_PENSACOLA,
+): Promise<PricingVersionRecord | null> {
   const row = await db
-    .prepare(`SELECT ${COLUMNS} FROM pricing_versions WHERE id = ? LIMIT 1`)
-    .bind(id)
+    .prepare(`SELECT ${COLUMNS} FROM pricing_versions WHERE id = ? AND branch_id = ? LIMIT 1`)
+    .bind(id, branchId)
     .first<PricingRow>();
   return row ? rowToRecord(row) : null;
 }
 
-export async function getPublishedPricing(db: D1Database): Promise<PricingVersionRecord | null> {
+export async function getPublishedPricing(
+  db: D1Database,
+  branchId: string = BRANCH_PENSACOLA,
+): Promise<PricingVersionRecord | null> {
   const row = await db
-    .prepare(`SELECT ${COLUMNS} FROM pricing_versions WHERE status = 'published' ORDER BY version DESC LIMIT 1`)
+    .prepare(
+      `SELECT ${COLUMNS} FROM pricing_versions
+       WHERE branch_id = ? AND status = 'published' ORDER BY version DESC LIMIT 1`,
+    )
+    .bind(branchId)
     .first<PricingRow>();
   return row ? rowToRecord(row) : null;
 }
 
-export async function getLatestDraft(db: D1Database): Promise<PricingVersionRecord | null> {
+export async function getLatestDraft(
+  db: D1Database,
+  branchId: string = BRANCH_PENSACOLA,
+): Promise<PricingVersionRecord | null> {
   const row = await db
-    .prepare(`SELECT ${COLUMNS} FROM pricing_versions WHERE status = 'draft' ORDER BY version DESC LIMIT 1`)
+    .prepare(
+      `SELECT ${COLUMNS} FROM pricing_versions
+       WHERE branch_id = ? AND status = 'draft' ORDER BY version DESC LIMIT 1`,
+    )
+    .bind(branchId)
     .first<PricingRow>();
   return row ? rowToRecord(row) : null;
 }
 
-export async function listPricingVersions(db: D1Database, limit = 40): Promise<PricingVersionSummary[]> {
+export async function listPricingVersions(
+  db: D1Database,
+  branchId: string = BRANCH_PENSACOLA,
+  limit = 40,
+): Promise<PricingVersionSummary[]> {
   const capped = Math.max(1, Math.min(100, Math.trunc(limit)));
   const result = await db
     .prepare(
-      `SELECT ${COLUMNS} FROM pricing_versions ORDER BY version DESC LIMIT ?`,
+      `SELECT ${COLUMNS} FROM pricing_versions
+       WHERE branch_id = ? ORDER BY version DESC LIMIT ?`,
     )
-    .bind(capped)
+    .bind(branchId, capped)
     .all<PricingRow>();
   return (result.results ?? []).map((row) => ({
     id: row.id,
+    branchId: row.branch_id,
     version: Number(row.version),
     status: row.status,
     fingerprint: row.fingerprint,
@@ -142,9 +171,10 @@ export async function listPricingVersions(db: D1Database, limit = 40): Promise<P
   }));
 }
 
-async function nextVersion(db: D1Database): Promise<number> {
+async function nextVersion(db: D1Database, branchId: string): Promise<number> {
   const row = await db
-    .prepare('SELECT COALESCE(MAX(version), 0) AS version FROM pricing_versions')
+    .prepare('SELECT COALESCE(MAX(version), 0) AS version FROM pricing_versions WHERE branch_id = ?')
+    .bind(branchId)
     .first<{ version: number }>();
   return Number(row?.version ?? 0) + 1;
 }
@@ -173,23 +203,25 @@ function snapshotColumns(
 
 export async function createPricingDraft(
   db: D1Database,
-  input: { snapshot?: PricingSnapshot; note?: string; actor: PricingActor },
+  input: { branchId?: string; snapshot?: PricingSnapshot; note?: string; actor: PricingActor },
 ): Promise<PricingVersionRecord> {
-  const published = await getPublishedPricing(db);
+  const branchId: string = input.branchId ?? BRANCH_PENSACOLA;
+  const published = await getPublishedPricing(db, branchId);
   const basedOn = input.snapshot ?? published?.snapshot ?? normalizePricingSnapshot({}).snapshot;
   const columns = snapshotColumns(basedOn, input.actor, input.note ?? '', published?.version ?? null);
-  const version = await nextVersion(db);
+  const version = await nextVersion(db, branchId);
   const id = `pricing_${crypto.randomUUID()}`;
   const timestamp = nowIso();
   await db
     .prepare(
       `INSERT INTO pricing_versions
-       (id, version, status, config_json, fingerprint, schema_version, based_on_version, note,
+       (id, branch_id, version, status, config_json, fingerprint, schema_version, based_on_version, note,
         created_by, created_by_email, created_at, updated_at)
-       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
+      branchId,
       version,
       columns.config_json,
       columns.fingerprint,
@@ -202,7 +234,7 @@ export async function createPricingDraft(
       timestamp,
     )
     .run();
-  const created = await getPricingVersion(db, id);
+  const created = await getPricingVersion(db, id, branchId);
   if (!created) throw new PricingStoreError('pricing_draft_failed', 500);
   return created;
 }
@@ -211,13 +243,15 @@ export async function updatePricingDraft(
   db: D1Database,
   input: {
     id: string;
+    branchId?: string;
     snapshot: PricingSnapshot;
     note?: string;
     expectedUpdatedAt?: string;
     actor: PricingActor;
   },
 ): Promise<PricingVersionRecord> {
-  const existing = await getPricingVersion(db, input.id);
+  const branchId: string = input.branchId ?? BRANCH_PENSACOLA;
+  const existing = await getPricingVersion(db, input.id, branchId);
   if (!existing) throw new PricingStoreError('pricing_draft_not_found', 404);
   if (existing.status !== 'draft') throw new PricingStoreError('pricing_version_not_editable', 409);
   if (input.expectedUpdatedAt && input.expectedUpdatedAt !== existing.updatedAt) {
@@ -229,7 +263,7 @@ export async function updatePricingDraft(
     .prepare(
       `UPDATE pricing_versions
        SET config_json = ?, fingerprint = ?, schema_version = ?, note = ?, updated_at = ?
-       WHERE id = ? AND status = 'draft' AND updated_at = ?`,
+       WHERE id = ? AND branch_id = ? AND status = 'draft' AND updated_at = ?`,
     )
     .bind(
       columns.config_json,
@@ -238,10 +272,11 @@ export async function updatePricingDraft(
       columns.note,
       timestamp,
       input.id,
+      branchId,
       existing.updatedAt,
     )
     .run();
-  const updated = await getPricingVersion(db, input.id);
+  const updated = await getPricingVersion(db, input.id, branchId);
   if (!updated || updated.updatedAt === existing.updatedAt) {
     throw new PricingStoreError('pricing_draft_conflict', 409);
   }
@@ -261,9 +296,10 @@ async function runBatch(db: D1Database, statements: D1PreparedStatement[]): Prom
 
 export async function publishPricingVersion(
   db: D1Database,
-  input: { id: string; note?: string; expectedUpdatedAt?: string; actor: PricingActor },
+  input: { id: string; branchId?: string; note?: string; expectedUpdatedAt?: string; actor: PricingActor },
 ): Promise<PricingVersionRecord> {
-  const version = await getPricingVersion(db, input.id);
+  const branchId: string = input.branchId ?? BRANCH_PENSACOLA;
+  const version = await getPricingVersion(db, input.id, branchId);
   if (!version) throw new PricingStoreError('pricing_version_not_found', 404);
   if (version.status !== 'draft') throw new PricingStoreError('pricing_version_not_draft', 409);
   if (input.expectedUpdatedAt && input.expectedUpdatedAt !== version.updatedAt) {
@@ -280,13 +316,15 @@ export async function publishPricingVersion(
   const configJson = JSON.stringify(normalized.snapshot);
   const fingerprint = pricingSnapshotVersion(normalized.snapshot);
   await runBatch(db, [
-    db.prepare(`UPDATE pricing_versions SET status = 'archived' WHERE status = 'published'`),
+    db
+      .prepare(`UPDATE pricing_versions SET status = 'archived' WHERE branch_id = ? AND status = 'published'`)
+      .bind(branchId),
     db
       .prepare(
         `UPDATE pricing_versions
          SET status = 'published', config_json = ?, fingerprint = ?, note = ?,
              updated_at = ?, published_by = ?, published_by_email = ?, published_at = ?
-         WHERE id = ? AND status = 'draft'`,
+         WHERE id = ? AND branch_id = ? AND status = 'draft'`,
       )
       .bind(
         configJson,
@@ -297,9 +335,10 @@ export async function publishPricingVersion(
         input.actor.email,
         timestamp,
         input.id,
+        branchId,
       ),
   ]);
-  const published = await getPublishedPricing(db);
+  const published = await getPublishedPricing(db, branchId);
   if (!published || published.id !== input.id) {
     throw new PricingStoreError('pricing_publish_conflict', 409);
   }
@@ -312,33 +351,37 @@ export async function publishPricingVersion(
  */
 export async function rollbackPricingVersion(
   db: D1Database,
-  input: { id: string; note?: string; actor: PricingActor },
+  input: { id: string; branchId?: string; note?: string; actor: PricingActor },
 ): Promise<PricingVersionRecord> {
-  const source = await getPricingVersion(db, input.id);
+  const branchId: string = input.branchId ?? BRANCH_PENSACOLA;
+  const source = await getPricingVersion(db, input.id, branchId);
   if (!source) throw new PricingStoreError('pricing_version_not_found', 404);
   if (source.status === 'draft') throw new PricingStoreError('pricing_version_not_published', 409);
   const normalized = normalizePricingSnapshot(source.snapshot, { strict: true });
   if (!normalized.ok) {
     throw new PricingStoreError('pricing_validation_failed', 400, normalized.errors.join(' '));
   }
-  const version = await nextVersion(db);
+  const version = await nextVersion(db, branchId);
   const id = `pricing_${crypto.randomUUID()}`;
   const timestamp = nowIso();
   const note = (input.note ?? `Restored from version ${source.version}`).slice(0, 500);
   const configJson = JSON.stringify(normalized.snapshot);
   const fingerprint = pricingSnapshotVersion(normalized.snapshot);
   await runBatch(db, [
-    db.prepare(`UPDATE pricing_versions SET status = 'archived' WHERE status = 'published'`),
+    db
+      .prepare(`UPDATE pricing_versions SET status = 'archived' WHERE branch_id = ? AND status = 'published'`)
+      .bind(branchId),
     db
       .prepare(
         `INSERT INTO pricing_versions
-         (id, version, status, config_json, fingerprint, schema_version, based_on_version, note,
+         (id, branch_id, version, status, config_json, fingerprint, schema_version, based_on_version, note,
           created_by, created_by_email, created_at, updated_at,
           published_by, published_by_email, published_at)
-         VALUES (?, ?, 'published', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, 'published', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
+        branchId,
         version,
         configJson,
         fingerprint,
@@ -354,19 +397,23 @@ export async function rollbackPricingVersion(
         timestamp,
       ),
   ]);
-  const created = await getPricingVersion(db, id);
+  const created = await getPricingVersion(db, id, branchId);
   if (!created) throw new PricingStoreError('pricing_rollback_failed', 500);
   return created;
 }
 
 export async function discardPricingDraft(
   db: D1Database,
-  input: { id: string; actor: PricingActor },
+  input: { id: string; branchId?: string; actor: PricingActor },
 ): Promise<void> {
-  const existing = await getPricingVersion(db, input.id);
+  const branchId: string = input.branchId ?? BRANCH_PENSACOLA;
+  const existing = await getPricingVersion(db, input.id, branchId);
   if (!existing) throw new PricingStoreError('pricing_draft_not_found', 404);
   if (existing.status !== 'draft') throw new PricingStoreError('pricing_version_not_draft', 409);
-  await db.prepare(`DELETE FROM pricing_versions WHERE id = ? AND status = 'draft'`).bind(input.id).run();
+  await db
+    .prepare(`DELETE FROM pricing_versions WHERE id = ? AND branch_id = ? AND status = 'draft'`)
+    .bind(input.id, branchId)
+    .run();
 }
 
 /** Stable JSON string used in audit records without leaking anything private. */
@@ -378,4 +425,3 @@ export function pricingAuditDetail(version: PricingVersionRecord): string {
     status: version.status,
   });
 }
-

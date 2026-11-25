@@ -179,15 +179,22 @@ test('the footer shows a distinct Follow Us section with only confirmed platform
     assert.match(nextdoorSvg, /M71\.2012 60\.1136/, 'Nextdoor uses the official house-n favicon geometry');
     assert.match(nextdoorSvg, /#1B8751/i, 'Nextdoor uses the official brand green');
 
-    // Each profile is one 52px circular button.
+    // Each profile is a transparent mark on a >=44px target; no white chip.
     for (let index = 0; index < CONFIRMED.length; index += 1) {
       const box = await links.nth(index).boundingBox();
-      assert.ok(box && box.width >= 44 && box.height >= 44, `${CONFIRMED[index].label} is a ≥44px target`);
-      assert.ok(
-        box && Math.abs(box.width - box.height) <= 1 && box.width <= 56,
-        `${CONFIRMED[index].label} is a compact circular button (52px)`,
-      );
+      assert.ok(box && box.width >= 44 && box.height >= 44, `${CONFIRMED[index].label} is a >=44px target`);
+      const style = await links.nth(index).evaluate((el) => ({
+        background: getComputedStyle(el).backgroundColor,
+        border: getComputedStyle(el).borderTopWidth,
+        radius: getComputedStyle(el).borderTopLeftRadius,
+      }));
+      assert.equal(style.background, 'rgba(0, 0, 0, 0)', `${CONFIRMED[index].label} has no white background`);
+      assert.equal(style.border, '0px', `${CONFIRMED[index].label} has no decorative border`);
+      assert.equal(style.radius, '0px', `${CONFIRMED[index].label} is not a circular chip`);
     }
+
+    const footerText = await page.locator('.site-footer').innerText();
+    assert.doesNotMatch(footerText, /Serving Pensacola, Cantonment and surrounding communities/i, 'footer service-area paragraph is removed');
 
     const text = (await section.textContent()) ?? '';
     for (const pending of PENDING_LABELS) {
@@ -216,18 +223,18 @@ test('the Follow Us section adapts to mobile without horizontal overflow', async
       const box = await links.nth(index).boundingBox();
       assert.ok(box && box.height >= 44, `link ${index} target height ${box?.height}`);
     }
-    // Phones: rows capped at four buttons (twelve profiles wrap as 4 + 4 + 4).
     const rows = await links.evaluateAll((nodes) => {
       const tops = nodes.map((node) => Math.round(node.getBoundingClientRect().top));
       return [...new Set(tops)].map((top) => tops.filter((value) => value === top).length);
     });
-    assert.deepEqual(rows, [4, 4, 4], 'icons wrap as four per row');
+    assert.ok(rows.length >= 2, 'transparent marks wrap naturally on phones');
+    assert.ok(rows.every((count) => count <= 6), 'rows stay readable at phone width');
   } finally {
     await context.close();
   }
 });
 
-test('very narrow phones show twelve circular buttons without overflow', async () => {
+test('very narrow phones show twelve transparent social marks without overflow', async () => {
   const { context, page } = await open('/', 320, 780);
   try {
     const section = page.locator('[data-social-follow]');
@@ -236,8 +243,7 @@ test('very narrow phones show twelve circular buttons without overflow', async (
     assert.equal(await links.count(), CONFIRMED.length);
     for (let index = 0; index < CONFIRMED.length; index += 1) {
       const box = await links.nth(index).boundingBox();
-      assert.ok(box && box.width >= 44 && box.height >= 44, `button ${index} is a ≥44px target`);
-      assert.ok(Math.abs((box?.width ?? 0) - (box?.height ?? 0)) <= 1, `button ${index} is circular`);
+      assert.ok(box && box.width >= 44 && box.height >= 44, `mark ${index} is a >=44px target`);
     }
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -258,6 +264,31 @@ test('the old inline contact-column social icons are gone (no duplicates)', asyn
       .locator('.site-footer__contact a[href*="facebook.com"], .site-footer__contact a[href*="nextdoor.com"]')
       .count();
     assert.equal(contactLinks, 0, 'no duplicated social icons inside the contact column');
+  } finally {
+    await context.close();
+  }
+});
+
+
+test('Follow Us appears once on every appropriate public page', async () => {
+  const { context, page } = await open('/', 1280);
+  try {
+    const paths = [
+      '/', '/about/', '/recurring-cleaning/', '/deep-cleaning/', '/move-in-move-out-cleaning/',
+      '/commercial-cleaning/', '/church-cleaning/', '/short-term-rental-cleaning/',
+      '/service-area/', '/contact/', '/estimate/', '/estimate/residential/',
+      '/estimate/commercial/', '/estimate/church/', '/estimate/str/', '/locations/pensacola/',
+    ];
+    for (const path of paths) {
+      await page.goto(BASE + path, { waitUntil: 'load' });
+      const sections = page.locator('[data-social-follow]');
+      assert.equal(await sections.count(), 1, `${path} has exactly one Follow Us section`);
+      assert.equal(await sections.locator('[data-social-links] a').count(), CONFIRMED.length, `${path} shows every confirmed profile`);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      assert.ok(overflow <= 1, `${path} has no horizontal overflow (${overflow}px)`);
+    }
   } finally {
     await context.close();
   }

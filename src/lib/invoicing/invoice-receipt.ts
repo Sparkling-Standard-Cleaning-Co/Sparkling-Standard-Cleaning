@@ -1,5 +1,6 @@
 import type { D1Database } from '../admin/d1.ts';
 import { audit } from '../admin/operations.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings } from '../admin/communications.ts';
 import { sendCustomerReceipt, type ReceiptEmailEnv } from '../forms/customer-receipt.ts';
 import type { ReceiptData, ReceiptLine } from '../payments/receipt.ts';
 
@@ -28,13 +29,14 @@ export async function loadInvoiceReceiptData(
 ): Promise<{ data: ReceiptData; paymentId: string } | null> {
   const invoice = await db
     .prepare(
-      `SELECT i.*, c.first_name, c.last_name, c.company_name,
+      `SELECT i.*, s.name AS service_name, c.first_name, c.last_name, c.company_name,
               (SELECT value FROM customer_contacts cc
                WHERE cc.customer_id = c.id AND cc.kind = 'email'
                ORDER BY cc.is_primary DESC, cc.created_at ASC LIMIT 1) AS customer_email,
               p.line1, p.line2, p.city, p.state, p.postal_code
        FROM invoices i
        JOIN customers c ON c.id = i.customer_id
+       LEFT JOIN services s ON s.code = i.service_code
        LEFT JOIN properties p ON p.id = i.property_id
        WHERE i.id = ? LIMIT 1`,
     )
@@ -60,25 +62,37 @@ export async function loadInvoiceReceiptData(
   const addressLines = [invoice.line1, invoice.line2, [invoice.city, invoice.state, invoice.postal_code].filter(Boolean).join(' ')]
     .map((line) => text(line, 200))
     .filter(Boolean);
-  const receiptLines: ReceiptLine[] = (lines.results ?? [])
-    .filter((line) => String(line.kind) !== 'tax')
-    .map((line) => ({
-      label: text(line.description, 300) || 'Cleaning service',
-      amountCents: Math.round(Number(line.total_cents) || 0),
-      kind: moneyLineKind(String(line.kind)),
-    }));
+  const tipCents = Math.max(0, Number(payment.tip_cents) || 0);
+  const tipOnly = tipCents > 0 && Number(payment.service_cents) === 0;
+  const receiptLines: ReceiptLine[] = tipOnly
+    ? [{ label: 'Optional gratuity for your cleaning team', amountCents: tipCents, kind: 'charge' }]
+    : (lines.results ?? [])
+        .filter((line) => String(line.kind) !== 'tax')
+        .map((line) => ({
+          label: text(line.description, 300) || 'Cleaning service',
+          amountCents: Math.round(Number(line.total_cents) || 0),
+          kind: moneyLineKind(String(line.kind)),
+        }));
+  if (tipCents > 0 && !tipOnly) {
+    receiptLines.push({ label: 'Optional gratuity for your cleaning team', amountCents: tipCents, kind: 'charge' });
+  }
   const balanceCents = Math.max(0, Number(invoice.balance_cents) || 0);
-  const totalCents = Math.max(0, Number(invoice.total_cents) || 0);
+  const totalCents = tipOnly
+    ? tipCents
+    : Math.max(0, Number(invoice.total_cents) || 0) + tipCents;
   const data: ReceiptData = {
     receiptNumber: `${text(invoice.number, 80)}-R1`,
     reference: text(invoice.number, 80),
     paidAt: text(payment.received_at, 60) || new Date().toISOString(),
-    service: `Cleaning service — ${text(invoice.number, 80)}`,
+    service: tipOnly
+      ? `Optional gratuity — ${text(invoice.number, 80)}`
+      : `${text(invoice.service_name, 120) || 'Cleaning service'} — ${text(invoice.number, 80)}`,
+    ...(text(invoice.service_date, 10) ? { serviceDate: text(invoice.service_date, 10) } : {}),
     ...(addressLines.length > 0 ? { serviceLocation: addressLines.join(', ') } : {}),
     ...(customerName ? { customerName } : {}),
     ...(text(invoice.customer_email, 200) ? { customerEmail: text(invoice.customer_email, 200) } : {}),
     lines: receiptLines,
-    subtotalCents: Math.max(0, Number(invoice.subtotal_cents) || 0),
+    subtotalCents: tipOnly ? tipCents : Math.max(0, Number(invoice.subtotal_cents) || 0),
     taxCents: Math.max(0, Number(invoice.tax_cents) || 0),
     taxRatePercent: null,
     taxJurisdiction: null,
@@ -124,9 +138,16 @@ export async function deliverInvoiceReceipt(
       .bind(receiptId, input.invoiceId, loaded.paymentId)
       .run();
   }
+  const communication = await readCommunicationSettings(db).catch(() => null);
+  const receiptReplyTo = communication
+    ? DEPARTMENT_ADDRESSES[communication.settings.replyTo.receipts]
+    : undefined;
   const outcome = await sendCustomerReceipt(
     loaded.data,
-    env,
+    {
+      ...env,
+      ...(receiptReplyTo ? { RESEND_BILLING_REPLY_TO: receiptReplyTo } : {}),
+    },
     input.force === true
       ? `invoice-receipt-resend-${loaded.paymentId}-${Date.now()}`
       : `invoice-receipt-${loaded.paymentId}`,

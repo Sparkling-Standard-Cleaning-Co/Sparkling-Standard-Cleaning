@@ -68,10 +68,12 @@ import {
 
           <form class="admin-form" data-admin-mfa hidden>
             <h2 style="font-size:1.1rem;margin:.5rem 0 0;">Two-step verification</h2>
-            <p class="admin-muted">Enter the current authenticator code. A recovery code also works.</p>
-            <label>Authenticator code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></label>
+            <p class="admin-muted" data-admin-mfa-copy>Enter the current authenticator code. A recovery code also works.</p>
+            <label><span data-admin-mfa-code-label>Authenticator code</span> <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></label>
             <label>Recovery code <input name="recoveryCode" autocomplete="off" maxlength="40" /></label>
             <button class="btn btn--primary" type="submit">Verify and Sign In</button>
+            <button class="btn btn--ghost btn--small" type="button" data-admin-mfa-resend hidden>Send a new email code</button>
+            <p class="admin-status-message" data-admin-mfa-gate-status role="status" aria-live="polite"></p>
             <button class="btn btn--ghost btn--small" type="button" data-admin-mfa-cancel>Back to sign in</button>
           </form>
 
@@ -109,22 +111,39 @@ import {
             <span><span class="admin-brand__name">Sparkling<br />Standard</span><br /><span class="admin-brand__sub">Operations</span></span>
           </a>
           <nav class="admin-nav" aria-label="Admin sections">
-            <button type="button" data-admin-nav="overview">Overview</button>
-            <button type="button" data-admin-nav="calendar">Calendar &amp; Requests</button>
-            <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
-            <button type="button" data-admin-nav="customers">Customers</button>
-            <button type="button" data-admin-nav="new-booking">New Booking</button>
-            <button type="button" data-admin-nav="recurring">Recurring Plans</button>
-            <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
-            <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
-            <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
-            <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
-            <button type="button" data-admin-nav="gift">Gift Certificates</button>
-            <button type="button" data-admin-nav="reports">Reports</button>
-            <button type="button" data-admin-nav="storage">Data &amp; Storage</button>
-            <button type="button" data-admin-nav="promotions">Promotions &amp; Discounts</button>
-            <button type="button" data-admin-nav="pricing">Pricing &amp; Estimator Control</button>
-            <button type="button" data-admin-nav="settings">Settings &amp; Audit</button>
+            <div class="admin-nav__group"><span class="admin-nav__label">Overview</span>
+              <button type="button" data-admin-nav="overview">Overview</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">Operations</span>
+              <button type="button" data-admin-nav="calendar">Calendar &amp; Requests</button>
+              <button type="button" data-admin-nav="customers">Customers</button>
+              <button type="button" data-admin-nav="new-booking">New Booking</button>
+              <button type="button" data-admin-nav="quick-estimate">Quick Estimate</button>
+              <button type="button" data-admin-nav="recurring">Recurring Plans</button>
+              <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
+              <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
+              <button type="button" data-admin-nav="careers">Careers</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">Sales &amp; Marketing</span>
+              <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
+              <button type="button" data-admin-nav="reviews">Google Reviews</button>
+              <button type="button" data-admin-nav="promotions">Promotions &amp; Discounts</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">Finance</span>
+              <button type="button" data-admin-nav="finance">Invoices &amp; Payments</button>
+              <button type="button" data-admin-nav="gift">Gift Certificates</button>
+              <button type="button" data-admin-nav="reports">Reports</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">Documents &amp; Compliance</span>
+              <button type="button" data-admin-nav="documents">Documents &amp; Agreements</button>
+              <button type="button" data-admin-nav="communications">Communications &amp; Notifications</button>
+              <button type="button" data-admin-nav="storage">Data &amp; Storage</button>
+            </div>
+            <div class="admin-nav__group"><span class="admin-nav__label">System &amp; Security</span>
+              <button type="button" data-admin-nav="pricing">Pricing &amp; Estimator Control</button>
+              <button type="button" data-admin-nav="branches">Branches &amp; Launch</button>
+              <button type="button" data-admin-nav="settings">Settings &amp; Audit</button>
+            </div>
           </nav>
           <div class="admin-sidebar__meta">
             <p data-admin-user></p>
@@ -138,7 +157,16 @@ import {
               <h1 class="admin-title" data-admin-view-title>Overview</h1>
               <p class="admin-sub" data-admin-view-sub>Live cleaning-company operations.</p>
             </div>
-            <span class="admin-status" data-admin-role></span>
+            <div class="admin-topbar__actions">
+              <label class="admin-branch-view" data-admin-branch-view-wrap hidden>Branch view
+                <select data-admin-branch-view>
+                  <option value="all">All branches</option>
+                  <option value="branch_pensacola">Pensacola</option>
+                  <option value="branch_tampa">Tampa Bay (prelaunch)</option>
+                </select>
+              </label>
+              <span class="admin-status" data-admin-role></span>
+            </div>
           </header>
           <p class="admin-error" data-admin-app-error role="alert"></p>
 
@@ -153,8 +181,24 @@ import {
 
           <section class="admin-view" data-admin-view="calendar" hidden>
             <div class="admin-card">
-              <h2 class="admin-section-title">Next seven days</h2>
-              <p class="admin-muted">Operational board for scheduling and staffing. Later confirmed appointments remain intact below.</p>
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Seven-day operations calendar</h2>
+                  <p class="admin-muted">Appointments are shown in each branch's local time. Use the week controls and filters to focus the board.</p>
+                </div>
+                <div class="admin-actions">
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="calendar-prev-week">Previous</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="calendar-today">Today</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="calendar-next-week">Next</button>
+                </div>
+              </div>
+              <p class="admin-muted" data-admin-week-label></p>
+              <div class="admin-calendar-filters">
+                <label>Employee <select data-admin-week-employee><option value="">All employees</option></select></label>
+                <label>Service <select data-admin-week-service><option value="">All services</option></select></label>
+                <label>Status <select data-admin-week-status><option value="">Active appointments</option><option value="confirmed">Confirmed</option><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Canceled</option><option value="all">All statuses</option></select></label>
+                <label>Branch <select data-admin-week-branch><option value="">All branches</option><option value="branch_pensacola">Pensacola</option><option value="branch_tampa">Tampa Bay</option></select></label>
+              </div>
               <div data-admin-week-board></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
@@ -173,25 +217,63 @@ import {
                   <option value="all">All / historical</option>
                 </select>
                 <input name="q" type="search" placeholder="Search reference, customer, address" aria-label="Search requests" />
+                <label>Service <input name="service" placeholder="Deep, recurring, move-out" aria-label="Filter loaded requests by service" /></label>
+                <label>From <input name="from" type="date" aria-label="Filter loaded requests from date" /></label>
+                <label>To <input name="to" type="date" aria-label="Filter loaded requests to date" /></label>
                 <button class="btn btn--secondary btn--small" type="submit">Search</button>
               </form>
+              <div class="admin-bulk-toolbar" data-admin-request-bulk hidden>
+                <strong data-admin-request-bulk-count>0 selected</strong>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-select-visible">Select all visible</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-select-filtered">Select all filtered results</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-clear-selection">Clear selection</button>
+                <span class="admin-bulk-toolbar__spacer"></span>
+                <button class="btn btn--primary btn--small" type="button" data-admin-action="request-bulk" data-operation="approve">Approve eligible</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="request-bulk" data-operation="archive">Archive</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-bulk" data-operation="restore">Restore</button>
+                <button class="btn btn--danger btn--small" type="button" data-admin-action="request-bulk" data-operation="deny">Deny (no email)</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-bulk" data-operation="mark_test">Mark as test</button>
+                <button class="btn btn--danger btn--small" type="button" data-admin-action="request-bulk" data-operation="delete_test">Delete eligible test records</button>
+              </div>
+              <div data-admin-request-bulk-result role="status" aria-live="polite"></div>
               <div data-admin-requests></div>
             </div>
             <div data-admin-request-detail style="margin-top:1rem;" hidden></div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Upcoming appointments</h2>
+              <div class="admin-calendar-filters">
+                <label>View <select data-admin-appointment-status><option value="active" selected>Confirmed + pending</option><option value="confirmed">Confirmed</option><option value="pending">Pending</option><option value="cancelled">Canceled</option><option value="completed">Completed</option><option value="all">All / history</option></select></label>
+                <label>Period <select data-admin-appointment-range><option value="30" selected>Next 30 days</option><option value="60">Next 60 days</option><option value="90">Next 90 days</option><option value="all">All future</option></select></label>
+                <label>Employee <select data-admin-appointment-employee><option value="">All employees</option></select></label>
+                <label>Service <select data-admin-appointment-service><option value="">All services</option></select></label>
+              </div>
               <div data-admin-appointments></div>
+              <div data-admin-appointments-pagination style="margin-top:.75rem;"></div>
             </div>
           </section>
 
           <section class="admin-view" data-admin-view="leads" hidden>
             <div class="admin-card">
               <form class="admin-inline-form" data-admin-lead-filter>
-                <label>Status <select name="status"><option value="">All</option><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="converted">Converted</option><option value="lost">Lost</option><option value="archived">Archived</option></select></label>
+                <label>Status <select name="status"><option value="active" selected>Active (excludes archived, lost, converted)</option><option value="">All records</option><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="converted">Converted</option><option value="lost">Lost</option><option value="archived">Archived</option></select></label>
                 <label>Search <input name="q" type="search" placeholder="Name, reference, address" /></label>
+                <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="status">Status</option><option value="request_type">Request type</option></select></label>
+                <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
                 <button class="btn btn--secondary btn--small" type="submit">Filter</button>
               </form>
+              <div class="admin-bulk-toolbar" data-admin-lead-bulk hidden>
+                <strong data-admin-lead-bulk-count>0 selected</strong>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="lead-select-visible">Select all visible</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-clear-selection">Clear selection</button>
+                <span class="admin-bulk-toolbar__spacer"></span>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="lead-bulk" data-operation="archive">Archive</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-bulk" data-operation="restore">Restore</button>
+                <button class="btn btn--danger btn--small" type="button" data-admin-action="lead-bulk" data-operation="delete">Delete disposable</button>
+              </div>
+              <div data-admin-lead-bulk-result role="status" aria-live="polite"></div>
               <div data-admin-leads style="margin-top:1rem;"></div>
+              <div data-admin-leads-pagination style="margin-top:.75rem;"></div>
+              <div class="admin-detail" data-admin-lead-detail style="margin-top:1rem;" hidden></div>
             </div>
           </section>
 
@@ -199,11 +281,15 @@ import {
             <div class="admin-card">
               <h2 class="admin-section-title">Customers</h2>
               <form class="admin-inline-form" data-admin-customer-search>
+                <label>View <select name="status" aria-label="Customer view"><option value="active" selected>Active customers</option><option value="archived">Archived customers</option><option value="deleted">Deleted / anonymized records</option><option value="">All customers</option></select></label>
                 <label>Search <input name="q" type="search" placeholder="Name, email or phone" /></label>
+                <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="name">Name</option><option value="status">Status</option></select></label>
+                <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
                 <button class="btn btn--secondary btn--small" type="submit">Search</button>
                 <button class="btn btn--ghost btn--small" type="button" data-admin-customer-new>New customer</button>
               </form>
               <div data-admin-customers style="margin-top:1rem;"></div>
+              <div data-admin-customers-pagination style="margin-top:.75rem;"></div>
               <div class="admin-detail" data-admin-customer-detail hidden></div>
             </div>
           </section>
@@ -217,9 +303,26 @@ import {
                 this estimate only and never rewrite the profile.
               </p>
               <form class="admin-form admin-form--grid" data-manual-booking-form style="max-width:none">
+                <label>Find customer <input type="search" data-manual-customer-search placeholder="Filter by name, email or phone" /></label>
                 <label>Customer <select name="customerId" data-manual-customer required><option value="">Choose a customer</option></select></label>
                 <label>Property <select name="propertyId" data-manual-property required><option value="">Choose a customer first</option></select></label>
-                <p class="admin-field--wide admin-muted">Need a new customer or another property? <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-manage-customer">Open the customer record</button></p>
+                <p class="admin-field--wide admin-muted" data-manual-branch>Branch and timezone are determined from the customer and service address.</p>
+                <details class="admin-detail-toggle admin-field--wide" data-manual-new-customer>
+                  <summary>Create a new customer without losing this booking</summary>
+                  <p class="admin-muted">Duplicate email and phone numbers are rejected by the server. The customer is assigned to the active branch for the verified address.</p>
+                  <div class="admin-form admin-form--grid">
+                    <label>First name <input name="newFirstName" required /></label>
+                    <label>Last name <input name="newLastName" /></label>
+                    <label>Email <input name="newEmail" type="email" /></label>
+                    <label>Phone <input name="newPhone" /></label>
+                    <label class="admin-field--wide">Service address <input name="newAddressLine1" autocomplete="off" /></label>
+                    <label>City <input name="newCity" /></label>
+                    <label>State <input name="newState" value="FL" maxlength="2" /></label>
+                    <label>ZIP <input name="newPostalCode" maxlength="10" /></label>
+                    <div class="admin-field--wide admin-actions"><button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-customer">Create customer and continue</button></div>
+                    <p class="admin-field--wide" data-manual-customer-result role="status" aria-live="polite"></p>
+                  </div>
+                </details>
                 <label>Booking type
                   <select name="engine" data-manual-engine>
                     <option value="residential">Residential cleaning</option>
@@ -228,11 +331,19 @@ import {
                     <option value="church">Church cleaning</option>
                   </select>
                 </label>
+                <label>Appointment type
+                  <select name="appointmentType" data-manual-appointment-type>
+                    <option value="scheduled">Schedule a cleaning</option>
+                    <option value="completed">Record completed cleaning</option>
+                  </select>
+                </label>
                 <label>Service
                   <select name="serviceType" data-manual-service>
                     <option value="standard">Residential maintenance</option>
                     <option value="deep">Deep cleaning</option>
-                    <option value="move_in_out">Move-in / move-out</option>
+                    <option value="move_out">Move-Out Cleaning</option>
+                    <option value="move_in">Move-In Cleaning</option>
+                    <option value="move_in_out">Move-in / Move-out Cleaning (combined)</option>
                   </select>
                 </label>
                 <label>Discounts &amp; Promotions
@@ -265,24 +376,70 @@ import {
                   <label><input type="checkbox" name="firstClean" value="yes" /> First clean / overdue reset</label>
                   <label><input type="checkbox" name="specialty" value="yes" /> Specialty work requiring review</label>
                 </div>
-                <fieldset class="admin-field--wide" data-manual-extras>
-                  <legend>Extras and bundles</legend>
-                  <div class="admin-form admin-form--grid" data-manual-addon-list></div>
-                  <div class="admin-form admin-form--grid" data-manual-bundle-list style="margin-top:.5rem;"></div>
+                <fieldset class="admin-field--wide admin-extras" data-manual-extras>
+                  <legend>Extras &amp; add-ons</legend>
+                  <details class="admin-extras__details">
+                    <summary data-manual-extras-summary>Choose extras</summary>
+                    <label>Search extras <input type="search" data-manual-addon-search placeholder="Kitchen, windows, organization…" /></label>
+                    <div class="admin-extras__selected" data-manual-extras-selected></div>
+                    <div class="admin-extras__list" data-manual-addon-list></div>
+                    <h4>Bundles</h4>
+                    <div class="admin-extras__list" data-manual-bundle-list></div>
+                  </details>
                 </fieldset>
-                <label>Cleaning date <input name="date" type="date" data-manual-date required /></label>
-                <label>Crew size <select name="crewSize" data-manual-crew><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
+                <fieldset class="admin-field--wide admin-extras" data-manual-pricing>
+                  <legend>Pricing adjustments</legend>
+                  <div class="admin-form admin-form--grid">
+                    <label>Pricing method
+                      <select name="pricingMethod" data-manual-pricing-method>
+                        <option value="estimated">Use calculated estimator price</option>
+                        <option value="custom">Enter custom agreed price ($)</option>
+                      </select>
+                    </label>
+                    <label data-manual-custom-price-wrap hidden>Custom agreed price ($)
+                      <input name="customPrice" type="number" min="0.01" step="0.01" data-manual-custom-price />
+                    </label>
+                    <label>Customer discount
+                      <select name="discountType" data-manual-discount-type>
+                        <option value="none">No discount</option>
+                        <option value="percent">Percentage (%)</option>
+                        <option value="fixed">Fixed dollar amount ($)</option>
+                      </select>
+                    </label>
+                    <label data-manual-discount-value-wrap hidden>Discount value
+                      <input name="discountValue" type="number" min="0" step="0.01" data-manual-discount-value />
+                    </label>
+                    <label class="admin-field--wide" data-manual-discount-reason-wrap hidden>Discount reason (optional)
+                      <input name="discountReason" maxlength="300" />
+                    </label>
+                  </div>
+                </fieldset>
+                <p class="admin-field--wide admin-muted" data-manual-pricing-summary aria-live="polite"></p>
+                <label data-manual-schedule-date-wrap>Cleaning date <input name="date" type="date" data-manual-date required /></label>
+                <label data-manual-completed-date-wrap hidden>Completed service date <input name="completedDate" type="date" data-manual-completed-date /></label>
+                <label data-manual-completed-agreement-wrap hidden>Existing signed agreement
+                  <select name="signingRequestId" data-manual-signed-agreements>
+                    <option value="">No agreement link</option>
+                  </select>
+                </label>
+                <label data-manual-crew-size-wrap>Crew size <select name="crewSize" data-manual-crew><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
                 <label class="admin-field--wide">Internal booking notes <textarea name="notes" rows="2" maxlength="2000" placeholder="Access details, special instructions, or why this estimate differs from the saved profile."></textarea></label>
-                <div class="admin-field--wide admin-actions">
+                <div class="admin-field--wide admin-actions" data-manual-scheduled-pricing>
                   <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-quote">Generate Estimate and Check Times</button>
                   <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-availability">Check Available Times</button>
                 </div>
                 <div class="admin-field--wide" data-manual-quote-result aria-live="polite"></div>
-                <label>Available appointment start <select name="slot" data-manual-slots><option value="">Generate an estimate and check times first</option></select></label>
+                <label data-manual-slot-wrap>Available appointment start <select name="slot" data-manual-slots><option value="">Generate an estimate and check times first</option></select></label>
                 <div class="admin-field--wide" data-manual-staff></div>
-                <div class="admin-field--wide admin-actions">
-                  <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-create">Save Pending Booking</button>
-                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-confirm">Create Booking and Confirm</button>
+                <div class="admin-field--wide admin-actions" data-manual-scheduled-actions>
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-create">Save Booking</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-documents">Book &amp; Send Agreements</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-create-send-invoice">Book, Send Agreements &amp; Invoice</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="manual-create-confirm">Book &amp; Confirm</button>
+                </div>
+                <div class="admin-field--wide admin-actions" data-manual-completed-actions hidden>
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="manual-completed-save">Save Completed Job</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="manual-completed-invoice">Save &amp; Create Invoice</button>
                 </div>
               </form>
               <div data-manual-booking-result style="margin-top:1rem;"></div>
@@ -294,12 +451,132 @@ import {
             </div>
           </section>
 
+          <section class="admin-view" data-admin-view="quick-estimate" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Quick Estimate</h2>
+              <p class="admin-muted">
+                Price a phone or walk-in inquiry without creating a customer or booking. The shared
+                server estimator applies the published prices, travel, promotions, FRIENDS15 and
+                Community Support rules. Nothing is charged, emailed or booked unless you choose it.
+              </p>
+              <form class="admin-form admin-form--grid" data-quick-form style="max-width:none">
+                <label>Existing customer (optional) <select name="customerId" data-quick-customer><option value="">New inquiry</option></select></label>
+                <label>Property (optional) <select name="propertyId" data-quick-property><option value="">Choose a customer first</option></select></label>
+                <p class="admin-field--wide admin-muted" data-quick-customer-note role="status" aria-live="polite"></p>
+                <label>Branch <select name="branchId" data-quick-branch data-admin-address-branch><option value="branch_pensacola">Pensacola</option><option value="branch_tampa" disabled>Tampa Bay / Central Florida (inactive)</option></select></label>
+                <label>Contact name <input name="customerName" maxlength="200" /></label>
+                <label>Contact email <input name="customerEmail" type="email" maxlength="200" /></label>
+                <label>Contact phone <input name="customerPhone" maxlength="40" /></label>
+                <div class="admin-field--wide admin-address-block" data-admin-address-block>
+                  <div class="admin-address-grid">
+                    <label class="admin-field--wide">Street address
+                      <input name="addressLine1" maxlength="200" placeholder="Start typing an address" autocomplete="off" data-admin-address-input required />
+                    </label>
+                    <label>Apartment / unit <input name="addressUnit" maxlength="40" placeholder="Optional" data-admin-address-unit /></label>
+                    <label>City <input name="city" maxlength="120" data-admin-address-city /></label>
+                    <label>State <select name="state" data-admin-address-state><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
+                    <label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" data-admin-address-zip required /></label>
+                    <input type="hidden" name="latitude" data-admin-address-lat />
+                    <input type="hidden" name="longitude" data-admin-address-lng />
+                    <input type="hidden" name="precision" data-admin-address-precision />
+                    <input type="hidden" name="placeId" data-admin-address-place-id />
+                    <input type="hidden" name="county" data-admin-address-county />
+                    <input type="hidden" name="formattedAddress" data-admin-address-formatted />
+                  </div>
+                  <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
+                </div>
+                <label>Service date (optional) <input name="serviceDate" type="date" /></label>
+                <label>Service <select name="engine" data-quick-engine><option value="residential">Residential cleaning</option><option value="str">Short-term rental turnover</option><option value="commercial">Commercial cleaning</option><option value="church">Church cleaning</option></select></label>
+                <label>Service type <select name="serviceType" data-quick-service><option value="standard">Residential maintenance</option><option value="deep">Deep cleaning</option><option value="move_in_out">Move-in / move-out</option></select></label>
+                <label>Frequency <select name="frequency">{FREQUENCY_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                <div class="admin-field--wide admin-form admin-form--grid" data-quick-residential>
+                  <label>Property type <select name="propertyType">{PROPERTY_TYPE_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Square feet <input name="squareFeet" type="number" min={RESIDENTIAL_INPUT_LIMITS.squareFeet.min} max={RESIDENTIAL_INPUT_LIMITS.squareFeet.max} step={RESIDENTIAL_INPUT_LIMITS.squareFeet.step} /></label>
+                  <label>Bedrooms <input name="bedrooms" type="number" min="0" max="12" /></label>
+                  <label>Full bathrooms <input name="fullBaths" type="number" min="0" max="12" /></label>
+                  <label>Half bathrooms <input name="halfBaths" type="number" min="0" max="12" /></label>
+                  <label>Beds to reset (STR) <input name="beds" type="number" min="1" max="30" /></label>
+                  <label>Pets <select name="pets">{PET_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Condition <select name="condition">{CONDITION_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Last professional clean <select name="lastClean">{LAST_CLEAN_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label class="admin-field--wide"><input type="checkbox" name="supportiveEligible" value="yes" /> Community Support eligibility (10% - client attestation only)</label>
+                </div>
+                <div class="admin-field--wide admin-form admin-form--grid" data-quick-facility hidden>
+                  <label>Facility type <select name="facilityType">{COMMERCIAL_FACILITY_TYPES.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Cleanable square feet <input name="cleanableSqft" type="number" min="100" max="200000" step="50" /></label>
+                  <label>Restroom fixtures <input name="restroomFixtures" type="number" min="0" max="40" step="1" /></label>
+                  <label>Breakroom / kitchen <select name="breakroom"><option value="none">None</option><option value="breakroom">Small breakroom</option><option value="kitchen">Full kitchen</option></select></label>
+                  <label>Condition <select name="facilityCondition">{FACILITY_CONDITION_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Traffic <select name="traffic">{TRAFFIC_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Flooring <select name="flooring">{FLOORING_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label>Visit frequency <select name="facilityFrequency">{FACILITY_FREQUENCY_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                  <label><input type="checkbox" name="firstClean" value="yes" /> First clean / overdue reset</label>
+                  <label><input type="checkbox" name="specialty" value="yes" /> Specialty work requiring review</label>
+                </div>
+                <label>Promotion <select name="promotionCode" data-quick-promotion><option value="">Automatic eligible benefit</option></select></label>
+                <p class="admin-field--wide admin-muted" data-quick-benefit-note></p>
+                <fieldset class="admin-field--wide admin-extras" data-quick-extras>
+                  <legend>Extras &amp; add-ons</legend>
+                  <details class="admin-extras__details">
+                    <summary data-quick-extras-summary>Choose extras</summary>
+                    <label>Search extras <input type="search" data-quick-addon-search placeholder="Kitchen, windows, organization…" /></label>
+                    <div class="admin-extras__selected" data-quick-extras-selected></div>
+                    <div class="admin-extras__list" data-quick-addon-list></div>
+                    <h4>Bundles</h4>
+                    <div class="admin-extras__list" data-quick-bundle-list></div>
+                  </details>
+                </fieldset>
+                <label class="admin-field--wide">Internal notes <textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+                <div class="admin-field--wide admin-actions">
+                  <button class="btn btn--primary btn--small" type="button" data-quick-action="calculate">Calculate</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-quick-action="save">Save</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="save-draft">Save as draft</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="pdf">Download PDF</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="email">Email estimate</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="discard">Discard</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-quick-action="reset">New estimate</button>
+                </div>
+                <div class="admin-field--wide" data-quick-result aria-live="polite"></div>
+              </form>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Saved Quick Estimates</h2>
+              <form class="admin-inline-form" data-quick-filter>
+                <label>Status <select name="status"><option value="">All</option><option value="saved">Saved</option><option value="draft">Draft</option><option value="converted">Converted</option><option value="discarded">Discarded</option></select></label>
+                <label>Search <input name="q" type="search" placeholder="Name, email, phone, address or reference" /></label>
+                <button class="btn btn--secondary btn--small" type="submit">Filter</button>
+              </form>
+              <div data-quick-list style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-quick-convert-card hidden>
+              <h2 class="admin-section-title">Convert to booking</h2>
+              <p class="admin-muted">The estimate, promotion and travel are recalculated by the server before a pending booking is created.</p>
+              <form class="admin-form admin-form--grid" data-quick-convert>
+                <input type="hidden" name="id" />
+                <label>Date <input name="date" type="date" required /></label>
+                <label>Start time <select name="start" required><option value="">Choose a time</option></select></label>
+                <label>Crew size <select name="crewSize"><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
+                <label class="admin-field--wide">Notes <textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+                <div class="admin-field--wide admin-actions"><button class="btn btn--ghost btn--small" type="button" data-quick-convert-check>Check available times</button><button class="btn btn--primary btn--small" type="submit">Convert to pending booking</button></div>
+                <p class="admin-field--wide admin-status-message" data-quick-convert-status role="status" aria-live="polite"></p>
+              </form>
+            </div>
+          </section>
+
           <section class="admin-view" data-admin-view="recurring" hidden>
             <div class="admin-card">
               <h2 class="admin-section-title">Recurring cleaning plans</h2>
+              <div class="admin-calendar-filters">
+                <label>View <select data-admin-recurring-status><option value="active" selected>Active and paused</option><option value="active-only">Active only</option><option value="paused">Paused only</option><option value="cancelled">Canceled</option><option value="all">All plans</option></select></label>
+              </div>
               <div data-admin-recurring-notice></div>
               <div data-admin-recurring></div>
               <div data-admin-recurring-occurrences style="margin-top:1rem;"></div>
+              <details class="admin-detail-toggle" style="margin-top:1.25rem;">
+                <summary>Operational worker history</summary>
+                <p class="admin-muted">Daily recurring worker runs. Failed runs remain visible for diagnosis; conflicts are not deleted.</p>
+                <div data-admin-recurring-runs></div>
+              </details>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Create a recurring plan</h2>
@@ -330,12 +607,143 @@ import {
           </section>
 
           <section class="admin-view" data-admin-view="jobs" hidden>
-            <div class="admin-card">
+            <div class="admin-card admin-dispatch">
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Intelligent Dispatch</h2>
+                  <p class="admin-muted">Automatic assignment is limited to unassigned jobs. Existing assignments and customer appointment times are never changed automatically.</p>
+                </div>
+                <select class="admin-select" data-dispatch-branch aria-label="Dispatch branch"><option value="branch_pensacola">Pensacola</option></select>
+              </div>
+              <p class="admin-status-message" data-dispatch-result role="status" aria-live="polite"></p>
+              <div class="admin-dispatch-kpis" data-dispatch-kpis></div>
+              <nav class="admin-dispatch-tabs" aria-label="Dispatch workspace">
+                <button type="button" data-dispatch-tab="board" aria-current="page">Dispatch Board</button>
+                <button type="button" data-dispatch-tab="team">Team Schedule</button>
+                <button type="button" data-dispatch-tab="coverage">Coverage &amp; Conflicts</button>
+                <button type="button" data-dispatch-tab="settings">Dispatch Settings</button>
+                <button type="button" data-dispatch-tab="history">Operational History</button>
+              </nav>
+              <form class="admin-form admin-form--grid" data-dispatch-settings data-dispatch-section="settings" style="margin-top:1rem;">
+                <label>Automation mode
+                  <select name="mode">
+                    <option value="analysis_only">Analysis only</option>
+                    <option value="automatic_unassigned">Automatically staff unassigned jobs</option>
+                  </select>
+                </label>
+                <label class="admin-check"><input type="checkbox" name="autoAssignEnabled" /> Enable automatic initial assignment</label>
+                <label class="admin-check"><input type="checkbox" name="paused" /> Emergency pause</label>
+                <label class="admin-check"><input type="checkbox" name="reassignmentRecommendations" /> Recommend improvements to existing assignments</label>
+                <label class="admin-check"><input type="checkbox" name="customerReschedulingRecommendations" disabled /> Recommend customer rescheduling (not enabled)</label>
+                <label>Minimum worthwhile saving (USD) <input name="minSavingsCents" type="number" min="0" step="0.01" /></label>
+                <label>Maximum candidates <input name="maxCandidates" type="number" min="1" max="20" step="1" /></label>
+                <label>Vehicle cost (cents per mile, optional) <input name="vehicleCostCentsPerMile" type="number" min="0" step="1" /></label>
+                <label>Compensable travel pay (%) <input name="travelPayPercent" type="number" min="0" max="100" step="1" /></label>
+                <div class="admin-actions">
+                  <button class="btn btn--secondary btn--small" type="submit">Save dispatch controls</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="dispatch-run-analysis">Run read-only analysis</button>
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="dispatch-run-auto">Run automatic assignment</button>
+                </div>
+              </form>
+              <details class="admin-detail-toggle" style="margin-top:1rem;" data-dispatch-section="settings">
+                <summary>Advanced optimizer weights</summary>
+                <form class="admin-form admin-form--grid" data-dispatch-weights>
+                  <label>Travel minutes <input name="travel" type="number" min="0" step="0.1" /></label>
+                  <label>Travel miles <input name="miles" type="number" min="0" step="0.1" /></label>
+                  <label>Labor cost <input name="labor" type="number" min="0" step="0.1" /></label>
+                  <label>Weekly workload <input name="workload" type="number" min="0" step="0.1" /></label>
+                  <label>Customer continuity <input name="continuity" type="number" min="0" step="0.1" /></label>
+                  <label>Shared transport <input name="shared" type="number" min="0" step="0.1" /></label>
+                  <button class="btn btn--secondary btn--small" type="submit">Save weights</button>
+                </form>
+              </details>
+              <h3 style="margin-top:1rem;" data-dispatch-section="board">Unassigned jobs</h3>
+              <div data-admin-dispatch-unassigned data-dispatch-section="board"></div>
+              <h3 data-dispatch-section="coverage">Reassignment recommendations</h3>
+              <div data-admin-dispatch-recommendations data-dispatch-section="coverage"></div>
+              <h3 data-dispatch-section="coverage">Coverage exceptions</h3>
+              <div data-admin-dispatch-exceptions data-dispatch-section="coverage"></div>
+              <h3 data-dispatch-section="team">Employee lanes</h3>
+              <div data-admin-dispatch-lanes data-dispatch-section="team"></div>
+              <h3 data-dispatch-section="history">Dispatch decision log</h3>
+              <div data-admin-dispatch-log data-dispatch-section="history"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-dispatch-section="team">
+              <h2 class="admin-section-title">Employee Dispatch Profile</h2>
+              <p class="admin-muted">Private origins are visible only to the owner and are never shown to customers or coworkers. Automatic assignment stays blocked until qualifications, equipment and transport are complete.</p>
+              <form class="admin-form admin-form--grid" data-dispatch-profile>
+                <div class="admin-field--wide admin-dispatch-readiness" data-dispatch-readiness></div>
+                <input type="hidden" name="memberId" />
+                <input type="hidden" name="branchId" value="branch_pensacola" />
+                <label>Team member <select name="profileMember" data-dispatch-profile-select required><option value="">Choose a team member</option></select></label>
+                <fieldset class="admin-field--wide"><legend>Approved service categories</legend>
+                  <label class="admin-check"><input type="checkbox" name="services" value="standard" /> Residential cleaning</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="deep" /> Deep cleaning</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="move_in_out" /> Move-in / move-out</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="str_turnover" /> STR turnover</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="commercial-cleaning" /> Commercial cleaning</label>
+                  <label class="admin-check"><input type="checkbox" name="services" value="church-cleaning" /> Church cleaning</label>
+                </fieldset>
+                <fieldset class="admin-field--wide"><legend>Approved equipment</legend>
+                  <label class="admin-check"><input type="checkbox" name="equipment" value="standard-kit" /> Standard residential kit</label>
+                  <label class="admin-check"><input type="checkbox" name="equipment" value="deep-kit" /> Deep-clean equipment</label>
+                  <label class="admin-check"><input type="checkbox" name="equipment" value="commercial-kit" /> Commercial equipment</label>
+                </fieldset>
+                <label>Transportation
+                  <select name="transportMode">
+                    <option value="unknown">Not configured</option>
+                    <option value="independent">Independent driver</option>
+                    <option value="shared">Shared crew transport</option>
+                    <option value="none">Needs transportation</option>
+                  </select>
+                </label>
+                <label class="admin-check"><input type="checkbox" name="canDrive" /> Can drive others</label>
+                <label>Vehicle seats <input name="seats" type="number" min="0" max="12" step="1" /></label>
+                <label class="admin-check"><input type="checkbox" name="canTransportEquipment" /> Can transport required equipment</label>
+                <label>Maximum weekly hours <input name="maxWeeklyHours" type="number" min="1" max="80" step="0.5" /></label>
+                <label class="admin-check"><input type="checkbox" name="overtimeApproved" /> Overtime approved</label>
+                <fieldset class="admin-field--wide"><legend>Regular workdays</legend>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="0" /> Sunday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="1" /> Monday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="2" /> Tuesday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="3" /> Wednesday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="4" /> Thursday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="5" /> Friday</label>
+                  <label class="admin-check"><input type="checkbox" name="workdays" value="6" /> Saturday</label>
+                </fieldset>
+                <label>Regular shift start <input name="workdayStart" type="time" step="900" /></label>
+                <label>Regular shift end <input name="workdayEnd" type="time" step="900" /></label>
+                <div class="admin-field--wide admin-address-block" data-admin-address-block>
+                  <div class="admin-address-grid">
+                    <label class="admin-field--wide">Dispatch origin
+                      <input name="addressLine1" maxlength="200" autocomplete="off" data-admin-address-input placeholder="Start typing the approved dispatch address" />
+                    </label>
+                    <label>City <input name="city" maxlength="120" data-admin-address-city /></label>
+                    <label>State <select name="state" data-admin-address-state><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
+                    <label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" data-admin-address-zip /></label>
+                    <input type="hidden" name="latitude" data-admin-address-lat />
+                    <input type="hidden" name="longitude" data-admin-address-lng />
+                    <input type="hidden" name="precision" data-admin-address-precision />
+                    <input type="hidden" name="placeId" data-admin-address-place-id />
+                  </div>
+                  <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
+                </div>
+                <fieldset class="admin-field--wide"><legend>Temporary unavailability</legend>
+                  <label>Starts <input name="unavailableFrom" type="datetime-local" /></label>
+                  <label>Ends <input name="unavailableTo" type="datetime-local" /></label>
+                  <label>Reason <input name="unavailableReason" maxlength="300" /></label>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="dispatch-add-timeoff">Add time off</button>
+                </fieldset>
+                <label class="admin-field--wide">Dispatch notes <textarea name="notes" rows="2"></textarea></label>
+                <button class="btn btn--secondary btn--small" type="submit">Save dispatch profile</button>
+              </form>
+            </div>
+            <div class="admin-card" data-dispatch-section="board">
               <h2 class="admin-section-title">Jobs</h2>
               <div data-admin-jobs></div>
               <div data-admin-checklist style="margin-top:1rem;"></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
+            <div class="admin-card" style="margin-top:1rem;" data-dispatch-section="team">
               <h2 class="admin-section-title">Team</h2>
               <div data-admin-team></div>
               <form class="admin-inline-form" data-admin-team-create style="margin-top:1rem;">
@@ -346,66 +754,321 @@ import {
             </div>
           </section>
 
-          <section class="admin-view" data-admin-view="documents" hidden>
+          <section class="admin-view" data-admin-view="careers" hidden>
             <div class="admin-card">
-              <h2 class="admin-section-title">Legal Approval Register</h2>
-              <p class="admin-muted">
-                Company records and draft agreements live in the owner master workspace, not in the public repository.
-                Open <strong>00 START HERE → START-HERE.html</strong> and then
-                <strong>01 COMPANY &amp; LEGAL → LEGAL-APPROVAL-REGISTER.md</strong>.
-              </p>
-              <p class="small text-muted">
-                Exact local path: <code>C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\00 START HERE\START-HERE.html</code>
-              </p>
-              <p class="small text-muted">
-                Company documents, customer agreements, employee documents, policies and pending owner review are
-                separated there. Approved templates are the only documents this admin may send for signature; drafts
-                must never be sent to customers or employees.
-              </p>
+              <div class="admin-detail-head">
+                <div><h2 class="admin-section-title">Career Applications</h2><p class="admin-muted">Private applicant records. Resumes are stored in private object storage and downloaded only through an authorized owner session.</p></div>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="careers-refresh">Refresh</button>
+              </div>
+              <form class="admin-inline-form" data-careers-search>
+                <label>Status
+                  <select data-careers-filter name="status">
+                    <option value="">All</option>
+                    <option value="new">New</option>
+                    <option value="reviewing">Reviewing</option>
+                    <option value="interview">Interview</option>
+                    <option value="offer">Offer</option>
+                    <option value="declined">Declined</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label>Branch
+                  <select name="branch">
+                    <option value="">All branches</option>
+                    <option value="pensacola">Pensacola</option>
+                    <option value="tampa">Tampa future interest</option>
+                  </select>
+                </label>
+                <label>Search <input name="q" type="search" placeholder="Name, email, reference or role" /></label>
+                <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="name">Applicant name</option><option value="status">Status</option></select></label>
+                <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
+                <button class="btn btn--secondary btn--small" type="submit">Filter</button>
+              </form>
+              <div data-careers-list style="margin-top:1rem;"></div>
+              <div data-careers-pagination style="margin-top:.75rem;"></div>
+              <div data-career-detail style="margin-top:1rem;"></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Document templates</h2>
+          </section>
+
+          <section class="admin-view" data-admin-view="documents" hidden>
+            <nav class="document-tabs" aria-label="Document center sections">
+              <button type="button" data-document-tab="overview" aria-current="page">Overview</button>
+              <button type="button" data-document-tab="send">Send for Signature</button>
+              <button type="button" data-document-tab="requests">Signing Requests</button>
+              <button type="button" data-document-tab="library">Document Library</button>
+              <button type="button" data-document-tab="packets">Packets</button>
+              <button type="button" data-document-tab="updates">Versions &amp; Updates</button>
+              <button type="button" data-document-tab="settings">Settings</button>
+            </nav>
+            <section class="document-panel" data-document-panel="overview">
+              <div class="admin-card">
+                <div class="admin-detail-head">
+                  <div>
+                    <h2 class="admin-section-title">Document center overview</h2>
+                    <p class="admin-muted">What needs attention now, then the safest next action.</p>
+                  </div>
+                  <button class="btn btn--secondary btn--small" type="button" data-document-tab="send">Send for signature</button>
+                </div>
+                <div data-document-overview></div>
+              </div>
+              <div class="admin-card" style="margin-top:1rem;">
+                <h2 class="admin-section-title">Legal Approval Register</h2>
+                <p class="admin-muted">
+                  Company records and draft agreements live in the owner master workspace, not in the public repository.
+                  Open <strong>00 START HERE → START-HERE.html</strong> and then
+                  <strong>01 COMPANY &amp; LEGAL → LEGAL-APPROVAL-REGISTER.md</strong>.
+                </p>
+                <p class="small text-muted">
+                  Exact local path: <code>C:\Users\thoma\Downloads\SPARKLING STANDARD - MASTER\00 START HERE\START-HERE.html</code>
+                </p>
+                <p class="small text-muted">
+                  Company documents, customer agreements, employee documents, policies and pending owner review are
+                  separated there. Approved templates are the only documents this admin may send for signature; drafts
+                  must never be sent to customers or employees.
+                </p>
+              </div>
+            </section>
+            <section class="document-panel" data-document-panel="settings" hidden>
+            <div class="admin-card" data-admin-owner-section>
+              <h2 class="admin-section-title">Signing reminders</h2>
+              <p class="admin-muted">Reminders never cancel an appointment or agreement. Signing links expire after seven days; an expired link is replaced only when a reminder can be delivered.</p>
+              <form class="admin-form admin-form--grid" data-document-reminders>
+                <label><input type="checkbox" name="enabled" /> Enable automatic reminders</label>
+                <label>First reminder (hours) <input name="firstHours" type="number" min="1" max="168" /></label>
+                <label>Second reminder (hours) <input name="secondHours" type="number" min="2" max="168" /></label>
+                <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Save reminder settings</button></div>
+              </form>
+              <p class="admin-status-message" data-document-reminders-status role="status" aria-live="polite"></p>
+            </div>
+            </section>
+            <section class="document-panel" data-document-panel="updates" hidden>
+            <div class="admin-card" data-admin-owner-section>
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Versions &amp; Updates</h2>
+                  <p class="admin-muted">
+                    New versions never overwrite an executed agreement. Review affected packets and customers here;
+                    no re-signing request is sent automatically.
+                  </p>
+                </div>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="document-updates-refresh">Refresh</button>
+              </div>
+              <div data-admin-document-updates></div>
+            </div>
+            </section>
+            <section class="document-panel" data-document-panel="library" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Document library</h2>
               <p class="admin-muted">Only owner-approved templates can create a signing requirement. Draft and retired templates never block a workflow.</p>
               <div data-admin-documents-templates></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Add a document template</h2>
+              <h2 class="admin-section-title">Create or upload a document</h2>
+              <p class="admin-muted">Create a document in the visual editor, or upload an owner-approved PDF. Internal family keys, versions and technical identifiers are generated automatically.</p>
               <div class="admin-grid">
                 <form class="admin-form" data-document-template-text>
-                  <h3>Approved text agreement</h3>
-                  <label>Title <input name="title" required maxlength="200" /></label>
-                  <label>Category <input name="category" maxlength="80" placeholder="residential, employee, commercial" /></label>
-                  <label>Version <input name="version" value="1.0" maxlength="40" /></label>
-                  <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
-                  <label>Agreement text <textarea name="contentText" rows="8" required maxlength="200000"></textarea></label>
-                  <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
-                  <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
-                  <button class="btn btn--secondary btn--small" type="submit">Save draft template</button>
+                  <h3>Create a Document</h3>
+                  <label>Document name <input name="title" required maxlength="200" placeholder="Residential Deep Cleaning Agreement" /></label>
+                  <label>Who signs it?
+                    <select name="signerParty">
+                      <option value="customer">Customer</option>
+                      <option value="employee">Employee</option>
+                      <option value="both">Customer and employee</option>
+                    </select>
+                  </label>
+                  <label>Category
+                    <select name="category">
+                      <option value="residential">Residential</option>
+                      <option value="commercial">Commercial</option>
+                      <option value="church">Church / facility</option>
+                      <option value="employee">Employee</option>
+                      <option value="general">General</option>
+                    </select>
+                  </label>
+                  <label>Legal review
+                    <select name="legalReviewStatus">
+                      <option value="not_reviewed">Not reviewed</option>
+                      <option value="owner_review_required">Owner review required</option>
+                      <option value="owner_approved" selected>Owner approved</option>
+                      <option value="attorney_review_required">Attorney review required</option>
+                      <option value="attorney_reviewed">Attorney reviewed</option>
+                    </select>
+                  </label>
+                  <button class="btn btn--primary btn--small" type="submit">Create a Document in the editor</button>
                 </form>
                 <form class="admin-form" data-document-template-upload enctype="multipart/form-data">
-                  <h3>Upload an approved PDF</h3>
-                  <label>Title <input name="title" required maxlength="200" /></label>
-                  <label>Category <input name="category" maxlength="80" /></label>
-                  <label>Version <input name="version" value="1.0" maxlength="40" /></label>
-                  <label>Signer <select name="signerParty"><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
-                  <label>PDF file <input name="file" type="file" accept="application/pdf" required /></label>
+                  <h3>Upload an Approved PDF</h3>
+                  <label>Document name <input name="title" required maxlength="200" /></label>
+                  <label>Who signs it?
+                    <select name="signerParty">
+                      <option value="customer">Customer</option>
+                      <option value="employee">Employee</option>
+                      <option value="both">Customer and employee</option>
+                    </select>
+                  </label>
+                  <label>Category
+                    <select name="category">
+                      <option value="residential">Residential</option>
+                      <option value="commercial">Commercial</option>
+                      <option value="church">Church / facility</option>
+                      <option value="employee">Employee</option>
+                      <option value="general">General</option>
+                    </select>
+                  </label>
+                  <label>Approved PDF <input name="file" type="file" accept="application/pdf" required /></label>
                   <label><input type="checkbox" name="requiresVerification" value="yes" /> Requires owner/admin verification or countersignature</label>
                   <label><input type="checkbox" name="requiresCountersignature" value="yes" /> Requires an explicit owner countersignature</label>
-                  <button class="btn btn--secondary btn--small" type="submit">Upload PDF template</button>
+                  <button class="btn btn--secondary btn--small" type="submit">Upload approved PDF</button>
                 </form>
               </div>
               <div data-document-template-result style="margin-top:.6rem;"></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Document bundles</h2>
-              <p class="admin-muted">A bundle defines exactly which approved documents apply to a service, customer or employee group. Conditions are optional.</p>
+            <div class="admin-card document-editor" data-document-editor hidden style="margin-top:1rem;">
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Edit and revise document</h2>
+                  <p class="admin-muted">Edit the actual approved wording. Saving creates a draft revision; the published version and every executed agreement remain unchanged. <strong>Approve &amp; Publish</strong> moves the packet to the new version and flags prior signers for review.</p>
+                </div>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-close>Close editor</button>
+              </div>
+              <input type="hidden" data-document-editor-id />
+              <div class="admin-form admin-form--grid">
+                <label>Title <input data-document-editor-title maxlength="200" /></label>
+                <label>Version <strong data-document-editor-version-display>Version 1.0</strong><input type="hidden" data-document-editor-version maxlength="40" /></label>
+                <label>Category <input data-document-editor-category maxlength="80" /></label>
+                <label>Signer <select data-document-editor-signer><option value="customer">Customer</option><option value="employee">Employee</option><option value="both">Both</option></select></label>
+                <label>Effective date <input data-document-editor-effective type="date" /></label>
+                <label>Legal review <select data-document-editor-review><option value="not_reviewed">Not reviewed</option><option value="owner_review_required">Owner review required</option><option value="owner_approved">Owner approved</option><option value="attorney_review_required">Attorney review required</option><option value="attorney_reviewed">Attorney reviewed</option></select></label>
+                <label><input type="checkbox" data-document-editor-verification /> Requires verification / countersignature</label>
+                <label><input type="checkbox" data-document-editor-countersignature /> Requires explicit owner countersignature</label>
+              </div>
+              <div class="document-editor-toolbar admin-actions" role="toolbar" aria-label="Document formatting">
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="undo" title="Undo">Undo</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="redo" title="Redo">Redo</button>
+                <select data-editor-block aria-label="Paragraph style">
+                  <option value="p">Normal text</option>
+                  <option value="h1">Title</option>
+                  <option value="h2">Heading 1</option>
+                  <option value="h3">Heading 2</option>
+                  <option value="h4">Heading 3</option>
+                </select>
+                <select data-editor-font aria-label="Font family">
+                  <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+                  <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                  <option value="Arial, Helvetica, sans-serif">Arial</option>
+                  <option value="'Source Sans 3', Arial, sans-serif">Source Sans</option>
+                  <option value="'Courier New', monospace">Courier</option>
+                </select>
+                <select data-editor-size aria-label="Font size">
+                  <option value="">Size</option>
+                  <option value="9pt">9 pt</option>
+                  <option value="10pt">10 pt</option>
+                  <option value="11pt">11 pt</option>
+                  <option value="12pt">12 pt</option>
+                  <option value="14pt">14 pt</option>
+                  <option value="16pt">16 pt</option>
+                  <option value="18pt">18 pt</option>
+                  <option value="22pt">22 pt</option>
+                </select>
+                <input type="color" data-editor-color value="#2c2421" aria-label="Text color" />
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="bold" title="Bold"><strong>B</strong></button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="italic" title="Italic"><em>I</em></button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="underline" title="Underline"><u>U</u></button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="justifyLeft" title="Align left">Left</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="justifyCenter" title="Align center">Center</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="justifyRight" title="Align right">Right</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="insertUnorderedList" title="Bulleted list">Bullets</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-command="insertOrderedList" title="Numbered list">Numbers</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-insert-table title="Insert table">Table</button>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-page-break title="Insert page break">Page break</button>
+                <select data-editor-field aria-label="Insert dynamic field">
+                  <option value="">Insert field</option>
+                  <option value="{{customer.legal_name}}">Customer legal name</option>
+                  <option value="{{property.address}}">Property address</option>
+                  <option value="{{booking.reference}}">Booking reference</option>
+                  <option value="{{service.scope}}">Service scope</option>
+                  <option value="{{service.date}}">Service date</option>
+                  <option value="{{service.arrival_window}}">Arrival window</option>
+                  <option value="{{price.summary}}">Price summary</option>
+                  <option value="{{price.line_items}}">Price line items</option>
+                  <option value="{{price.tax}}">Tax</option>
+                  <option value="{{price.discount}}">Discount</option>
+                  <option value="{{payment.terms}}">Payment terms</option>
+                  <option value="{{cancellation.terms}}">Cancellation terms</option>
+                  <option value="{{document.version}}">Document version</option>
+                </select>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-insert-field>Insert</button>
+                <select data-editor-signature aria-label="Insert signature line">
+                  <option value="">Signature line</option>
+                  <option value="customer">Customer signature</option>
+                  <option value="employee">Employee signature</option>
+                </select>
+                <button class="btn btn--ghost btn--small" type="button" data-editor-insert-signature>Place</button>
+              </div>
+              <div class="document-editor-layout">
+                <div class="document-editor-canvas-pane">
+                  <div class="document-editor-brandbar" aria-label="Branded letterhead applied to this document">
+                    <img src="/brand/sparkling-standard-circular-logo-1024.png" alt="" width="42" height="42" />
+                    <div>
+                      <strong>Sparkling Standard Cleaning Co.</strong>
+                      <span>Standards That Sparkle.</span>
+                    </div>
+                    <small>Branded letterhead, footer and page numbers are applied automatically.</small>
+                  </div>
+                  <label class="admin-muted" style="display:block;font-size:.75rem;">Document header (optional)</label>
+                  <input data-document-editor-header class="document-editor-header-input" maxlength="500" placeholder="Printed at the top of the document" />
+                  <div class="document-editor-surface-wrap">
+                    <div class="document-editor-surface">
+                      <div class="document-editor-page-brand" aria-hidden="true">
+                        <img src="/brand/sparkling-standard-circular-logo-1024.png" alt="" width="42" height="42" />
+                        <div>
+                          <strong>Sparkling Standard Cleaning Co.</strong>
+                          <span>Standards That Sparkle.</span>
+                        </div>
+                      </div>
+                      <div class="document-editor-canvas" data-document-editor-canvas contenteditable="true" role="textbox" aria-multiline="true" aria-label="Document body"></div>
+                      <div class="document-editor-page-footer" aria-hidden="true">
+                        <span>Sparkling Standard LLC · Standards That Sparkle.</span>
+                        <span>Confidential customer copy</span>
+                      </div>
+                    </div>
+                  </div>
+                  <label class="admin-muted" style="display:block;font-size:.75rem;">Document footer (optional)</label>
+                  <input data-document-editor-footer class="document-editor-footer-input" maxlength="500" placeholder="Printed at the end of the document" />
+                </div>
+                <div class="document-editor-preview-pane">
+                  <div class="admin-composer__toolbar">
+                    <strong style="font-size:.8rem;">Live document preview</strong>
+                    <button class="btn btn--ghost btn--small" type="button" data-document-editor-print>Print / Save PDF</button>
+                  </div>
+                  <iframe class="document-editor-preview" data-document-editor-preview title="Live document preview" sandbox="allow-same-origin"></iframe>
+                  <p class="admin-muted" style="font-size:.72rem;margin:.4rem 0 0;">This preview mirrors the customer-facing rendering. The executed PDF is generated from the approved version at signing.</p>
+                </div>
+              </div>
+              <div class="admin-actions" style="margin-top:1rem;">
+                <button class="btn btn--secondary btn--small" type="button" data-document-editor-save>Save draft revision</button>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-compare>Compare with published</button>
+                <button class="btn btn--primary btn--small" type="button" data-document-editor-publish>Approve &amp; Publish</button>
+                <button class="btn btn--ghost btn--small" type="button" data-document-editor-cancel>Cancel</button>
+              </div>
+              <p class="admin-status-message" data-document-editor-status role="status" aria-live="polite"></p>
+              <div data-document-editor-compare-result style="margin-top:.8rem;"></div>
+            </div>
+            </section>
+            <section class="document-panel" data-document-panel="packets" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Packets</h2>
+              <p class="admin-muted">A packet defines exactly which approved documents apply to a service, customer or employee group. An active packet with no approved documents is never treated as ready and cannot be sent.</p>
               <div data-admin-documents-bundles></div>
-              <form class="admin-inline-form" data-document-bundle-create style="margin-top:1rem;">
-                <label>Code <input name="code" required placeholder="customer.residential" /></label>
-                <label>Name <input name="name" required placeholder="Residential cleaning documents" /></label>
+              <form class="admin-form admin-form--grid" data-document-bundle-create style="margin-top:1rem;">
+                <label>Code <input name="code" required placeholder="packet.residential_one_time" /></label>
+                <label>Name <input name="name" required placeholder="Residential one-time packet" /></label>
                 <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
+                <label>Purpose <select name="purpose"><option value="customer">Customer</option><option value="employee">Employee</option><option value="operational">Operational</option></select></label>
+                <label>Packet type <input name="packetType" placeholder="residential_one_time" maxlength="60" /></label>
                 <label>Service category <input name="serviceCategory" placeholder="residential" /></label>
-                <button class="btn btn--secondary btn--small" type="submit">Create bundle</button>
+                <label class="admin-field--wide">Recipient instructions <textarea name="instructions" rows="2" maxlength="2000" placeholder="Shown above the documents in the signing link."></textarea></label>
+                <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Create packet</button></div>
               </form>
               <form class="admin-inline-form" data-document-bundle-item style="margin-top:1rem;">
                 <label>Bundle <select name="bundleId" data-document-bundle-options required></select></label>
@@ -426,23 +1089,161 @@ import {
               </form>
               <div data-document-bundle-items style="margin-top:1rem;"></div>
             </div>
-            <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Signing requests</h2>
-              <p class="admin-muted">Send a secure single-purpose link to a customer or employee. Signed versions are immutable and retained privately.</p>
-              <form class="admin-form admin-form--grid" data-document-send>
-                <label>Subject <select name="subjectType"><option value="customer">Customer</option><option value="employee">Employee</option></select></label>
-                <label>Customer ID <input name="customerId" placeholder="cust_..." /></label>
-                <label>Employee ID <input name="teamMemberId" placeholder="team_..." /></label>
-                <label>Service code <input name="serviceCode" placeholder="residential-cleaning" /></label>
-                <label>Frequency <input name="frequency" placeholder="weekly" /></label>
-                <label>Booking reference <input name="bookingReference" placeholder="SS-..." /></label>
-                <label>Recipient email <input name="email" type="email" /></label>
-                <button class="btn btn--secondary btn--small" type="submit">Create signing link</button>
-              </form>
+            </section>
+            <section class="document-panel" data-document-panel="send" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Send for signature</h2>
+              <p class="admin-muted">Search for the customer, choose the service and packet, review the automatically loaded details, then send one secure link. Internal IDs are never required.</p>
+              <div class="admin-composer" data-document-composer>
+                <form class="admin-form admin-form--grid" data-document-send>
+                  <section class="document-send-step admin-field--wide">
+                    <h3>1. Choose the recipient</h3>
+                    <p class="admin-muted">Search by name, email, phone, or company. Internal IDs are filled automatically and never typed by staff.</p>
+                    <label>Search customers
+                      <input type="search" data-document-customer-search placeholder="Start typing a customer name, email, phone, or company" autocomplete="off" />
+                    </label>
+                    <div data-document-customer-results class="document-recipient-results"></div>
+                    <div data-document-selected-recipient class="document-selected-recipient" hidden></div>
+                    <input type="hidden" name="customerId" />
+                    <input type="hidden" name="teamMemberId" />
+                    <div class="admin-inline-form" style="margin-top:.5rem;">
+                      <label>Recipient type
+                        <select name="subjectType" data-document-subject-type>
+                          <option value="customer">Customer</option>
+                          <option value="employee">Employee</option>
+                        </select>
+                      </label>
+                      <label>Recipient email
+                        <input name="email" type="email" placeholder="Verified email for the signing link" />
+                      </label>
+                    </div>
+                    <div data-document-employee-picker hidden>
+                      <label>Employee
+                        <select data-document-employee-select>
+                          <option value="">Choose an employee</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="admin-detail-toggle">
+                      <summary>Advanced: enter identifiers manually</summary>
+                      <div class="admin-form admin-form--grid" style="margin-top:.5rem;">
+                        <label>Customer ID <input name="manualCustomerId" placeholder="cust_..." /></label>
+                        <label>Employee ID <input name="manualTeamMemberId" placeholder="team_..." /></label>
+                        <label>Property ID <input name="manualPropertyId" placeholder="prop_..." /></label>
+                      </div>
+                    </details>
+                  </section>
+
+                  <section class="document-send-step admin-field--wide">
+                    <h3>2. Choose the service or transaction</h3>
+                    <p class="admin-muted">The packet is selected automatically from the service, and verified customer/property values load below.</p>
+                    <div class="admin-form admin-form--grid">
+                      <label>Service
+                        <select name="serviceCode" data-document-service>
+                          <option value="">Choose a service</option>
+                          <option value="residential-cleaning">Residential cleaning</option>
+                          <option value="recurring-residential">Recurring residential cleaning</option>
+                          <option value="residential-deep">Deep cleaning</option>
+                          <option value="move-in-move-out">Move-in / move-out cleaning</option>
+                          <option value="str-turnover">Short-term rental turnover</option>
+                          <option value="commercial-cleaning">Commercial cleaning</option>
+                          <option value="church-cleaning">Church / facility cleaning</option>
+                          <option value="property-management">Property management</option>
+                          <option value="specialty-addons">Specialty / add-ons</option>
+                          <option value="employee-onboarding">Employee onboarding</option>
+                        </select>
+                      </label>
+                      <label>Frequency
+                        <select name="frequency">
+                          <option value="one_time">One time</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="biweekly">Every two weeks</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
+                      </label>
+                      <label>Property
+                        <select name="propertyId" data-document-property>
+                          <option value="">No specific property</option>
+                        </select>
+                      </label>
+                      <label>Booking or estimate reference
+                        <input name="bookingReference" placeholder="SS-..." />
+                      </label>
+                      <label class="admin-field--wide">Document packet
+                        <select name="bundleId" data-document-send-bundle>
+                          <option value="">Automatic (service rules)</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div data-document-context-hint class="admin-muted"></div>
+                  </section>
+
+                  <section class="document-send-step admin-field--wide">
+                    <h3>3. Fill only the remaining details</h3>
+                    <p class="admin-muted">Company identity, approved clauses, and document versions are locked to the approved template. Values already known from the customer, property, or booking load automatically; unresolved fields are flagged before sending.</p>
+                    <div class="admin-form admin-form--grid">
+                      <label>Service scope <textarea name="serviceScope" rows="3" maxlength="8000"></textarea></label>
+                      <label>Included additions <textarea name="serviceAdditions" rows="2" maxlength="4000"></textarea></label>
+                      <label>Exclusions <textarea name="serviceExclusions" rows="2" maxlength="4000"></textarea></label>
+                      <label>Service date <input name="serviceDate" type="date" /></label>
+                      <label>Arrival window <input name="arrivalWindow" maxlength="120" placeholder="8:00 a.m. to 10:00 a.m." /></label>
+                      <label>Price summary <input name="priceSummary" maxlength="2000" placeholder="$260.00" /></label>
+                      <label class="admin-field--wide">Line items <textarea name="priceLineItems" rows="2" maxlength="8000"></textarea></label>
+                      <label>Tax <input name="priceTax" maxlength="1000" /></label>
+                      <label>Discount <input name="priceDiscount" maxlength="1000" /></label>
+                      <label>Payment terms <textarea name="paymentTerms" rows="2" maxlength="4000"></textarea></label>
+                      <label>Cancellation terms <textarea name="cancellationTerms" rows="2" maxlength="4000"></textarea></label>
+                      <label class="admin-field--wide">Additional recipient instructions <textarea name="instructions" rows="2" maxlength="2000"></textarea></label>
+                    </div>
+                  </section>
+
+                  <section class="document-send-step admin-field--wide">
+                    <h3>4. Review and send</h3>
+                    <p class="admin-muted">Preview the actual rendered agreement, then send the secure link or save a draft link to share later. A packet with no approved documents or unresolved required details cannot be sent.</p>
+                    <div class="admin-actions">
+                      <button class="btn btn--secondary btn--small" type="button" data-document-preview>Preview agreement</button>
+                      <button class="btn btn--ghost btn--small" type="button" data-document-save-draft>Save draft link</button>
+                      <button class="btn btn--primary btn--small" type="submit">Create and send signing link</button>
+                    </div>
+                    <p class="admin-muted" data-document-send-readiness role="status" aria-live="polite"></p>
+                  </section>
+                </form>
+                <div class="admin-composer__preview" data-document-preview-pane>
+                  <div class="admin-composer__toolbar">
+                    <label>Section <select data-document-preview-section></select></label>
+                    <label>Zoom <select data-document-preview-zoom><option value="0.8">80%</option><option value="1" selected>100%</option><option value="1.2">120%</option><option value="1.5">150%</option></select></label>
+                    <button class="btn btn--ghost btn--small" type="button" data-document-preview-print>Print / Save PDF</button><button class="btn btn--ghost btn--small" type="button" data-document-preview-fullscreen>Full screen</button>
+                  </div>
+                  <iframe class="admin-preview-frame" data-document-preview-frame title="Live agreement preview" sandbox="allow-same-origin"></iframe>
+                  <p class="admin-muted" style="font-size:.72rem;margin:.4rem 0 0;">Live draft preview. Only approved template text is rendered; unresolved fields are flagged before a link can be created.</p>
+                </div>
+              </div>
+              <div data-document-preview-result style="margin-top:.6rem;"></div>
               <div data-document-send-result style="margin-top:.6rem;"></div>
-              <div data-admin-documents-requests style="margin-top:1rem;"></div>
-              <div data-document-request-detail style="margin-top:1rem;" hidden></div>
             </div>
+            </section>
+            <section class="document-panel" data-document-panel="requests" hidden>
+              <div class="admin-card">
+                <h2 class="admin-section-title">Signing requests</h2>
+                <p class="admin-muted">Track every request, open the executed copy, countersign when required, and resend a secure link when necessary. Signed versions are immutable and retained privately.</p>
+                <div class="admin-inline-form" style="margin-top:.75rem;">
+                  <label>Search <input type="search" data-document-request-search placeholder="Customer, packet, or reference" /></label>
+                  <label>Status
+                    <select data-document-request-status>
+                      <option value="active" selected>Active (awaiting signature)</option>
+                      <option value="">All statuses</option>
+                      <option value="pending">Awaiting signature</option>
+                      <option value="partially_signed">Partially signed</option>
+                      <option value="signed">Completed</option>
+                      <option value="expired">Expired</option>
+                      <option value="void">Revoked / void</option>
+                    </select>
+                  </label>
+                </div>
+                <div data-admin-documents-requests style="margin-top:1rem;"></div>
+                <div data-document-request-detail style="margin-top:1rem;" hidden></div>
+              </div>
+            </section>
           </section>
 
           <section class="admin-view" data-admin-view="timekeeping" hidden>
@@ -526,11 +1327,80 @@ import {
             </div>
           </section>
 
+          <section class="admin-view" data-admin-view="reviews" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Google review requests</h2>
+              <p class="admin-muted">
+                Requests are created only for a verified completed service, use the branch's official
+                review link, and respect the owner's delay and frequency settings. Nothing is sent
+                automatically from this screen without an explicit action. Customers are never
+                required to leave a review, and no incentive or positive-only screening is used.
+              </p>
+              <div class="admin-inline-form">
+                <label>Branch
+                  <select data-review-branch>
+                    <option value="">All branches</option>
+                    <option value="branch_pensacola">Pensacola</option>
+                    <option value="branch_tampa">Tampa Bay</option>
+                  </select>
+                </label>
+                <label>Status
+                  <select data-review-status>
+                    <option value="">All</option>
+                    <option value="queued">Queued</option>
+                    <option value="sent">Sent</option>
+                    <option value="suppressed">Suppressed</option>
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+                <button class="btn btn--secondary btn--small" type="button" data-review-refresh>Refresh</button>
+              </div>
+              <div data-admin-review-list style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Completed cleanings</h2>
+              <p class="admin-muted">
+                Choose the completed cleaning by customer, service or address. The server verifies completion,
+                the branch review link, frequency limits and duplicate requests. No internal appointment ID is needed.
+                Review eligibility follows the customer, not the appointment: a customer who already reviewed, opted out
+                or asked not to be contacted is not invited again automatically. Manual review status changes are owner
+                records and are never presented as Google-verified reviews.
+              </p>
+              <div class="admin-inline-form">
+                <label>Search <input type="search" data-review-search placeholder="Customer, service or address" /></label>
+                <label>Review relationship
+                  <select data-review-eligible-filter>
+                    <option value="">All completed cleanings</option>
+                    <option value="not_invited">Never invited</option>
+                    <option value="queued">Invitation queued</option>
+                    <option value="sent">Invitation sent</option>
+                    <option value="failed">Delivery failed</option>
+                    <option value="unknown">Review status unknown</option>
+                    <option value="reviewed">Confirmed reviewed</option>
+                    <option value="do_not_ask">Do not ask again</option>
+                    <option value="opted_out">Customer opted out</option>
+                  </select>
+                </label>
+              </div>
+              <div data-review-eligible-list style="margin-top:1rem;"></div>
+              <p class="admin-status-message" data-review-status-message role="status" aria-live="polite"></p>
+            </div>
+          </section>
+
           <section class="admin-view" data-admin-view="finance" hidden>
             <div class="admin-grid" data-admin-finance-summary></div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Invoices</h2>
-              <div data-admin-invoices></div>
+              <form class="admin-inline-form" data-admin-finance-filter>
+                <label>Status <select name="status"><option value="">All</option><option value="draft">Draft</option><option value="open">Open</option><option value="partially_paid">Partially paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option><option value="void">Void</option></select></label>
+                <label>Search <input name="q" type="search" placeholder="Invoice number or customer" /></label>
+                <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="due_date">Due date</option><option value="balance">Balance</option><option value="status">Status</option></select></label>
+                <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
+                <button class="btn btn--secondary btn--small" type="submit">Filter</button>
+              </form>
+              <div data-admin-invoices style="margin-top:1rem;"></div>
+              <div data-admin-invoices-pagination style="margin-top:.75rem;"></div>
               <div data-admin-invoice-detail style="margin-top:1rem;"></div>
               <div data-admin-invoice-controls style="margin-top:1rem;"></div>
             </div>
@@ -538,8 +1408,9 @@ import {
               <h2 class="admin-section-title">Create an invoice</h2>
               <form class="admin-form" data-admin-invoice-create>
                 <label>Customer <select name="customerId" data-admin-customer-options required></select></label>
-                <label>Service <select name="serviceCode"><option value="residential-cleaning">Residential cleaning — due immediately</option><option value="commercial-cleaning">Commercial cleaning — Net 15</option><option value="church-cleaning">Church cleaning — Net 15</option></select></label>
-                <label>Description <input name="description" required /></label>
+                <label>Service <select name="serviceCode" data-admin-invoice-services required><option value="">Choose a service</option></select></label>
+                <label>Description (optional) <input name="description" placeholder="Defaults to the selected service" /></label>
+                <label>Service performed date (today or earlier) <input name="serviceDate" type="date" /></label>
                 <label>Amount (USD) <input name="amount" type="number" min="0.01" step="0.01" required /></label>
                 <label>Due date (optional — residential defaults to issue date; commercial/church default to Net 15) <input name="dueDate" type="date" /></label>
                 <button class="btn btn--primary" type="submit">Create Invoice</button>
@@ -568,31 +1439,144 @@ import {
 
           <section class="admin-view" data-admin-view="storage" hidden>
             <div class="admin-card">
-              <h2 class="admin-section-title">Data &amp; Storage</h2>
-              <p class="admin-muted">Owner-only health, business-record counts, safe exports and photo-retention controls. Provider byte totals require Cloudflare account analytics; no universal capacity percentage is invented.</p>
+              <h2 class="admin-section-title">Storage &amp; data</h2>
+              <p class="admin-muted">See what is stored, download your business records, review customer photos and keep backups healthy. Customer photos are private and are only removed by an owner action or the 30-day cleanup.</p>
+              <div class="admin-inline-form" style="margin-bottom:.75rem;">
+                <label>Branch filter
+                  <select data-admin-storage-branch>
+                    <option value="">All branches</option>
+                    <option value="branch_pensacola">Pensacola</option>
+                    <option value="branch_tampa">Tampa Bay</option>
+                  </select>
+                </label>
+                <label>Export format
+                  <select data-admin-storage-format>
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                  </select>
+                </label>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-apply-branch">Apply filter</button>
+              </div>
               <div class="admin-grid" data-admin-storage-kpis></div>
               <p class="small text-muted" data-admin-storage-note></p>
               <div class="admin-actions" style="margin-top:1rem;">
                 <button class="btn btn--secondary btn--small" type="button" data-admin-action="storage-refresh">Refresh</button>
-                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-preview">Preview Photo Cleanup</button>
-                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-run">Delete Eligible Photos</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-preview">Preview 30-day photo cleanup</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="storage-cleanup-run">Delete photos older than 30 days</button>
               </div>
               <p class="admin-status-message" data-admin-storage-status role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Customer photos</h2>
+              <p class="admin-muted">Photos linked to a cleaning request. A legal hold protects the entire customer, property or request until it is released. Deleting a photo is permanent and audit-recorded.</p>
+              <div data-admin-photo-list><p class="admin-muted">Loading photos...</p></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Business records export</h2>
               <p class="admin-muted">CSV downloads contain business records only; never credentials, tokens or card data. Each export is owner-authenticated and audit-recorded.</p>
               <div class="admin-actions">
-                <button class="btn btn--secondary btn--small" type="button" data-admin-export="customers">Customers CSV</button>
-                <button class="btn btn--secondary btn--small" type="button" data-admin-export="properties">Properties CSV</button>
-                <button class="btn btn--secondary btn--small" type="button" data-admin-export="appointments">Appointments CSV</button>
-                <button class="btn btn--secondary btn--small" type="button" data-admin-export="invoices">Invoices CSV</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="customers">Customers</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="properties">Properties</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="appointments">Appointments</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="invoices">Invoices</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-export="signatures">Signing evidence</button>
               </div>
+              <p class="admin-muted">Exports are generated on demand, owner-authenticated, never cached and audit-recorded. Signing evidence includes signature status, timestamps, hashes and template versions.</p>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Backup and cleanup status</h2>
+              <h2 class="admin-section-title">Backup health</h2>
+              <div data-admin-storage-backup></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-backup-control>
+              <h2 class="admin-section-title">Backup control center</h2>
+              <p class="admin-muted">Start, monitor, verify and restore encrypted backups without opening GitHub, Cloudflare or OneDrive. A complete backup includes the operations database and private application objects; a database backup includes the operations database only.</p>
+              <div data-admin-backup-config></div>
+              <div class="admin-grid" data-admin-backup-kpis></div>
+              <div class="admin-actions" style="margin-top:1rem;">
+                <button class="btn btn--primary btn--small" type="button" data-admin-backup-action="start-complete">Start complete backup</button>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-backup-action="start-database">Start database backup</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-backup-action="refresh">Refresh</button>
+              </div>
+              <p class="admin-status-message" data-admin-backup-status role="status" aria-live="polite"></p>
+              <div data-admin-backup-active></div>
+
+              <h3 class="admin-section-title" style="font-size:1.05rem;margin-top:1.25rem;">Automatic schedule &amp; retention</h3>
+              <form class="admin-form admin-form--grid" data-backup-schedule-control>
+                <label><input type="checkbox" name="enabled" /> Automatic backups enabled</label>
+                <label>Frequency
+                  <select name="cadence">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </label>
+                <label>UTC hour <input name="utcHour" type="number" min="0" max="23" required /></label>
+                <label>UTC minute <input name="utcMinute" type="number" min="0" max="59" required /></label>
+                <label>Weekly day (0 Sun)
+                  <select name="dayOfWeek">
+                    <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+                    <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option>
+                    <option value="6">Saturday</option>
+                  </select>
+                </label>
+                <label>Monthly day <input name="dayOfMonth" type="number" min="1" max="28" required /></label>
+                <label>Backup scope
+                  <select name="scope">
+                    <option value="complete">Complete application backup</option>
+                    <option value="database">Database only</option>
+                  </select>
+                </label>
+                <label>Daily copies kept <input name="retentionDaily" type="number" min="1" max="365" required /></label>
+                <label>Weekly copies kept <input name="retentionWeekly" type="number" min="1" max="104" required /></label>
+                <label>Monthly copies kept <input name="retentionMonthly" type="number" min="1" max="120" required /></label>
+                <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Save backup schedule</button></div>
+              </form>
+              <p class="admin-status-message" data-admin-backup-schedule-status role="status" aria-live="polite"></p>
+
+              <h3 class="admin-section-title" style="font-size:1.05rem;margin-top:1.25rem;">Backup history</h3>
+              <div data-admin-backup-history></div>
+
+              <h3 class="admin-section-title" style="font-size:1.05rem;margin-top:1.25rem;">Encrypted archives</h3>
+              <p class="admin-muted">Archives are encrypted before upload. Downloads are short-lived owner-only links; no encryption key is sent to the browser.</p>
+              <div data-admin-backup-archives></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Retention registry and legal holds</h2>
+              <p class="admin-muted">Records retention intent and legal holds only. Saving a policy never deletes or anonymizes a record. Permanent deletion remains a separate, explicit owner operation.</p>
+              <div data-admin-retention></div>
+              <form class="admin-form admin-form--grid" data-retention-policy style="margin-top:1rem;">
+                <label>Record type
+                  <select name="recordType" required>
+                    <option value="">Choose a record type</option>
+                    <option value="customer_agreement">Signed customer agreements</option>
+                    <option value="customer_contact">Customer contact details</option>
+                    <option value="lead">Website inquiries</option>
+                    <option value="photo">Customer photos</option>
+                    <option value="appointment">Appointments and jobs</option>
+                    <option value="invoice">Invoices and payments</option>
+                  </select>
+                </label>
+                <label>Keep for (months) <input name="retentionMonths" type="number" min="0" max="600" required /></label>
+                <label>Status <select name="status"><option value="draft">Draft</option><option value="active">Active (owner approval)</option><option value="retired">Retired</option></select></label>
+                <label class="admin-field--wide">Plain-English description <input name="description" maxlength="1000" placeholder="Example: Keep signed cleaning agreements for seven years." /></label>
+                <label class="admin-field--wide"><input type="checkbox" name="automaticCleanup" /> Include in future automatic cleanup review (nothing is deleted automatically)</label>
+                <div class="admin-field--wide"><button class="btn btn--secondary btn--small" type="submit">Save retention policy</button></div>
+              </form>
+              <form class="admin-form admin-form--grid" data-legal-hold style="margin-top:1rem;">
+                <label class="admin-field--wide">Customer, property or booking to protect
+                  <select name="subjectChoice" data-admin-hold-options required>
+                    <option value="">Loading customers, properties and bookings...</option>
+                  </select>
+                </label>
+                <label class="admin-field--wide">Reason <textarea name="reason" rows="2" minlength="5" maxlength="1000" required placeholder="Example: legal review requested; preserve until released."></textarea></label>
+                <div class="admin-field--wide"><button class="btn btn--ghost btn--small" type="submit">Place legal hold</button></div>
+              </form>
+              <p class="admin-status-message" data-admin-retention-status role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Photo cleanup history</h2>
               <div data-admin-storage-settings></div>
-              <p class="admin-muted" style="margin-top:.75rem;">Encrypted D1/R2 off-site backup uses the private master archive and CLI; the encrypted D1 restore has been verified. Full R2 object archive requires owner-provided S3 credentials or an approved destination.</p>
+              <p class="admin-muted" style="margin-top:.75rem;">A backup run record is not restore proof. Encrypted off-site backups are kept in the private master archive; the latest restore has been verified.</p>
             </div>
           </section>
           <section class="admin-view" data-admin-view="promotions" hidden>
@@ -650,10 +1634,12 @@ import {
               <h2 class="admin-section-title">Pricing &amp; Estimator Control</h2>
               <p class="admin-muted">
                 Change the pricing used by the residential, STR, commercial and church estimators.
-                Edits stay in a draft until you publish them. Publishing creates a new version and
-                new estimates use it immediately; historical quotes and payments keep the price they
-                were created with.
+                Each branch has an independent immutable price book. Pensacola is live; Tampa Bay
+                remains draft/prelaunch and cannot publish until its launch checks pass.
               </p>
+              <label class="admin-inline-field">Pricing branch
+                <select data-pricing-branch></select>
+              </label>
               <div data-pricing-status>
                 <p class="admin-muted">Loading pricing configuration…</p>
               </div>
@@ -688,6 +1674,212 @@ import {
               <h2 class="admin-section-title">Version history</h2>
               <p class="admin-muted">Published versions are immutable. Restoring an older version creates a new version, so nothing is erased.</p>
               <div data-pricing-history></div>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="branches" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Branches &amp; Launch Control</h2>
+              <p class="admin-muted">
+                One legal entity, independent operating branches. Pensacola is live. Tampa Bay is
+                prelaunch and cannot publish public pricing or accept bookings until every launch
+                prerequisite is complete and the owner explicitly advances it.
+              </p>
+              <label>Branch
+                <select data-branch-select></select>
+              </label>
+              <p class="admin-status-message" data-branch-status role="status" aria-live="polite"></p>
+            </div>
+            <form class="admin-form admin-card" data-branch-form style="margin-top:1rem;max-width:none;">
+              <h2 class="admin-section-title">Branch setup</h2>
+              <div class="admin-grid">
+                <label>Lifecycle
+                  <select name="lifecycle" required>
+                    <option value="draft">Draft</option>
+                    <option value="setup">Setup</option>
+                    <option value="internally_testable">Internally testable</option>
+                    <option value="approved_to_launch">Approved to launch</option>
+                    <option value="live">Live</option>
+                    <option value="paused">Paused</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </label>
+                <label>Public name <input name="publicName" required maxlength="120" /></label>
+                <label>Public URL slug <input name="publicSlug" required maxlength="80" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
+                <label>Region label <input name="regionLabel" maxlength="200" /></label>
+                <label>Time zone <input name="timezone" maxlength="80" /></label>
+                <label>Public phone <input name="publicPhone" maxlength="40" /></label>
+                <label>Public email <input name="publicEmail" type="email" maxlength="200" /></label>
+                <label>Hours label <input name="hoursLabel" maxlength="200" /></label>
+                <label>Google Business Profile status
+                  <select name="gbpStatus">
+                    <option value="not_created">Not created</option>
+                    <option value="eligibility_review">Eligibility review</option>
+                    <option value="prepared">Prepared</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="verified">Verified</option>
+                    <option value="paused">Paused</option>
+                  </select>
+                </label>
+                <label>Google Business Profile URL <input name="gbpUrl" type="url" maxlength="500" /></label>
+                <label>Google review link <input name="reviewUrl" type="url" maxlength="500" placeholder="https://g.page/r/.../review" /></label>
+                <label>Branch calendar ID <input name="calendarId" maxlength="300" autocomplete="off" placeholder="Server-side calendar ID" /></label>
+                <label>Calendar name <input name="calendarName" maxlength="200" placeholder="Sparkling Standard — Tampa Bookings" /></label>
+              </div>
+              <fieldset class="admin-field--wide">
+                <legend>Review requests</legend>
+                <p class="admin-muted">Requests are only considered after a verified completed service. Automation stays off until the owner enables it and the branch has an official review link.</p>
+                <label><input type="checkbox" name="reviewRequestsEnabled" /> Enable automated review requests for this branch</label>
+                <label>Delay after completion (hours) <input name="reviewRequestDelayHours" type="number" min="1" max="720" step="1" /></label>
+                <label>Maximum requests per customer <input name="reviewRequestMaxPerCustomer" type="number" min="1" max="12" step="1" /></label>
+              </fieldset>
+              <fieldset class="admin-field--wide">
+                <legend>Service availability</legend>
+                <div class="admin-grid">
+                  <label>Residential
+                    <select name="serviceResidential">
+                      <option value="disabled">Disabled</option>
+                      <option value="request_only">Request only</option>
+                      <option value="estimate_enabled">Estimate enabled</option>
+                      <option value="bookable">Bookable</option>
+                    </select>
+                  </label>
+                  <label>STR
+                    <select name="serviceStr">
+                      <option value="disabled">Disabled</option>
+                      <option value="request_only">Request only</option>
+                      <option value="estimate_enabled">Estimate enabled</option>
+                      <option value="bookable">Bookable</option>
+                    </select>
+                  </label>
+                  <label>Commercial
+                    <select name="serviceCommercial">
+                      <option value="disabled">Disabled</option>
+                      <option value="request_only">Request only</option>
+                      <option value="estimate_enabled">Estimate enabled</option>
+                      <option value="bookable">Bookable</option>
+                    </select>
+                  </label>
+                  <label>Church
+                    <select name="serviceChurch">
+                      <option value="disabled">Disabled</option>
+                      <option value="request_only">Request only</option>
+                      <option value="estimate_enabled">Estimate enabled</option>
+                      <option value="bookable">Bookable</option>
+                    </select>
+                  </label>
+                </div>
+              </fieldset>
+              <label>Service-area ZIPs (comma or line separated)
+                <textarea name="serviceAreaZips" rows="6" placeholder="32501, 32502, 32503"></textarea>
+              </label>
+              <fieldset class="admin-field--wide"><legend>Service states</legend>
+                <label><input type="checkbox" name="serviceStateFL" /> Florida</label>
+                <label><input type="checkbox" name="serviceStateAL" /> Alabama</label>
+              </fieldset>
+              <div class="admin-card" style="background:#fbf7f1;">
+                <h3>Operating origin</h3>
+                <p class="admin-muted">This private branch origin determines customer travel eligibility and dispatch planning. It is never published. Verify it with Google Places before activation.</p>
+                <input type="hidden" name="branchId" value="" data-admin-address-branch />
+                <div class="admin-field--wide admin-address-block" data-admin-address-block>
+                  <div class="admin-address-grid">
+                    <label class="admin-field--wide">Street address
+                      <input name="addressLine1" maxlength="200" autocomplete="off" data-admin-address-input placeholder="Start typing the verified operating address" />
+                    </label>
+                    <label>City <input name="city" maxlength="120" data-admin-address-city /></label>
+                    <label>State <select name="state" data-admin-address-state><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
+                    <label>ZIP <input name="postalCode" inputmode="numeric" maxlength="10" data-admin-address-zip /></label>
+                    <input type="hidden" name="latitude" data-admin-address-lat />
+                    <input type="hidden" name="longitude" data-admin-address-lng />
+                    <input type="hidden" name="placeId" data-admin-address-place-id />
+                  </div>
+                  <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
+                </div>
+                <label>Travel limit (one-way miles) <input name="travelLimitMiles" type="number" min="1" max="500" step="0.5" /></label>
+              </div>
+              <div data-branch-readiness style="margin-bottom:1rem;"></div>
+              <label>Launch note <textarea name="launchNote" rows="4" maxlength="1000"></textarea></label>
+              <label>Change note <input name="note" maxlength="500" placeholder="Why this setup changed" /></label>
+              <div class="admin-actions">
+                <button class="btn btn--primary" type="submit">Save branch setup</button>
+                <button class="btn btn--ghost btn--small" type="button" data-branch-refresh>Refresh</button>
+              </div>
+              <p class="admin-status-message" data-branch-form-status role="status" aria-live="polite"></p>
+            </form>
+          </section>
+
+          <section class="admin-view" data-admin-view="communications" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Communications &amp; notifications</h2>
+              <p class="admin-muted">
+                The six department addresses are approved architecture. Owners control which department receives each
+                operational notice, the reply-to department for customer mail and the approved notification wording.
+                Critical security and backup alerts always include both admin@ and owner@.
+              </p>
+              <div data-admin-communications-status></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Provider and delivery health</h2>
+              <div data-admin-communications-provider></div>
+              <div data-admin-communications-health style="margin-top:1rem;"></div>
+              <div data-admin-communications-failures style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+              <h2 class="admin-section-title">Routing and templates</h2>
+              <form data-communications-form>
+                <h3 class="admin-section-title" style="font-size:1rem;">Notification routing</h3>
+                <div data-communications-routing></div>
+                <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Reply-to department</h3>
+                <div data-communications-reply-to></div>
+                <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Approved email wording</h3>
+                <label>Email type <select data-communications-template-select></select></label>
+                <div class="admin-record" style="margin:.75rem 0;" data-communications-template-guide></div>
+                <p class="admin-muted" style="margin:.15rem 0 .4rem;">Subject</p><div class="admin-email-editor__subject" contenteditable="true" role="textbox" aria-label="Email subject" data-communications-subject></div>
+                <p class="admin-muted" style="margin:.15rem 0 .4rem;">Message</p>
+                <div class="admin-email-editor">
+                  <div class="admin-email-editor__toolbar">
+                    <label>Insert an automatic field
+                      <select data-communications-variable-select></select>
+                    </label>
+                    <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-insert-variable">Insert field</button>
+                    <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-approved-wording">Load approved wording</button>
+                  </div>
+                  <div class="admin-email-editor__body" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Email message" data-communications-body></div>
+                </div>
+                <p class="admin-muted">Fields appear as labeled chips inside the message and fill automatically when the email is sent. Use Preview to see the completed example.</p>
+                <div class="admin-actions">
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-preview">Preview</button>
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-reset">Reset form to saved settings</button>
+                </div>
+                <div data-communications-preview style="margin-top:.75rem;"></div>
+                <h3 class="admin-section-title" style="font-size:1rem;margin-top:1.25rem;">Alert thresholds</h3>
+                <div class="admin-form admin-form--grid">
+                  <label>Owner escalation (minutes) <input data-communications-escalation type="number" min="5" max="1440" /></label>
+                  <label>Failure threshold before escalation <input data-communications-threshold type="number" min="1" max="100" /></label>
+                </div>
+                <label>Change note <input data-communications-note maxlength="500" placeholder="Why this configuration changed" /></label>
+                <div class="admin-actions">
+                  <button class="btn btn--primary btn--small" type="submit">Save configuration</button>
+                </div>
+                <p class="admin-status-message" data-communications-form-status role="status" aria-live="polite"></p>
+                <div data-communications-errors class="admin-error" role="alert"></div>
+              </form>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+              <h2 class="admin-section-title">Controlled delivery test</h2>
+              <p class="admin-muted">
+                Sends a clearly marked test email with no customer data. Only do this when you can check the destination
+                mailbox. A provider acceptance is not inbox proof.
+              </p>
+              <div class="admin-inline-form">
+                <label>Department <select data-communications-test-department></select></label>
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="communications-test">Send test message</button>
+              </div>
+              <p class="admin-status-message" data-communications-test-status role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
+              <h2 class="admin-section-title">Version history</h2>
+              <div data-communications-versions></div>
             </div>
           </section>
 
@@ -727,11 +1919,23 @@ import {
             <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
               <h2 class="admin-section-title">Audit history</h2>
               <div data-admin-audit></div>
+              <div data-admin-audit-pagination style="margin-top:.75rem;"></div>
             </div>
           </section>
         </div>
       </div>
     </main>
+    <dialog class="admin-dialog" data-admin-dialog aria-labelledby="admin-dialog-title">
+      <form method="dialog">
+        <h2 id="admin-dialog-title" data-admin-dialog-title>Confirm action</h2>
+        <div class="admin-dialog__body" data-admin-dialog-body></div>
+        <div class="admin-actions admin-dialog__actions">
+          <button class="btn btn--ghost btn--small" value="cancel" data-admin-dialog-cancel>Cancel</button>
+          <button class="btn btn--primary btn--small" value="confirm" data-admin-dialog-confirm>Confirm</button>
+        </div>
+      </form>
+    </dialog>
+    <div data-admin-calendar-dialog></div>
     <script>
       import '../../scripts/admin';
     </script>

@@ -61,3 +61,23 @@ refund or new payment.
 2. Verify the receipt status.
 3. Click **Resend payment receipt** to deliver the historical receipt.
 4. Keep Stripe-native receipt emails disabled for invoice Checkout while the app receipt is active.
+
+## Phase A closeout - 2026-11-19
+
+Verified against the implementation and automated tests:
+
+- `payment_receipts` is created by migration `0037` and indexed by invoice and status.
+- The webhook delivers a receipt only after the paid invoice reconciliation succeeds.
+- One receipt per `(invoice_id, payment_id, channel)`; duplicate webhook delivery does not send twice.
+- The Resend idempotency key is `invoice-receipt-<paymentId>`; an owner resend uses a new key.
+- The receipt is built from the stored invoice, invoice lines, customer email and succeeded payment.
+- Resend message ID, error code and sent timestamp are recorded and audited.
+- The admin paid-invoice view shows the latest receipt status and the **Resend payment receipt** action.
+- The resend action requires `finance.write`; a manager without that permission is refused, and a
+  finance user outside the invoice branch cannot see or resend it.
+- The non-gift tender row now reads **Total paid** without a misleading minus sign.
+- New focused tests cover exact receipt data, branding, customer email, failed provider delivery,
+  audit failure recording and branch/permission enforcement.
+
+Current suite after this closeout: see the final closeout report. No live customer receipt was sent,
+no new charge was created and the historical $5 invoice was not automatically resent.

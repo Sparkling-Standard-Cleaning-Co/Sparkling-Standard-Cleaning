@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { business } from '../config/business';
+import CareersForm from '../components/CareersForm.astro';
+
+const title = 'Cleaning Careers | Sparkling Standard';
+const description = 'Apply to join Sparkling Standard in Pensacola or the developing Tampa Bay branch. Tell us about your cleaning experience, availability and the kind of work you want to do.';
+---
+
+<BaseLayout title={title} description={description}>
+  <section class="section">
+    <div class="container container--narrow">
+      <p class="eyebrow">Careers</p>
+      <h1>Careful work. Real standards.</h1>
+      <p class="lead">Sparkling Standard hires people who notice the details, communicate honestly and take pride in caring for someone else's space. Experienced professional cleaners and entry-level applicants are welcome. Pensacola is the active hiring branch; Tampa Bay is future interest only.</p>
+      <div class="prose">
+        <h2>Apply securely</h2>
+        <p>Use the application below to tell us about your experience, availability, transportation and preferred branch. A PDF or DOCX resume is optional. Applications are stored securely and are visible only to authorized hiring administrators.</p>
+        <p>Questions before applying? Email <a href={`mailto:${business.hiringEmail}?subject=${encodeURIComponent('Cleaning career inquiry')}`}>{business.hiringEmail}</a>.</p>
+        <p>Please do not send Social Security numbers, driver's license images, banking information or other sensitive documents by email. We will tell you what is needed if the hiring process moves forward.</p>
+        <h2>How we work</h2>
+        <p>Reliability matters. Our customers plan around the arrival window we agree to. We expect punctuality, respectful communication, careful product use and a willingness to follow the approved cleaning process.</p>
+        <p>We do not promise a role, schedule or pay rate before reviewing your experience and the current business need. We will be direct with you about what is available.</p>
+        <p><a class="btn btn--secondary" href={`mailto:${business.hiringEmail}?subject=${encodeURIComponent('Cleaning career question')}`}>Email the Hiring Team</a></p>
+      </div>
+    </div>
+  </section>
+  <CareersForm />
+</BaseLayout>

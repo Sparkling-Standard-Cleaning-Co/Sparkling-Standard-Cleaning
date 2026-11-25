@@ -11,6 +11,10 @@
 // no third-party carousel library.
 
 import { getCollection } from 'astro:content';
+import { Image } from 'astro:assets';
+import dennisCouch1 from '../assets/images/reviews/dennis-couch-1.webp';
+import dennisCouch2 from '../assets/images/reviews/dennis-couch-2.webp';
+import lauraShower from '../assets/images/reviews/laura-shower.webp';
 import GoogleG from './GoogleG.astro';
 import Icon from './Icon.astro';
 import PremiumIcon from './PremiumIcon.astro';
@@ -26,6 +30,11 @@ const { heading = 'Kind Words From Our Customers', eyebrow = 'Reviews' } = Astro
 const reviews = (await getCollection('reviews')).sort((a, b) => a.data.order - b.data.order);
 const profileUrl = isPending(business.reviews.profileUrl) ? null : business.reviews.profileUrl;
 const total = reviews.length;
+const photoAssets = {
+  'dennis-couch-1': dennisCouch1,
+  'dennis-couch-2': dennisCouch2,
+  'laura-shower': lauraShower,
+} as const;
 
 // Split authentic wording into readable paragraphs on blank lines. The quote
 // itself is never edited, truncated or "improved" — only whitespace between
@@ -35,6 +44,8 @@ const paragraphsOf = (quote: string): string[] =>
     .split(/\n\s*\n/)
     .map((paragraph) => paragraph.trim())
     .filter((paragraph) => paragraph.length > 0);
+
+
 ---
 
 {
@@ -55,7 +66,8 @@ const paragraphsOf = (quote: string): string[] =>
           class="review-carousel__stage"
           role="group"
           aria-roledescription="carousel"
-          aria-label="Customer reviews"
+          aria-label="Customer review carousel. Use the left and right arrow keys or the controls below to move between reviews."
+          tabindex="0"
         >
           {reviews.map((review, index) => {
             const paragraphs = paragraphsOf(review.data.quote);
@@ -64,6 +76,9 @@ const paragraphsOf = (quote: string): string[] =>
                 class="review-carousel__card"
                 data-review-card
                 data-index={String(index)}
+                data-review-author={review.data.author}
+                data-review-context={review.data.context ?? ''}
+                data-has-photos={review.data.photos.length > 0 ? 'true' : undefined}
                 role="group"
                 aria-roledescription="slide"
                 aria-label={`Review ${index + 1} of ${total}${review.data.author ? ` — ${review.data.author}` : ''}`}
@@ -92,18 +107,44 @@ const paragraphsOf = (quote: string): string[] =>
                   </span>
                 </div>
 
-                <div class="review-carousel__quote">
+                <div
+                  class="review-carousel__quote"
+                  data-review-quote
+                  role="region"
+                  aria-label={`${review.data.author} review text; scroll inside this area for the full review`}
+                  tabindex="0"
+                >
                   {paragraphs.map((paragraph, paragraphIndex) => (
                     <p>
-                      {paragraphIndex === 0 ? '“' : ''}
+                      {paragraphIndex === 0 ? '\u201c' : ''}
                       {paragraph}
-                      {paragraphIndex === paragraphs.length - 1 ? '”' : ''}
+                      {paragraphIndex === paragraphs.length - 1 ? '\u201d' : ''}
                     </p>
                   ))}
                 </div>
 
+                {review.data.photos.length > 0 && (
+                  <div class="review-carousel__photos" data-photo-count={review.data.photos.length}>
+                    {review.data.photos.map((photo) => {
+                      const asset = photoAssets[photo.src as keyof typeof photoAssets];
+                      return asset ? (
+                        <Image
+                          src={asset}
+                          alt={photo.alt}
+                          widths={[300, 480, 720]}
+                          sizes="(max-width: 720px) 80vw, 320px"
+                          loading="lazy"
+                        />
+                      ) : null;
+                    })}
+                  </div>
+                )}
+
                 <footer class="review-carousel__footer">
                   <strong>{review.data.author}</strong>
+                  {review.data.context && (
+                    <span class="review-carousel__meta">{review.data.context}</span>
+                  )}
                 </footer>
               </blockquote>
             );
@@ -204,6 +245,17 @@ const paragraphsOf = (quote: string): string[] =>
       return distance;
     };
 
+    const refreshQuoteCues = (): void => {
+      for (const quote of root.querySelectorAll<HTMLElement>('[data-review-quote]')) {
+        const scrollable = quote.scrollHeight - quote.clientHeight > 4;
+        quote.dataset.scrollable = scrollable ? 'true' : 'false';
+        quote.dataset.atEnd =
+          !scrollable || quote.scrollTop + quote.clientHeight >= quote.scrollHeight - 4
+            ? 'true'
+            : 'false';
+      }
+    };
+
     const update = (announce: boolean): void => {
       for (const card of cards) {
         const index = Number(card.dataset.index ?? '0');
@@ -212,6 +264,9 @@ const paragraphsOf = (quote: string): string[] =>
         if (offset === 0) card.setAttribute('aria-current', 'true');
         else card.removeAttribute('aria-current');
       }
+      const activeQuote = cards[active]?.querySelector<HTMLElement>('[data-review-quote]');
+      if (activeQuote) activeQuote.scrollTop = 0;
+      refreshQuoteCues();
       for (const dot of dots) {
         dot.setAttribute('aria-pressed', dot.dataset.index === String(active) ? 'true' : 'false');
       }
@@ -284,6 +339,16 @@ const paragraphsOf = (quote: string): string[] =>
       },
       { passive: true },
     );
+
+    for (const quote of root.querySelectorAll<HTMLElement>('[data-review-quote]')) {
+      quote.addEventListener('scroll', refreshQuoteCues, { passive: true });
+    }
+    window.addEventListener('resize', refreshQuoteCues, { passive: true });
+    window.addEventListener('load', refreshQuoteCues);
+    if ('ResizeObserver' in window) {
+      const observer = new ResizeObserver(refreshQuoteCues);
+      for (const quote of root.querySelectorAll<HTMLElement>('[data-review-quote]')) observer.observe(quote);
+    }
 
     update(false);
     root.tabIndex = -1;

@@ -1,3 +1,11 @@
+> **Current-policy note (2026-11-22):** this 2026-10-27 research memorandum
+> predates the owner-selected cancellation schedule now implemented in
+> `src/config/legal-policy.ts` and the final legal candidates: 48 hours or more
+> = $0; 24 to less than 48 hours = up to $20; less than 24 hours = up to $40;
+> failed access after arrival = up to $40; cost-limited, non-stacking, one
+> courtesy waiver per rolling 12 months, statutory rights preserved. Fees remain
+> inactive until owner activation and exact-version approval.
+
 # Terms and policy research memorandum
 
 **Prepared:** 2026-10-27

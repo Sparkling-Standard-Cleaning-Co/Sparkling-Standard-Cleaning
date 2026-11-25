@@ -53,15 +53,13 @@ export function paymentAuthorizationText(input: {
   const timing = input.chargeAfterService
     ? 'The saved payment method may be charged after the cleaning is completed, only for the service described here and only up to the maximum stated below.'
     : 'The saved payment method may be charged only after a separate customer-approved invoice or payment request is issued for the service described here.';
-  return `SPARKLING STANDARD — PAYMENT METHOD AUTHORIZATION
-Document version: ${PAYMENT_AUTHORIZATION_VERSION}
-Terms version: ${legalTerms.termsVersion}
-Electronic-signature consent version: ${ESIGN_CONSENT_VERSION}
+  const serviceLabel = input.serviceCode.replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+  return `SPARKLING STANDARD - PAYMENT METHOD AUTHORIZATION
 
 Customer: ${input.customerName}
 Email: ${input.customerEmail}
 Service address: ${input.propertyAddress}
-Service: ${input.serviceCode}
+Service: ${serviceLabel}
 
 Authorization: The customer authorizes Sparkling Standard to save a payment method with Stripe and to charge that payment method for the service described above, up to ${money(input.maxAmountCents)}. The expected service amount is ${money(input.amountCents)}.
 
@@ -69,12 +67,12 @@ Timing: ${timing}
 
 A charge above the maximum, a materially different service, or a materially different property requires a new signed authorization before charging. A saved card by itself does not authorize any charge.
 
-Cancellation and withdrawal: The Sparkling Standard Terms and Conditions apply, including the cancellation and rescheduling terms at ${legalTerms.cancellationPath} (version ${legalTerms.termsVersion}). The customer may withdraw this authorization before a charge by contacting Sparkling Standard and requesting revocation of the saved payment method.
+Cancellation and withdrawal: The Sparkling Standard Terms and Conditions apply, including the cancellation and rescheduling terms at ${legalTerms.cancellationPath}. The customer may withdraw this authorization before a charge by contacting Sparkling Standard and requesting revocation of the saved payment method.
 
 Electronic signature: By signing below, the customer confirms that they reviewed this authorization, consent to use an electronic signature and electronic records for this transaction, and agree that typing their legal name constitutes their signature.
 
 Signature: ______________________________
-Date and time: recorded by the server in UTC
+Date: ______________________________
 `;
 }
 

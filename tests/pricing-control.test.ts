@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+﻿import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -86,8 +86,14 @@ class TestD1 implements D1Database {
 function migratedDb(): TestD1 {
   const db = new TestD1();
   db.raw.exec('PRAGMA foreign_keys = ON');
+  const foundation = fs.readFileSync(path.join(process.cwd(), 'migrations', '0001_operational_foundation.sql'), 'utf8');
+  db.raw.exec(foundation);
+  const seeds = fs.readFileSync(path.join(process.cwd(), 'migrations', '0002_admin_security_and_seeds.sql'), 'utf8');
+  db.raw.exec(seeds);
   const migration = fs.readFileSync(path.join(process.cwd(), 'migrations', '0026_pricing_control.sql'), 'utf8');
   db.raw.exec(migration);
+  const branchTopology = fs.readFileSync(path.join(process.cwd(), 'migrations', '0040_branch_topology.sql'), 'utf8');
+  db.raw.exec(branchTopology);
   return db;
 }
 

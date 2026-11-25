@@ -58,6 +58,7 @@ const targets = [
 const failures = [];
 const review = [];
 
+
 for (const file of targets) {
   const content = fs.readFileSync(file, 'utf8');
   for (const { pattern, label } of HARD_BANNED) {

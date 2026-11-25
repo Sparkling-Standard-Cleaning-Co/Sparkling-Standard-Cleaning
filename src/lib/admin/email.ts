@@ -14,6 +14,25 @@ export interface AdminEmail {
   text: string;
 }
 
+export interface AdminEmailAttachment {
+  filename: string;
+  content: string;
+  contentType?: string;
+}
+
+export interface AdminEmailOptions {
+  replyTo?: string;
+  attachments?: AdminEmailAttachment[];
+  from?: string;
+}
+
+export interface AdminEmailDelivery {
+  ok: boolean;
+  status: number;
+  providerId: string;
+  error: string;
+}
+
 function siteUrl(env: AdminEmailEnv): string {
   return (env.PUBLIC_SITE_URL?.trim() || 'https://sparkling-standard.com').replace(/\/+$/, '');
 }
@@ -98,6 +117,22 @@ export function buildOpsPasswordResetEmail(env: AdminEmailEnv, token: string, na
   };
 }
 
+export function buildOpsMfaCodeEmail(env: AdminEmailEnv, code: string, name?: string): AdminEmail {
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hello,';
+  const plainGreeting = name ? `Hi ${name},` : 'Hello,';
+  return {
+    subject: 'Your Sparkling Standard verification code',
+    html: shell(
+      'Your verification code',
+      `<p style="font-size:16px;line-height:1.6">${greeting}</p>
+       <p style="font-size:16px;line-height:1.6">Use this one-time code to finish signing in. It expires in five minutes.</p>
+       <p style="font-size:32px;letter-spacing:.18em;font-weight:700;color:#7d3f49;margin:1.5rem 0">${code}</p>
+       <p style="font-size:14px;line-height:1.6">If you did not request this code, change your password and contact the owner immediately. Never share this code.</p>`,
+    ),
+    text: `Your Sparkling Standard verification code\n\n${plainGreeting}\n\n${code}\n\nThis one-time code expires in five minutes. If you did not request it, change your password and contact the owner immediately. Never share this code.\n\n${siteUrl(env)}`,
+  };
+}
+
 export function buildOpsPasswordChangedEmail(env: AdminEmailEnv, name?: string): AdminEmail {
   const url = `${siteUrl(env)}/admin/`;
   const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hello,';
@@ -160,20 +195,44 @@ export function buildDocumentSigningEmail(
       'Documents ready for signature',
       `<p style="font-size:16px;line-height:1.6">The following document set is ready for your review and electronic signature: <strong>${escapeHtml(bundleName)}</strong>.</p>
        <p><a href="${url}" style="display:inline-block;background:#9a5b61;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Review and sign securely</a></p>
-       <p style="font-size:14px;line-height:1.6">This secure link expires in 14 days and can be used until the required documents are signed. If you were not expecting this, contact Sparkling Standard directly.</p>`,
+       <p style="font-size:14px;line-height:1.6">This secure link expires in 7 days and can be used until the required documents are signed. If you were not expecting this, contact Sparkling Standard directly.</p>`,
     ),
-    text: `Documents ready for your electronic signature: ${bundleName}.\n\nReview and sign securely (expires in 14 days):\n${url}\n\nIf you were not expecting this, contact Sparkling Standard directly.`,
+    text: `Documents ready for your electronic signature: ${bundleName}.\n\nReview and sign securely (expires in 7 days):\n${url}\n\nIf you were not expecting this, contact Sparkling Standard directly.`,
   };
 }
 
-export async function sendAdminEmail(
+export function buildSigningReminderEmail(
+  env: AdminEmailEnv,
+  bundleName: string,
+  token?: string,
+): AdminEmail {
+  const url = token ? `${siteUrl(env)}/document-sign/?token=${encodeURIComponent(token)}` : '';
+  const action = url
+    ? `<p><a href="${url}" style="display:inline-block;background:#9a5b61;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">Review and sign securely</a></p>
+       <p style="font-size:14px;line-height:1.6">This replacement link expires in 7 days.</p>`
+    : '<p style="font-size:14px;line-height:1.6">Open the secure link in your earlier email to review and sign. If that link has expired, contact Sparkling Standard for a new one.</p>';
+  return {
+    subject: `Reminder: documents awaiting your signature - ${bundleName}`,
+    html: shell(
+      'Documents still awaiting your signature',
+      `<p style="font-size:16px;line-height:1.6">The document set <strong>${escapeHtml(bundleName)}</strong> is still awaiting your review and electronic signature.</p>
+       ${action}
+       <p style="font-size:14px;line-height:1.6">Your appointment is not cancelled by this reminder. If you have a question or need help, reply to this message.</p>`,
+    ),
+    text: `Reminder: the document set ${bundleName} is still awaiting your review and electronic signature.\n\n${url ? `Review and sign (replacement link expires in 7 days):\n${url}\n\n` : 'Open the secure link in your earlier email. If it has expired, contact Sparkling Standard for a new one.\n\n'}Your appointment is not cancelled by this reminder.`,
+  };
+}
+
+export async function sendAdminEmailDetailed(
   env: AdminEmailEnv,
   to: string,
   email: AdminEmail,
   idempotencyKey: string,
-): Promise<boolean> {
+  options: AdminEmailOptions = {},
+): Promise<AdminEmailDelivery> {
   const key = env.RESEND_API_KEY?.trim();
-  if (!key || !to) return false;
+  if (!key) return { ok: false, status: 0, providerId: '', error: 'not_configured' };
+  if (!to) return { ok: false, status: 0, providerId: '', error: 'recipient_missing' };
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -184,18 +243,60 @@ export async function sendAdminEmail(
       },
       body: JSON.stringify({
         from:
+          options.from?.trim() ||
           env.RESEND_FROM_EMAIL?.trim() ||
           'Sparkling Standard <notifications@sparkling-standard.com>',
-        ...(env.RESEND_REPLY_TO?.trim() ? { reply_to: env.RESEND_REPLY_TO.trim() } : {}),
+        ...(options.replyTo?.trim() || env.RESEND_REPLY_TO?.trim()
+          ? { reply_to: options.replyTo?.trim() || env.RESEND_REPLY_TO?.trim() }
+          : {}),
         to: [to],
         subject: email.subject,
         html: email.html,
         text: email.text,
+        ...(options.attachments?.length
+          ? {
+              attachments: options.attachments.map((attachment) => ({
+                filename: attachment.filename,
+                content: attachment.content,
+                ...(attachment.contentType ? { content_type: attachment.contentType } : {}),
+              })),
+            }
+          : {}),
       }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(15_000),
     });
-    return response.ok;
-  } catch {
-    return false;
+    const payload = (await response.json().catch(() => ({}))) as { id?: string; message?: string };
+    if (response.ok) {
+      return {
+        ok: true,
+        status: response.status,
+        providerId: typeof payload.id === 'string' ? payload.id : '',
+        error: '',
+      };
+    }
+    return {
+      ok: false,
+      status: response.status,
+      providerId: '',
+      error: payload.message?.slice(0, 200) || `provider_${response.status}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      providerId: '',
+      error: error instanceof Error ? error.name : 'network_error',
+    };
   }
+}
+
+export async function sendAdminEmail(
+  env: AdminEmailEnv,
+  to: string,
+  email: AdminEmail,
+  idempotencyKey: string,
+  options: AdminEmailOptions = {},
+): Promise<boolean> {
+  const outcome = await sendAdminEmailDetailed(env, to, email, idempotencyKey, options);
+  return outcome.ok;
 }

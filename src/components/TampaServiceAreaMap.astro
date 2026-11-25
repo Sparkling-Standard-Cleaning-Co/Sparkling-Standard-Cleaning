@@ -1,0 +1,73 @@
+---
+import {
+  TAMPA_MAP_CITIES,
+  TAMPA_MAP_COUNTIES,
+  TAMPA_MAP_COUNTY_LABELS,
+  TAMPA_MAP_CONTEXT_PATHS,
+  TAMPA_MAP_HEIGHT,
+  TAMPA_MAP_STATE_LINE,
+  TAMPA_MAP_WIDTH,
+} from '../lib/geo/tampa-service-area-map';
+---
+
+<figure class="area-map area-map--regional">
+  <div class="area-map__frame">
+    <svg
+      viewBox={`0 0 ${TAMPA_MAP_WIDTH} ${TAMPA_MAP_HEIGHT}`}
+      class="area-map__svg"
+      role="img"
+      aria-label="Tampa Bay approved service-area map: Pasco, Pinellas and Hillsborough counties are highlighted. Surrounding counties are geographic context only. Actual eligibility requires an approved ZIP and 20 miles or less of actual road-driving distance from the Tampa operating origin."
+    >
+      <rect x="0" y="0" width={TAMPA_MAP_WIDTH} height={TAMPA_MAP_HEIGHT} fill="var(--color-cream-100)" />
+      <g fill="var(--color-cream-200)" stroke="var(--color-sand-300)" stroke-width="1">
+        {TAMPA_MAP_CONTEXT_PATHS.map((path) => <path d={path} />)}
+      </g>
+      <g class="area-map__core area-map__core--tampa">
+        {TAMPA_MAP_COUNTIES.map((county) => <path d={county.path} class="area-map__county" />)}
+      </g>
+      <path d={TAMPA_MAP_STATE_LINE} class="area-map__stateline" fill="none" />
+      <g class="area-map__labels">
+        {TAMPA_MAP_COUNTY_LABELS.map((label) => (
+          <text x={label.x} y={label.y} class="area-map__county-label area-map__county-label--core">
+            {label.name} {label.state}
+          </text>
+        ))}
+      </g>
+      <g class="area-map__cities">
+        {TAMPA_MAP_CITIES.map((city) => (
+          <g>
+            <circle cx={city.x} cy={city.y} r="4.5" class="area-map__city-dot" />
+            <text
+              x={city.x + city.dx}
+              y={city.y + city.dy}
+              text-anchor={city.anchor}
+              class="area-map__city-label"
+            >
+              {city.name}
+            </text>
+          </g>
+        ))}
+      </g>
+    </svg>
+  </div>
+  <figcaption class="area-map__legend">
+    <span class="area-map__legend-item">
+      <span class="area-map__swatch area-map__swatch--tampa" aria-hidden="true"></span>
+      <span><strong>Approved Tampa Bay counties</strong></span>
+    </span>
+    <span class="area-map__legend-item">
+      <span class="area-map__swatch area-map__swatch--context" aria-hidden="true"></span>
+      <span><strong>Geographic context</strong> <span class="area-map__legend-note">not automatically served</span></span>
+    </span>
+    <span class="area-map__legend-item">
+      <span class="area-map__swatch area-map__swatch--confirm" aria-hidden="true"></span>
+      <a href="/locations/tampa-bay/" data-cta="tampa-map-check">Check your Tampa address</a>
+    </span>
+  </figcaption>
+  <p class="small text-muted area-map__note">
+    County shading is an approximate visual guide, not a booking promise. Tampa
+    eligibility requires an approved ZIP in Pasco, Pinellas or Hillsborough
+    County and a verified road-driving distance of 20 miles or less from the
+    Tampa operating origin.
+  </p>
+</figure>

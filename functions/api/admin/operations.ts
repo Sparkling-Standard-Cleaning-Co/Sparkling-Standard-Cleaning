@@ -9,6 +9,7 @@ import {
 } from '../../../src/lib/admin/recurring-schedule.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { recurringSchedulingEnabled } from '../../../src/lib/booking/recurring-gate.ts';
+import { queueReviewForAppointment } from '../../../src/lib/reviews/service.ts';
 import { AdminAuthError, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
   assignTeam,
@@ -49,6 +50,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         ok: true,
         recurring: await listRecurring(db, actor),
         recurringEnabled: recurringSchedulingEnabled(context.env),
+        workerRuns: (
+          await db.prepare(
+            `SELECT run_key, status, started_at, finished_at, plans_scanned, plans_synced, errors, detail_json
+             FROM recurring_worker_runs ORDER BY started_at DESC LIMIT 30`,
+          ).all<Record<string, unknown>>()
+        ).results ?? [],
       });
     }
     if (view === 'occurrences') {
@@ -244,7 +251,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       return json({ ok: true });
     }
     if (action === 'job_status') {
-      await updateAppointmentStatus(db, actor, String(body.appointmentId ?? ''), String(body.status ?? ''));
+      const appointmentId = String(body.appointmentId ?? '');
+      const status = String(body.status ?? '');
+      await updateAppointmentStatus(db, actor, appointmentId, status);
+      if (status === 'completed') {
+        await queueReviewForAppointment(db, appointmentId).catch(() => undefined);
+      }
       return json({ ok: true });
     }
     if (action === 'create_checklist') {

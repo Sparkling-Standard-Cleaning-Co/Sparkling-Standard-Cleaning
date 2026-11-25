@@ -1,0 +1,109 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from '../components/Icon.astro';
+---
+
+<BaseLayout
+  title="Secure Invoice Payment"
+  description="Review your Sparkling Standard invoice and choose an optional gratuity."
+  noindex
+  analytics={false}
+>
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="invoice-pay" data-invoice-pay>
+        <div class="invoice-pay__head">
+          <span class="card__icon"><Icon name="shield" /></span>
+          <div>
+            <p class="invoice-pay__eyebrow">Sparkling Standard</p>
+            <h1 class="invoice-pay__title">Secure invoice payment</h1>
+            <p class="invoice-pay__lead">Standards That Sparkle.</p>
+          </div>
+        </div>
+
+        <p class="invoice-pay__status" data-pay-loading role="status">Loading your secure invoice…</p>
+        <p class="invoice-pay__error" data-pay-error role="alert" hidden></p>
+        <div data-pay-content hidden>
+          <p class="invoice-pay__greeting" data-pay-greeting></p>
+          <dl class="invoice-pay__summary">
+            <div><dt>Invoice</dt><dd data-pay-number>—</dd></div>
+            <div data-pay-service-row><dt>Service</dt><dd data-pay-service-name>—</dd></div>
+            <div><dt>Service amount</dt><dd data-pay-service>—</dd></div>
+            <div><dt>Optional gratuity</dt><dd data-pay-tip-line>$0.00</dd></div>
+            <div class="invoice-pay__total"><dt>Total</dt><dd data-pay-total>—</dd></div>
+          </dl>
+          <div data-pay-lines class="invoice-pay__lines"></div>
+
+          <form data-pay-form novalidate>
+            <fieldset class="invoice-pay__tip" data-pay-tip-fieldset>
+              <legend>Would you like to leave an optional tip for your cleaning team?</legend>
+              <p class="invoice-pay__hint">Your gratuity is completely optional and goes to the cleaners who performed your service.</p>
+              <div class="invoice-pay__choices" data-pay-choices>
+                <label class="invoice-pay__choice"><input type="radio" name="tip" value="0" checked /><span>No tip</span></label>
+                <label class="invoice-pay__choice"><input type="radio" name="tip" value="1000" /><span>$10</span></label>
+                <label class="invoice-pay__choice"><input type="radio" name="tip" value="1500" /><span>$15</span></label>
+                <label class="invoice-pay__choice"><input type="radio" name="tip" value="2500" /><span>$25</span></label>
+                <label class="invoice-pay__choice"><input type="radio" name="tip" value="custom" /><span>Custom amount</span></label>
+              </div>
+              <label class="invoice-pay__custom" data-pay-custom hidden>
+                Custom gratuity (USD)
+                <input data-pay-custom-input type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+              </label>
+              <p class="invoice-pay__hint">No tip is selected by default. Choosing no tip does not affect your service, review or receipt.</p>
+            </fieldset>
+            <p class="invoice-pay__error" data-pay-form-error role="alert" hidden></p>
+            <div class="invoice-pay__actions">
+              <button class="btn btn--primary" type="submit" data-pay-submit>Continue to secure payment</button>
+              <a class="btn btn--ghost" href="/" data-pay-close>Close without paying</a>
+            </div>
+            <p class="invoice-pay__fine">Payment is processed securely by Stripe. The final amount is confirmed before any charge. The service amount is never charged twice.</p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .invoice-pay {
+    max-width: 42rem;
+    margin-inline: auto;
+    padding: var(--space-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+  }
+  .invoice-pay__head { display: flex; gap: var(--space-4); align-items: center; margin-bottom: var(--space-5); }
+  .invoice-pay__eyebrow { margin: 0; color: var(--color-champagne-text); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-wider); text-transform: uppercase; }
+  .invoice-pay__title { margin: var(--space-1) 0 0; font-family: var(--font-display); font-size: var(--text-2xl); color: var(--color-text-strong); }
+  .invoice-pay__lead { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+  .invoice-pay__status, .invoice-pay__error { margin: var(--space-4) 0; font-size: var(--text-sm); }
+  .invoice-pay__error { color: var(--color-error-700); }
+  .invoice-pay__greeting { margin: 0 0 var(--space-4); font-size: var(--text-lg); color: var(--color-text); }
+  .invoice-pay__summary { display: grid; gap: var(--space-2); margin: 0 0 var(--space-4); }
+  .invoice-pay__summary > div { display: flex; justify-content: space-between; gap: var(--space-3); padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border); }
+  .invoice-pay__summary dt { color: var(--color-text-muted); font-size: var(--text-sm); }
+  .invoice-pay__summary dd { margin: 0; color: var(--color-text-strong); font-weight: var(--weight-semibold); text-align: right; }
+  .invoice-pay__total dt, .invoice-pay__total dd { color: var(--color-primary); font-size: var(--text-lg); }
+  .invoice-pay__lines { margin: 0 0 var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
+  .invoice-pay__lines p { margin: var(--space-1) 0; }
+  .invoice-pay__tip { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); margin: 0 0 var(--space-4); }
+  .invoice-pay__tip legend { padding-inline: var(--space-2); font-family: var(--font-display); font-size: var(--text-lg); color: var(--color-text-strong); }
+  .invoice-pay__hint { color: var(--color-text-muted); font-size: var(--text-sm); }
+  .invoice-pay__choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }
+  .invoice-pay__choice { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); cursor: pointer; font-weight: var(--weight-semibold); }
+  .invoice-pay__choice:has(input:checked) { border-color: var(--color-primary); background: var(--color-primary-soft); }
+  .invoice-pay__custom { display: grid; gap: var(--space-2); margin: var(--space-2) 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+  .invoice-pay__custom input { min-height: 2.75rem; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); font: inherit; }
+  .invoice-pay__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .invoice-pay__fine { margin: var(--space-4) 0 0; color: var(--color-text-muted); font-size: var(--text-xs); line-height: var(--leading-normal); }
+  @media (max-width: 30rem) {
+    .invoice-pay { padding: var(--space-4); }
+    .invoice-pay__actions .btn { width: 100%; }
+  }
+</style>
+
+<script>
+  import '../scripts/invoice-pay';
+</script>

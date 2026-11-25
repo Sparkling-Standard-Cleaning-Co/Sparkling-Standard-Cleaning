@@ -397,19 +397,19 @@ test('sends verified photos as real Resend attachments and skips the Web3Forms f
   assert.equal(result.photoCount, 1);
   assert.equal(result.photoDelivery, 'attached');
   assert.equal(web3Calls.length, 0, 'attachments go through Resend, not the attachment-less Web3Forms plan');
-  assert.equal(resendCalls.length, 2, 'owner attachment plus the mandatory customer confirmation');
+  assert.equal(resendCalls.length, 3, 'Customer Service and Owner attachment notices plus the mandatory customer confirmation');
   const ownerCall = resendCalls.find((call) => {
     const parsed = JSON.parse(call.body) as { to?: string[] };
-    return parsed.to?.includes('owner@sparkling-standard.com');
+    return parsed.to?.includes('customer-service@sparkling-standard.com');
   });
   assert.ok(ownerCall);
-  assert.match(ownerCall.headers['Idempotency-Key'] ?? '', /^owner-notification\/SS-20261025-ABC123\/part-1\/v1$/);
+  assert.match(ownerCall.headers['Idempotency-Key'] ?? '', /^owner-notification\/SS-20261025-ABC123\/part-1\/v1\/customerService$/);
   const body = JSON.parse(ownerCall.body) as {
     to: string[];
     subject: string;
     attachments: Array<{ filename: string; content: string; content_type: string }>;
   };
-  assert.deepEqual(body.to, ['owner@sparkling-standard.com']);
+  assert.deepEqual(body.to, ['customer-service@sparkling-standard.com']);
   assert.match(body.subject, /SS-20261025-ABC123/);
   assert.equal(body.attachments.length, 1);
   assert.match(body.attachments[0]?.filename ?? '', /^SS-20261025-ABC123_01_bathroom\.jpg$/);
@@ -464,7 +464,7 @@ test('falls back to Web3Forms with an explicit attachment-failure note when Rese
   assert.equal(response.status, 200);
   const body = (await response.json()) as { photoDelivery: string };
   assert.equal(body.photoDelivery, 'links_only');
-  assert.equal(resendAttempts, 2, 'one attempt for the owner attachment and one independent customer confirmation');
+  assert.equal(resendAttempts, 3, 'Customer Service and Owner attachment attempts plus one independent customer confirmation');
   assert.equal(web3.length, 1);
   assert.match(String(web3[0]?.['Photos - Attachment delivery'] ?? ''), /FAILED/i);
   assert.match(String(web3[0]?.['Photos - Private owner links'] ?? ''), /sig=/);

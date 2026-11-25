@@ -1,0 +1,947 @@
+/* Secure customer signing ceremony. Mobile-first, readable legal text and
+   one signature ceremony applied to the documents the customer selects. */
+
+.signing-body {
+  margin: 0;
+  background: #f8f1ec;
+  color: #2c2421;
+  font-family: var(--font-body, "Source Sans 3", Arial, sans-serif);
+}
+
+.signing-shell {
+  width: min(100%, 76rem);
+  margin: 0 auto;
+  padding: 1rem 1rem 8rem;
+}
+
+.signing-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.signing-brand img {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+}
+
+.signing-brand p {
+  margin: 0;
+}
+
+.signing-brand__name {
+  font-family: var(--font-display, Georgia, serif);
+  font-weight: 700;
+  color: #6d343c;
+}
+
+.signing-brand__sub {
+  font-size: 0.8rem;
+  color: #756963;
+}
+
+.signing-title {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: clamp(1.55rem, 2.6vw, 2.15rem);
+  line-height: 1.15;
+  margin: 0 0 0.35rem;
+  color: #5f2d35;
+}
+
+.signing-lead {
+  margin: 0 0 1rem;
+  color: #5c4b45;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+.signing-status {
+  min-height: 1.4rem;
+  margin: 0 0 0.8rem;
+  color: #5c4b45;
+  font-weight: 600;
+}
+
+.signing-status[data-kind="error"] {
+  color: #9b2f38;
+}
+
+.signing-status[data-kind="ok"] {
+  color: #2f6a45;
+}
+
+.signing-progress {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.55rem;
+  margin: 0 0 1rem;
+  border: 1px solid #e7d9cb;
+  border-radius: 0.9rem;
+  background: rgba(255, 252, 248, 0.96);
+  backdrop-filter: blur(8px);
+  scrollbar-width: thin;
+}
+
+.signing-progress button {
+  flex: 1 0 auto;
+  min-height: 2.75rem;
+  border: 1px solid transparent;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: #6f5a52;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.signing-progress button[aria-current="step"] {
+  background: #f1dfe0;
+  border-color: #d8b8bc;
+  color: #6d343c;
+}
+
+.signing-progress button:focus-visible,
+.signing-btn:focus-visible,
+.signing-card button:focus-visible,
+.signing-card a:focus-visible,
+.signing-card input:focus-visible,
+.signing-card select:focus-visible,
+.signing-card textarea:focus-visible {
+  outline: 3px solid #9a5b61;
+  outline-offset: 2px;
+}
+
+.signing-panel[hidden],
+.signing-actionbar[hidden],
+.signing-success[hidden] {
+  display: none !important;
+}
+
+.signing-grid {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+.signing-card {
+  background: #fffdfa;
+  border: 1px solid #e7d9cb;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 10px 30px rgba(80, 45, 45, 0.05);
+  min-width: 0;
+}
+
+.signing-card h2,
+.signing-card h3 {
+  font-family: var(--font-display, Georgia, serif);
+  color: #6d343c;
+  margin: 0 0 0.55rem;
+}
+
+.signing-card h2 {
+  font-size: 1.2rem;
+}
+
+.signing-card h3 {
+  font-size: 1rem;
+}
+
+.signing-muted {
+  color: #756963;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin: 0.35rem 0;
+}
+
+.signing-summary {
+  display: grid;
+  gap: 0.45rem 1rem;
+  margin: 0;
+}
+
+.signing-summary div {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #f0e5da;
+}
+
+.signing-summary dt {
+  color: #8c7a70;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.signing-summary dd {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.signing-fields {
+  display: grid;
+  gap: 1rem;
+}
+
+.signing-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.signing-field > label,
+.signing-field > legend {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #4a2e33;
+}
+
+.signing-field fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.signing-field legend {
+  margin-bottom: 0.4rem;
+}
+
+.signing-contact-choice,
+.signing-contact-summary,
+.signing-contact-fields {
+  grid-column: 1 / -1;
+}
+
+.signing-contact-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.signing-contact-summary {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid #d8c8b7;
+  border-radius: 0.7rem;
+  background: #fdf8f2;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.signing-contact-summary__label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7a5b60;
+}
+
+.signing-contact-summary__missing {
+  color: #9b2c2c;
+  font-weight: 700;
+}
+
+@media (min-width: 48rem) {
+  .signing-contact-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.signing-options {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.signing-option {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid #e8dcd0;
+  border-radius: 0.7rem;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.signing-option:has(input:checked) {
+  border-color: #b98088;
+  background: #fdf6f6;
+}
+
+.signing-option input {
+  margin-top: 0.18rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: #8a4a52;
+  flex: 0 0 auto;
+}
+
+.signing-option span {
+  display: block;
+}
+
+.signing-option small {
+  display: block;
+  color: #756963;
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+
+.signing-field input[type="text"],
+.signing-field input[type="email"],
+.signing-field input[type="tel"],
+.signing-field select,
+.signing-field textarea {
+  width: 100%;
+  min-height: 2.9rem;
+  border: 1px solid #d8c8b7;
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  font: inherit;
+  font-size: 1rem;
+  background: #fff;
+  color: #2c2421;
+}
+
+.signing-field textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.signing-documents {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.signing-document {
+  border: 1px solid #e7d9cb;
+  border-radius: 0.8rem;
+  padding: 0.85rem;
+  background: #fff;
+}
+
+.signing-document__head {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.signing-document h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.signing-document__meta {
+  color: #756963;
+  font-size: 0.78rem;
+  margin: 0.2rem 0 0;
+}
+
+.signing-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #f2e8de;
+  color: #6b564c;
+  white-space: nowrap;
+}
+
+.signing-badge--required {
+  background: #f6dedf;
+  color: #7b2f38;
+}
+
+.signing-badge--signed {
+  background: #e2f0e6;
+  color: #245c3c;
+}
+
+.signing-document__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.55rem;
+}
+
+.signing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid transparent;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.signing-btn--primary {
+  background: #8a4a52;
+  color: #fff;
+}
+
+.signing-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.signing-btn--secondary {
+  background: #fff;
+  border-color: #d8b8bc;
+  color: #6d343c;
+}
+
+.signing-btn--ghost {
+  background: transparent;
+  border-color: #e1d3c4;
+  color: #5b4a43;
+}
+
+.signing-btn--wide {
+  width: 100%;
+}
+
+.signing-ack {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  margin-top: 0.65rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.signing-ack input {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-top: 0.15rem;
+  accent-color: #8a4a52;
+  flex: 0 0 auto;
+}
+
+.signing-signature-method {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.35rem 0 0.6rem;
+}
+
+.signing-signature-method label {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #e1d3c4;
+  border-radius: 0.65rem;
+  background: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.signing-signature-method label:has(input:checked) {
+  border-color: #b98088;
+  background: #fdf6f6;
+}
+
+.signing-signature-preview {
+  border: 1px dashed #cdb8a6;
+  border-radius: 0.65rem;
+  min-height: 5.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem;
+  background: #fff;
+  margin-top: 0.5rem;
+}
+
+.signing-signature-preview span {
+  font-family: "Brush Script MT", "Segoe Script", cursive;
+  font-size: 1.9rem;
+  color: #4a2e33;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.signing-signature-preview img {
+  max-width: 100%;
+  max-height: 7rem;
+}
+
+.signing-canvas-wrap {
+  margin-top: 0.5rem;
+}
+
+.signing-canvas {
+  width: 100%;
+  height: 9rem;
+  border: 1px solid #d8c8b7;
+  border-radius: 0.65rem;
+  background: #fff;
+  touch-action: none;
+  display: block;
+}
+
+.signing-canvas-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.45rem;
+}
+
+.signing-disclosure {
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: #6c5b53;
+}
+
+.signing-disclosure a {
+  color: #8a4a52;
+}
+
+.signing-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.signing-actions .signing-btn {
+  flex: 1 1 12rem;
+}
+
+.signing-actionbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  padding: 0.65rem max(1rem, env(safe-area-inset-left)) calc(0.65rem + env(safe-area-inset-bottom));
+  background: rgba(255, 252, 248, 0.98);
+  border-top: 1px solid #e7d9cb;
+  box-shadow: 0 -8px 24px rgba(80, 45, 45, 0.08);
+}
+
+.signing-actionbar__inner {
+  width: min(100%, 76rem);
+  margin: 0 auto;
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.signing-actionbar__status {
+  font-size: 0.82rem;
+  color: #6c5b53;
+  margin: 0;
+  flex: 1 1 12rem;
+}
+
+.signing-actionbar .signing-btn {
+  flex: 1 1 14rem;
+}
+
+.signing-dialog {
+  width: min(100% - 1rem, 62rem);
+  max-height: 90dvh;
+  border: 1px solid #d8b8bc;
+  border-radius: 1rem;
+  padding: 0;
+  background: #fffdfa;
+  color: #2c2421;
+  box-shadow: 0 30px 80px rgba(50, 20, 25, 0.3);
+}
+
+.signing-dialog::backdrop {
+  background: rgba(44, 36, 33, 0.55);
+}
+
+.signing-dialog__head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  background: #fffdfa;
+  border-bottom: 1px solid #eadfd3;
+}
+
+.signing-dialog__head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #6d343c;
+}
+
+.signing-dialog__body {
+  padding: 1rem 1.1rem 3rem;
+}
+
+.signing-doc-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: 72ch;
+  margin: 0 auto;
+}
+
+/* The shared branded letterhead owns typography and spacing when present. */
+.signing-doc-text.branded-document {
+  white-space: normal;
+  max-width: 50rem;
+  font-size: 10.8pt;
+  line-height: 1.58;
+}
+
+.signing-success {
+  text-align: center;
+  max-width: 40rem;
+  margin: 2rem auto;
+}
+
+.signing-success__mark {
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto 0.8rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #e2f0e6;
+  color: #245c3c;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.signing-success .signing-actions {
+  justify-content: center;
+}
+
+@media (min-width: 48rem) {
+  .signing-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .signing-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .signing-field--wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 64rem) {
+  .signing-shell {
+    padding: 1.5rem 1.5rem 7rem;
+  }
+
+  .signing-card {
+    padding: 1.25rem;
+  }
+
+  .signing-review-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 0.85fr);
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .signing-signer-card {
+    position: sticky;
+    top: 4.5rem;
+  }
+}
+
+@media (max-width: 30rem) {
+  .signing-progress button {
+    font-size: 0.78rem;
+    padding: 0.45rem 0.6rem;
+  }
+
+  .signing-actionbar__inner {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .signing-actionbar__status {
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signing-shell * {
+    scroll-behavior: auto !important;
+  }
+}
+
+.signing-doc-text .doc-title {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: clamp(1.35rem, 3vw, 1.9rem);
+  line-height: 1.2;
+  color: #5f2d35;
+  margin: 0 0 .75rem;
+}
+
+.signing-doc-text .doc-heading {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.15rem;
+  line-height: 1.3;
+  color: #6d343c;
+  margin: 1.5rem 0 .5rem;
+  padding-bottom: .3rem;
+  border-bottom: 1px solid #eadfd3;
+}
+
+.signing-doc-text p {
+  margin: 0 0 .85rem;
+}
+
+.signing-doc-text ul {
+  margin: 0 0 1rem;
+  padding-left: 1.35rem;
+}
+
+.signing-doc-text li {
+  margin: .35rem 0;
+}
+
+.signing-doc-text .doc-meta {
+  color: #756963;
+  font-size: .86rem;
+  margin-bottom: 1.2rem;
+}
+
+.signing-doc-text strong {
+  color: #4a2e33;
+}
+
+/* Persistent price panel, per-document signature boxes and signature pad. */
+.signing-price-panel {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.signing-price-block h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8c7a70;
+}
+
+.signing-price-block p {
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.signing-price-lines {
+  display: grid;
+  gap: 0.3rem;
+  border-top: 1px solid #f0e5da;
+  padding-top: 0.6rem;
+}
+
+.signing-price-line,
+.signing-price-total > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.signing-price-line--credit strong {
+  color: #2f6a45;
+}
+
+.signing-price-total {
+  display: grid;
+  gap: 0.35rem;
+  border-top: 2px solid #d8b8bc;
+  padding-top: 0.6rem;
+  font-size: 1.02rem;
+}
+
+.signing-price-total strong {
+  font-size: 1.18rem;
+  color: #5f2d35;
+}
+
+.signing-signature-progress {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+}
+
+.signing-signature-progress__bar {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #f0e5da;
+  overflow: hidden;
+}
+
+.signing-signature-progress__bar span {
+  display: block;
+  height: 100%;
+  background: #9a5b61;
+  transition: width 180ms ease;
+}
+
+.signing-signature-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+  padding: 0.85rem;
+  min-height: 4.5rem;
+  border: 2px dashed #c99fa3;
+  border-radius: 0.8rem;
+  background: #fffdfa;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.signing-signature-slot:hover,
+.signing-signature-slot:focus-visible {
+  border-color: #8a4a52;
+  background: #fdf4f2;
+}
+
+.signing-signature-slot.is-next {
+  border-color: #8a4a52;
+  box-shadow: 0 0 0 4px rgba(154, 91, 97, 0.16);
+}
+
+.signing-signature-slot.is-signed {
+  border-style: solid;
+  border-color: #2f6a45;
+  background: #f3faf5;
+  cursor: default;
+}
+
+.signing-signature-slot__x {
+  flex: 0 0 auto;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #9a5b61;
+  line-height: 1;
+}
+
+.signing-signature-slot.is-signed .signing-signature-slot__x {
+  color: #2f6a45;
+}
+
+.signing-signature-slot__copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.signing-signature-slot__copy strong {
+  color: #5f2d35;
+}
+
+.signing-signature-slot__copy small {
+  color: #756963;
+  line-height: 1.4;
+}
+
+.signing-signature-slot__value {
+  margin-left: auto;
+  font-family: "Segoe Script", "Brush Script MT", cursive;
+  font-size: 1.35rem;
+  color: #3f2b30;
+  overflow-wrap: anywhere;
+}
+
+.signing-signature-slot__image {
+  margin-left: auto;
+  max-height: 3.2rem;
+  max-width: 45%;
+  object-fit: contain;
+}
+
+.signing-signature-dialog {
+  width: min(96vw, 44rem);
+}
+
+.signing-canvas--large {
+  height: 14rem;
+}
+
+.signing-signature-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.signing-btn--inline {
+  padding: 0.35rem 0.7rem;
+  min-height: 2.25rem;
+  font-size: 0.8rem;
+}
+
+.signing-success__amount {
+  display: inline-flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  margin: 0.4rem auto 0.8rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.6rem;
+  background: #fdf4f2;
+  border: 1px solid #e7d9cb;
+}
+
+.signing-success__amount strong {
+  font-size: 1.25rem;
+  color: #5f2d35;
+}
+
+@media (max-width: 40rem) {
+  .signing-signature-slot {
+    flex-wrap: wrap;
+  }
+
+  .signing-signature-slot__value,
+  .signing-signature-slot__image {
+    margin-left: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+}

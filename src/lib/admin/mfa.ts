@@ -1,4 +1,4 @@
-import { hashToken, randomToken } from './auth.ts';
+import { constantTimeEqual, hashToken, randomToken } from './auth.ts';
 import { decryptMfaSecret, encryptMfaSecret } from './secrets.ts';
 import type { D1Database } from './d1.ts';
 
@@ -7,6 +7,9 @@ const MFA_PERIOD_SECONDS = 30;
 const MFA_DIGITS = 6;
 const MFA_CHALLENGE_SECONDS = 5 * 60;
 const MFA_MAX_ATTEMPTS = 5;
+const MFA_EMAIL_CODE_SECONDS = 5 * 60;
+const MFA_EMAIL_RESEND_SECONDS = 60;
+const MFA_EMAIL_MAX_ATTEMPTS = 5;
 
 function base32Encode(bytes: Uint8Array): string {
   let bits = 0;
@@ -116,7 +119,7 @@ export async function createRecoveryCodes(db: D1Database, userId: string): Promi
   return codes;
 }
 
-async function consumeRecoveryCode(db: D1Database, userId: string, code: string): Promise<boolean> {
+export async function consumeRecoveryCode(db: D1Database, userId: string, code: string): Promise<boolean> {
   const normalized = normalizeRecoveryCode(code);
   if (normalized.length < 8) return false;
   const hash = await hashToken(normalized);
@@ -202,7 +205,7 @@ export async function startMfaEnrollment(
 ): Promise<{ secret: string; uri: string }> {
   const secret = generateTotpSecret();
   await db
-    .prepare("UPDATE admin_users SET mfa_secret = ?, mfa_enabled = 0, updated_at = ? WHERE id = ?")
+    .prepare("UPDATE admin_users SET mfa_secret = ?, mfa_enabled = 0, mfa_method = 'totp', updated_at = ? WHERE id = ?")
     .bind(await encryptMfaSecret(secret, encryptionKey), new Date().toISOString(), userId)
     .run();
   return { secret, uri: totpUri(secret, email) };
@@ -220,13 +223,171 @@ export async function enableMfa(
     .first<{ mfa_secret: string | null }>();
   const secret = row?.mfa_secret ? await decryptMfaSecret(row.mfa_secret, encryptionKey) : null;
   if (!secret || !(await verifyTotp(secret, code))) return null;
-  return createRecoveryCodes(db, userId);
+  const codes = await createRecoveryCodes(db, userId);
+  await db
+    .prepare("UPDATE admin_users SET mfa_method = 'totp', updated_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), userId)
+    .run();
+  return codes;
 }
 
 export async function disableMfa(db: D1Database, userId: string): Promise<void> {
   await db
-    .prepare("UPDATE admin_users SET mfa_secret = NULL, mfa_enabled = 0, updated_at = ? WHERE id = ?")
+    .prepare("UPDATE admin_users SET mfa_secret = NULL, mfa_enabled = 0, mfa_method = 'totp', updated_at = ? WHERE id = ?")
     .bind(new Date().toISOString(), userId)
     .run();
   await db.prepare('DELETE FROM admin_recovery_codes WHERE user_id = ?').bind(userId).run();
+}
+export function generateEmailCode(): string {
+  let value: number;
+  do {
+    const bytes = crypto.getRandomValues(new Uint8Array(4));
+    value = ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 0;
+  } while (value >= 4_294_000_000);
+  return String(value % 1_000_000).padStart(6, '0');
+}
+
+function emailCodeHash(token: string, code: string): Promise<string> {
+  return hashToken(`${token}:${code.replace(/\D/g, '').slice(0, 6)}`);
+}
+
+export async function createEmailMfaChallenge(
+  db: D1Database,
+  userId: string,
+  code: string,
+): Promise<{ token: string; expiresAt: string; resendAfterSeconds: number }> {
+  const token = randomToken(32);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + MFA_EMAIL_CODE_SECONDS * 1000).toISOString();
+  await db
+    .prepare(
+      `DELETE FROM admin_email_mfa_challenges
+       WHERE user_id = ? AND (expires_at <= ? OR attempts >= ?)`,
+    )
+    .bind(userId, now.toISOString(), MFA_EMAIL_MAX_ATTEMPTS)
+    .run();
+  await db
+    .prepare(
+      `INSERT INTO admin_email_mfa_challenges
+       (id, user_id, token_hash, code_hash, expires_at, attempts, last_sent_at)
+       VALUES (?, ?, ?, ?, ?, 0, ?)`,
+    )
+    .bind(
+      `emfa_${crypto.randomUUID()}`,
+      userId,
+      await hashToken(token),
+      await emailCodeHash(token, code),
+      expiresAt,
+      now.toISOString(),
+    )
+    .run();
+  return { token, expiresAt, resendAfterSeconds: MFA_EMAIL_RESEND_SECONDS };
+}
+
+export async function emailMfaChallengeExists(db: D1Database, token: string): Promise<boolean> {
+  if (!token) return false;
+  const row = await db
+    .prepare('SELECT id FROM admin_email_mfa_challenges WHERE token_hash = ? LIMIT 1')
+    .bind(await hashToken(token))
+    .first<{ id: string }>();
+  return Boolean(row);
+}
+
+export async function prepareEmailMfaResend(
+  db: D1Database,
+  token: string,
+  code: string,
+): Promise<
+  | { ok: true; userId: string; expiresAt: string; resendAfterSeconds: number }
+  | { ok: false; reason: 'not_found' | 'expired' | 'attempts' | 'cooldown'; retryAfterSeconds?: number }
+> {
+  if (!token) return { ok: false, reason: 'not_found' };
+  const row = await db
+    .prepare(
+      `SELECT id, user_id, expires_at, attempts, last_sent_at
+       FROM admin_email_mfa_challenges WHERE token_hash = ? LIMIT 1`,
+    )
+    .bind(await hashToken(token))
+    .first<{
+      id: string;
+      user_id: string;
+      expires_at: string;
+      attempts: number;
+      last_sent_at: string;
+    }>();
+  if (!row) return { ok: false, reason: 'not_found' };
+  if (Number(row.attempts) >= MFA_EMAIL_MAX_ATTEMPTS) return { ok: false, reason: 'attempts' };
+  if (Date.parse(row.expires_at) <= Date.now()) return { ok: false, reason: 'expired' };
+  const elapsed = Math.floor((Date.now() - Date.parse(row.last_sent_at)) / 1000);
+  if (elapsed < MFA_EMAIL_RESEND_SECONDS) {
+    return {
+      ok: false,
+      reason: 'cooldown',
+      retryAfterSeconds: MFA_EMAIL_RESEND_SECONDS - elapsed,
+    };
+  }
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + MFA_EMAIL_CODE_SECONDS * 1000).toISOString();
+  await db
+    .prepare(
+      `UPDATE admin_email_mfa_challenges
+       SET code_hash = ?, expires_at = ?, last_sent_at = ?
+       WHERE id = ?`,
+    )
+    .bind(await emailCodeHash(token, code), expiresAt, now.toISOString(), row.id)
+    .run();
+  return { ok: true, userId: row.user_id, expiresAt, resendAfterSeconds: MFA_EMAIL_RESEND_SECONDS };
+}
+
+export async function verifyEmailMfaChallenge(
+  db: D1Database,
+  token: string,
+  input: { code?: string; recoveryCode?: string },
+): Promise<{ userId: string } | null> {
+  if (!token) return null;
+  const row = await db
+    .prepare(
+      `SELECT c.id, c.user_id, c.expires_at, c.attempts, c.code_hash, u.status
+       FROM admin_email_mfa_challenges c JOIN admin_users u ON u.id = c.user_id
+       WHERE c.token_hash = ? LIMIT 1`,
+    )
+    .bind(await hashToken(token))
+    .first<{
+      id: string;
+      user_id: string;
+      expires_at: string;
+      attempts: number;
+      code_hash: string;
+      status: string;
+    }>();
+  if (!row || row.status !== 'active') return null;
+  if (Date.parse(row.expires_at) <= Date.now() || Number(row.attempts) >= MFA_EMAIL_MAX_ATTEMPTS) {
+    await db.prepare('DELETE FROM admin_email_mfa_challenges WHERE id = ?').bind(row.id).run();
+    return null;
+  }
+  const code = String(input.code ?? '').replace(/\D/g, '');
+  const validCode =
+    code.length === 6 &&
+    constantTimeEqual(await hashToken(`${token}:${code}`), row.code_hash);
+  const validRecovery = input.recoveryCode
+    ? await consumeRecoveryCode(db, row.user_id, input.recoveryCode)
+    : false;
+  if (!validCode && !validRecovery) {
+    await db
+      .prepare('UPDATE admin_email_mfa_challenges SET attempts = attempts + 1 WHERE id = ?')
+      .bind(row.id)
+      .run();
+    return null;
+  }
+  await db.prepare('DELETE FROM admin_email_mfa_challenges WHERE id = ?').bind(row.id).run();
+  return { userId: row.user_id };
+}
+
+export async function enableEmailMfa(db: D1Database, userId: string): Promise<string[]> {
+  const codes = await createRecoveryCodes(db, userId);
+  await db
+    .prepare("UPDATE admin_users SET mfa_method = 'email', updated_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), userId)
+    .run();
+  return codes;
 }

@@ -1,5 +1,35 @@
 # Verification status
 
+## Platform completion, change orders and backup correction - 2026-11-24/25
+
+Application code **`aaa4c83`** is live on `production-safe` in Cloudflare Pages deployment **`9cea2813-c777-4dd6-97ab-f8e62c2ea845`**, verified on 2026-11-25 with served admin asset `/_astro/index.astro_astro_type_script_index_0_lang.DLPf6bre.js`. Migrations `0059` and `0060` add one-primary-invoice enforcement and signed change orders. The Customer File gains jobs, payments, communications and one chronological activity timeline; the Job File adds crew, finance, photos, communications, change orders and timeline. Signed change orders use the approved Additional Service and Add-On Authorization template, require owner approval, preserve the original agreement/invoice, and create one explicit supplemental invoice. Signing requests can be revoked, default to active, and no longer crash when a packet is missing or renamed. The master workspace was reconciled: the stale unspaced Downloads workspace is a dated legacy archive, two duplicate scheduled tasks are disabled, the start page/README are corrected, and a retained-path duplicate manifest exists; no files were deleted. Backup status was corrected: the local Windows daily and weekly encrypted backups are verified (latest weekly: 2,595 files, D1 60 migrations/104 tables, independent OneDrive download hash matched, isolated restore passed, `backup_runs` heartbeat recorded and stale incident resolved); the GitHub workflow is visible on `main` but remains blocked by zero repository secrets. Verified: unit **1,118** (1,117 pass, 1 pre-existing skip), browser **279/279**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages, CI `45518441282` green; 60 production migrations and 0 foreign-key violations. No customer email, charge, review invitation, production record or branch was mutated. Evidence: [`2026-11-24-PLATFORM-COMPLETION.md`](2026-11-24-PLATFORM-COMPLETION.md) and `docs/audit/2026-11-24/`.
+
+## Platform consolidation, document library and review suppression - 2026-11-24
+
+Application code **`2a95955`** is live on `production-safe` in Cloudflare Pages deployment **`103a481a-b6aa-4162-b2f1-e1654c964c55`**, verified on 2026-11-24 with served admin asset `/_astro/index.astro_astro_type_script_index_0_lang.alIZjPxx.js`. Migration `0058` adds `document_family_state` and `customer_review_state`. The normal Document Library now shows one current approved version per family (27 families; 27 approved, 3 draft and 28 retired versions are separated into drafts/history), supports guarded draft deletion and family archive/restore, and publishes revisions transactionally when D1 batch is available. Review eligibility is now customer-level: reviewed, do-not-ask, opted-out, unknown and recently invited customers are not solicited again, invoice/PDF invitations are suppressed accordingly, and failed deliveries can be retried. The Customer File gains a review relationship card and quick actions for booking, completed service, estimate, invoice, agreement and contact. Production integrity: 0 foreign-key violations, 0 orphans, 0 duplicate invoice numbers, 0 duplicate per-appointment invoices; counts unchanged (12 customers, 14 properties, 21 appointments, 3 invoices, 6 signing requests, 1 review request, 58 templates). Verified: unit **1,114** (1,113 pass, 1 pre-existing 
+skip), browser **278/278**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages, CI `45504337889` green. The Leads workspace now defaults to active records and excludes archived, lost and converted inquiries unless explicitly selected. The audit also found the scheduled backup workflow is absent from the default branch and therefore not running; branch cutover and master-workspace cleanup require owner approval. No customer email, charge, review invitation, production record mutation or branch change was performed. Evidence: [`2026-11-24-PLATFORM-CONSOLIDATION.md`](2026-11-24-PLATFORM-CONSOLIDATION.md) and `docs/audit/2026-11-24/`.
+
+## Data recovery, review design and backup closeout - 2026-11-20
+
+The pre-existing residential and commercial prospect systems were recovered intact: 4,241 addresses (3,892 owner-occupied), 66 routes, 20 neighborhoods, 800 commercial prospects (16 sectors, 56 route groups, 192 Priority A). Protected copies, checksum manifests and a 1,932-file master index are in the master workspace. The review carousel now uses seven owner-approved reviews with consistent card heights and an accessible full-text dialog when needed; Laura's blank-line spacing is collapsed and Dennis/Laura photos are retained. New encrypted backups cover D1, application R2 (88 objects) and the master workspace; R2 parts were downloaded/rejoined/verified and an independent OneDrive copy was checksum-verified. Application code `e011105` is live in Cloudflare Pages deployment `df9fa304-c87c-4812-a5ad-47018356f999`. Unit suite 907 (906 pass, one pre-existing skip); 228 browser tests pass. Tampa full booking activation remains blocked by the missing branch-aware estimator/travel/scheduling path. Full detail: [`2026-11-20-DATA-RECOVERY-BACKUP.md`](2026-11-20-DATA-RECOVERY-BACKUP.md).
+
+## Reviews, photographs, footer and Tampa inquiry corrections - 2026-11-20
+
+The owner-approved carousel now displays seven reviews: Christina, Richard, Laura, Dennis D, K V, S Ismail and Rob & Christi Moore. Bob, Amanda and Elizabeth are excluded. The exact owner-supplied K V and S Ismail text is included, with K V's "bi-monthly" wording preserved. Dennis's two couch photographs and Laura's shower photograph were restored from the public Google review. The former rating/count summary and footer service-area paragraph were removed. Follow Us remains twelve transparent 44px official marks with no white circles. Tampa Bay now has a premium public page with a dedicated branch-assigned inquiry form; it creates a Tampa lead but no booking, quote or payment, and the page remains noindex until launch gates pass. Unit suite 907 (906 pass, one pre-existing skip); 228 browser tests pass. Application code `1d7c997` is live in Cloudflare Pages deployment `c6469de6-bf79-407c-a2a4-3f54c4051d35`. Screenshots: `docs/verification/2026-11-20-reviews-footer/`. Full detail: [`2026-11-20-REVIEWS-FOOTER.md`](2026-11-20-REVIEWS-FOOTER.md).
+
+
+## Two-branch topology and B2B launchpad - 2026-11-20
+
+Migration `0040` adds branch lifecycle/configuration and per-branch immutable pricing versions. Production D1 was backed up and verified before application; Pensacola remains live and Tampa Bay remains setup/prelaunch. The owner gained a server-scoped All/Pensacola/Tampa view, Branches & Launch setup and branch-specific pricing control. Public `/locations/pensacola/` is indexable; `/locations/tampa-bay/` is noindex and excluded from the sitemap. The commercial/institutional campaign launchpad was generated in the Windows master workspace with six print-ready Pensacola one-pagers, scripts, checklists, pipeline and 30/60/90 plan. Full unit suite 907 (906 pass, one pre-existing skip); 228 browser tests pass. Migrations and deployment are live. Full detail: [`2026-11-20-TWO-BRANCH-B2B.md`](2026-11-20-TWO-BRANCH-B2B.md).
+
+## Production activation and admin address autocomplete - 2026-11-19
+
+Application code **`019fad6`** is live on `production-safe` (Cloudflare Pages production deployment `f890914f-32fc-4691-9557-009214a9e380`). Migrations `0038` and `0039` are applied to production D1 and verified; legacy customer/appointment/invoice/payment counts match the pre-migration backup. Google Places (New) admin address autocomplete is live and the production endpoint returned real predictions/details for a synthetic Pensacola address. Quick Estimate calculation and PDF generation were exercised against production without creating business records. Encrypted D1 and 2.5 GB master-workspace backups were created, uploaded to private R2, downloaded, rejoined and restore-verified. CI `validate` and `browser` passed; local suite 902 tests (901 pass, 1 pre-existing skip) and 225 browser tests passed. No live charge, refund, customer email, legal execution or production customer record change was performed. Full detail: [`2026-11-19-PRODUCTION-ACTIVATION.md`](2026-11-19-PRODUCTION-ACTIVATION.md).
+
+## Master production closeout - 2026-11-19
+
+Application code **`054d395`** remains in production history. It delivered the Quick Estimate, document packet builder, admin improvements and backup tooling. Evidence: [`2026-11-19-MASTER-CLOSEOUT.md`](2026-11-19-MASTER-CLOSEOUT.md).
+
 ## Invoice payment receipts - 2026-11-19
 
 Application code **`85d5178`** is deployed in Cloudflare Pages production deployment `c70d8b1d-2a1a-4b59-b9e6-b44f663d8351`. Migration `0037` adds idempotent invoice receipt delivery. The invoice-payment webhook now sends one branded itemized receipt after verified payment, records Resend status and exposes an owner resend action. No live receipt was sent during verification. Full detail: [`docs/verification/2026-11-19-INVOICE-RECEIPTS.md`](2026-11-19-INVOICE-RECEIPTS.md).
@@ -1020,7 +1050,7 @@ delivery with valid-from activation); Cloudflare Pages deployment
 **Not yet live-tested:** Hayli's first-run password setup, backup-email delivery/verification,
 password recovery, live Stripe gift purchase/refund, and the GitHub scheduled-delivery trigger.
 No customer data, password, token or payment secret is recorded in this verification.
-## Verified G�� 2026-10-28 Google Calendar booking activation
+## Verified - 2026-10-28 Google Calendar booking activation
 
 **Code:** `fcbbd98`; Cloudflare Pages deployment `6afb9c46-d22b-47cc-b8e9-620127a5154e`. Durable pending requests now survive hold expiry; a submitted appointment remains non-guaranteed until owner confirmation.
 GitHub `validate`, `browser` and Cloudflare checks passed.
@@ -1036,7 +1066,7 @@ GitHub `validate`, `browser` and Cloudflare checks passed.
 - Live screenshots: `docs/verification/6.9/live-booking-available-desktop.png`,
   `live-booking-hold-desktop.png`, `live-booking-available-mobile.png`.
 
-Current settings are active: one crew, 8:00 a.m.G��6:00 p.m. Central, seven days, 24-hour notice,
+Current settings are active: one crew, 8:00 a.m. - 6:00 p.m. Central, seven days, 24-hour notice,
 15-minute buffers, 20-minute holds, `owner_approval`, `autoConfirmAllowed:false`.
 
 **Pending request fix:** a submitted reservation now becomes a durable pending owner-review request separate from the 20-minute hold; it remains after hold expiry, does not block capacity, and confirmation revalidates the slot plus checks for an existing Sparkling event.\n\n**Not yet live-tested:** owner confirmation and Google Calendar event creation/cancellation. The
@@ -1055,7 +1085,7 @@ real jobs with full addresses before availability reflects live work.
 | Owner confirmation | implemented, mock-tested; live test pending private token |
 
 
-## Verified G�� 2026-10-28 Initiative 6.9 deployment
+## Verified - 2026-10-28 Initiative 6.9 deployment
 
 **Release:** `4e28788`; Cloudflare Pages deployment `7f8a172c-18a9-43d0-9a4e-382094ba211d`.
 GitHub `validate`, `browser` and Cloudflare Pages checks passed. Initiative 6.10 social
@@ -1094,7 +1124,7 @@ were not supplied; Stripe test-mode credentials were not available; no live paym
 or gift fulfillment was exercised. The deployed code does not advertise unavailable functionality.
 
 
-## Verified G�� 2026-10-28 Initiative 6.10 social platform activation
+## Verified - 2026-10-28 Initiative 6.10 social platform activation
 
 **Release:** `eb8b2bc`; Cloudflare Pages deployment `95b29d45-33fa-4fdf-a695-c058b53bdae2`.
 GitHub `validate`, `browser` and Cloudflare Pages checks passed. Local work from Initiative 6.9
@@ -1117,7 +1147,7 @@ not placement-confirmed; the existing eight placements are unchanged.
 | Visual evidence | `docs/verification/6.10/` local and production desktop/mobile captures |
 
 
-## Verified G�� 2026-10-27 Initiative 6.8 production deployment
+## Verified - 2026-10-27 Initiative 6.8 production deployment
 
 **Audit:** `Aaron ss website audit.docx` (three pages, annotated screenshots).
 **Start baseline:** `820ad19`; the verified 6.7 payment work was integrated first as `f111014`.
@@ -1190,7 +1220,7 @@ Known residuals at this checkpoint:
 - Deployment and production checks are recorded in the release closeout after the push.
 
 
-## Verified G�� 2026-10-27 Initiative 6.7 payment reliability (local, pending deployment)
+## Verified - 2026-10-27 Initiative 6.7 payment reliability (local, pending deployment)
 
 **Baseline:** `820ad19`. The working tree contains the 6.7 payment-reliability changes; they are
 not reset or overwritten by Initiative 6.8. Local verification after the final retry/cancellation
@@ -1216,7 +1246,7 @@ Stripe test-mode transaction was performed.
 What has actually been verified, what has not, and the exact commands. Never report partial
 work as complete; update this file when verification runs.
 
-## Verified G�� 2026-10-27 Initiative 6.6 production deployment
+## Verified - 2026-10-27 Initiative 6.6 production deployment
 
 **Live branch/commit:** `main` at `0b907d4`. **Cloudflare Pages deployment:**
 `26e3b9f8-7665-426f-8687-7f171588c865`. GitHub `validate`, `browser` and Cloudflare
@@ -1267,7 +1297,7 @@ checkout before claiming live online payment. No live card charge or live lead s
 GTM Version 5 church/promotion event receipt still needs DebugView/Realtime confirmation. The
 private legal archive is outside Git.
 
-## Verified G�� 2026-10-26 Initiative 6.5 production deployment
+## Verified - 2026-10-26 Initiative 6.5 production deployment
 
 **Live branch/commit:** `main` at `298c1df` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `f9b4f61a-58d1-4ff3-8535-c375af8789fc`. GitHub `validate`,
@@ -1313,7 +1343,7 @@ completes. GitHub `browser` is the regression gate for that class of issue. GTM 
 church/promotion event receipt still needs DebugView/Realtime confirmation; no live lead-email
 submission was made for this release; production R2 signed-link retrieval was not independently
 tested locally. The documentation closeout commit follows this code release.
-## Verified G�� 2026-10-25 Initiative 6.4 production deployment
+## Verified - 2026-10-25 Initiative 6.4 production deployment
 
 **Live branch/commit:** `main` at `685031d` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `f9dea1a0-5b55-4cd8-b09e-18efae73c68a`. GitHub `validate`,
@@ -1361,7 +1391,7 @@ confirmation; production R2 signed-link retrieval was not independently tested l
 lead-email submission was made for this release (the owner photo inbox path remains owner-confirmed).
 The documentation closeout commit follows this code release.
 
-## Verified G�� 2026-10-25 Initiative 6.3 production deployment
+## Verified - 2026-10-25 Initiative 6.3 production deployment
 
 **Live branch/commit:** `main` at `911b5aa` (code release; documentation closeout follows).
 **Cloudflare Pages deployment:** `1b1a854c-4cec-433b-b02d-0daefa012101`. GitHub `validate`,
@@ -1409,7 +1439,7 @@ did not reprice the company.
 confirmation; production R2 signed-link retrieval was not independently tested locally. The owner's
 local master directory is outside Git and is intentionally not deployed. Pricing is unchanged.
 
-## Verified G�� 2026-10-25 audit-correction production deployment
+## Verified - 2026-10-25 audit-correction production deployment
 
 **Live branch/commit:** `main` at `13fa860` (preceded by `3abf2a9`). **Cloudflare Pages
 deployment:** `29c28a52-9669-43e5-9f65-72890d4cc4e8`. GitHub `validate`, `browser` and Cloudflare
@@ -1450,7 +1480,7 @@ attachment delivery were not changed.
 | Live reachability | `node scripts/live-check.mjs https://sparkling-standard.com` passed with 0 warnings |
 | Owner photo inbox | **Owner-confirmed**: actual customer-photo attachments reach the business inbox (2026-10-25) |
 
-## Verified G�� 2026-10-25 Initiative 6.2 production deployment
+## Verified - 2026-10-25 Initiative 6.2 production deployment
 
 **Live branch/commit:** `main` at `e635d7f` (fast-forwarded from `af46db4`; previous 6.2 commits
 `5919cbc` and `f3ed6f7`). **Cloudflare Pages deployment:** `877a241a-863b-423b-875b-1284182dcd39`

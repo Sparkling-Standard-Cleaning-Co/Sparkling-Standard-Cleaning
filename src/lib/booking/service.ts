@@ -8,12 +8,15 @@
  */
 import { bookingConfig } from '../../config/booking.ts';
 import {
+  calendarEnvForBranchWithDb,
   calendarJobsForDate,
   calendarJobsForRange,
   calendarStatus,
+  calendarTimeZoneForBranch,
   googleConfigured,
   type GoogleCalendarEnv,
 } from './google-calendar.ts';
+import { BRANCH_PENSACOLA, branchConfig, type BranchId } from '../../config/branches.ts';
 import {
   calculateAvailability,
   calculateScheduleAvailability,
@@ -46,15 +49,26 @@ export type AvailabilityServiceResult =
       date: string;
       durationMinutes: number;
       crewSize: number;
+      timeZone: string;
+      branchId: BranchId;
       origin: LatLng;
       destination: LatLng;
       availability: AvailabilityResult;
     };
 
+async function calendarEnvForBranchRecord(
+  env: BookingEnv,
+  branchId: BranchId,
+): Promise<GoogleCalendarEnv | null> {
+  return calendarEnvForBranchWithDb(env, env.DB, branchId);
+}
+
 export interface AvailabilityInput {
   date: string;
   durationMinutes: number;
   destination: LatLng;
+  /** Server-resolved branch. Defaults to the live Pensacola branch for legacy callers. */
+  branchId?: BranchId;
   /** Defaults to one cleaning resource. */
   crewSize?: number;
   /** Force an owner-selected resource assignment. */
@@ -72,18 +86,21 @@ export async function availabilityForDate(
   if (!bookingConfig.enabled) {
     return { ok: false, enabled: false, reason: 'booking_not_enabled', slots: [] };
   }
-  if (!googleConfigured(env)) {
+  const branchId = input.branchId ?? BRANCH_PENSACOLA;
+  const calendarEnv = await calendarEnvForBranchRecord(env, branchId);
+  const timeZone = branchConfig(branchId)?.timezone ?? calendarTimeZoneForBranch(branchId);
+  if (!calendarEnv || !googleConfigured(calendarEnv)) {
     return { ok: false, enabled: false, reason: 'calendar_not_configured', slots: [] };
   }
   const origin = parseLatLng(env.TRAVEL_ORIGIN);
   if (!origin) {
     return { ok: false, enabled: false, reason: 'travel_origin_not_configured', slots: [] };
   }
-  const status = await calendarStatus(env);
+  const status = await calendarStatus(calendarEnv);
   if (!status.connected) {
     return { ok: false, enabled: false, reason: status.reason ?? 'calendar_unavailable', slots: [] };
   }
-  const calendar = await calendarJobsForDate(env, input.date, bookingConfig.timeZone);
+  const calendar = await calendarJobsForDate(calendarEnv, input.date, timeZone);
   if (!calendar.ok) {
     return {
       ok: false,
@@ -149,7 +166,7 @@ export async function availabilityForDate(
   const availability = await calculateAvailability(
     {
       date: input.date,
-      timeZone: bookingConfig.timeZone,
+      timeZone,
       workdayStart: bookingConfig.workdayStart,
       workdayEnd: bookingConfig.workdayEnd,
       workdays: bookingConfig.workdays,
@@ -177,6 +194,8 @@ export async function availabilityForDate(
     date: input.date,
     durationMinutes,
     crewSize,
+    timeZone,
+    branchId,
     origin,
     destination: input.destination,
     availability,
@@ -207,6 +226,7 @@ export async function availabilityForRange(
     to: string;
     durationMinutes: number;
     destination: LatLng;
+    branchId?: BranchId;
     crewSize?: number;
     now?: Date;
     ignoreHoldId?: string;
@@ -215,12 +235,15 @@ export async function availabilityForRange(
 ): Promise<{ ok: true; timeZone: string; days: MonthAvailability[] } | { ok: false; reason: string; days: MonthAvailability[] }> {
   const empty = (reason: string): { ok: false; reason: string; days: MonthAvailability[] } => ({ ok: false, reason, days: [] });
   if (!bookingConfig.enabled) return empty('booking_not_enabled');
-  if (!googleConfigured(env)) return empty('calendar_not_configured');
+  const branchId = input.branchId ?? BRANCH_PENSACOLA;
+  const calendarEnv = await calendarEnvForBranchRecord(env, branchId);
+  const timeZone = branchConfig(branchId)?.timezone ?? calendarTimeZoneForBranch(branchId);
+  if (!calendarEnv || !googleConfigured(calendarEnv)) return empty('calendar_not_configured');
   const origin = parseLatLng(env.TRAVEL_ORIGIN);
   if (!origin) return empty('travel_origin_not_configured');
-  const status = await calendarStatus(env);
+  const status = await calendarStatus(calendarEnv);
   if (!status.connected) return empty(status.reason ?? 'calendar_unavailable');
-  const calendar = await calendarJobsForRange(env, input.from, input.to, bookingConfig.timeZone);
+  const calendar = await calendarJobsForRange(calendarEnv, input.from, input.to, timeZone);
   if (!calendar.ok) return empty(calendar.reason ?? 'calendar_unavailable');
   const bucket = bookingStore(env);
   if (!bucket) return empty('booking_store_not_configured');
@@ -233,7 +256,7 @@ export async function availabilityForRange(
   const jobsByDay = new Map<string, typeof calendar.jobs>();
   for (const job of calendar.jobs) {
     if (excludedEvents.has(job.id)) continue;
-    const key = localDateKey(job.start, bookingConfig.timeZone);
+    const key = localDateKey(job.start, timeZone);
     const list = jobsByDay.get(key) ?? [];
     list.push(job);
     jobsByDay.set(key, list);
@@ -291,7 +314,7 @@ export async function availabilityForRange(
     const availability = await calculateAvailability(
       {
         date,
-        timeZone: bookingConfig.timeZone,
+        timeZone,
         workdayStart: bookingConfig.workdayStart,
         workdayEnd: bookingConfig.workdayEnd,
         workdays: bookingConfig.workdays,
@@ -317,7 +340,7 @@ export async function availabilityForRange(
     let morningSlots = 0;
     let afternoonSlots = 0;
     for (const slot of availability.slots) {
-      const local = new Intl.DateTimeFormat('en-US', { timeZone: bookingConfig.timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(slot.start));
+      const local = new Intl.DateTimeFormat('en-US', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(slot.start));
       const [hour = 0, minute = 0] = local.split(':').map(Number);
       const minutes = hour * 60 + minute;
       if (minutes >= 7 * 60 && minutes <= 8 * 60 + 30) { morning = true; morningSlots += 1; }
@@ -336,19 +359,29 @@ export async function availabilityForRange(
       ...(availability.reason ? { reason: availability.reason } : {}),
     });
   }
-  return { ok: true, timeZone: bookingConfig.timeZone, days };
+  return { ok: true, timeZone, days };
 }
 
 export async function scheduleAvailabilityForRange(
   env: BookingEnv,
-  input: { from: string; to: string; durationMinutes: number; crewSize?: number; now?: Date },
+  input: {
+    from: string;
+    to: string;
+    durationMinutes: number;
+    branchId?: BranchId;
+    crewSize?: number;
+    now?: Date;
+  },
 ): Promise<{ ok: true; timeZone: string; days: MonthAvailability[] } | { ok: false; reason: string; days: MonthAvailability[] }> {
   const empty = (reason: string): { ok: false; reason: string; days: MonthAvailability[] } => ({ ok: false, reason, days: [] });
   if (!bookingConfig.enabled) return empty('booking_not_enabled');
-  if (!googleConfigured(env)) return empty('calendar_not_configured');
-  const status = await calendarStatus(env);
+  const branchId = input.branchId ?? BRANCH_PENSACOLA;
+  const calendarEnv = await calendarEnvForBranchRecord(env, branchId);
+  const timeZone = branchConfig(branchId)?.timezone ?? calendarTimeZoneForBranch(branchId);
+  if (!calendarEnv || !googleConfigured(calendarEnv)) return empty('calendar_not_configured');
+  const status = await calendarStatus(calendarEnv);
   if (!status.connected) return empty(status.reason ?? 'calendar_unavailable');
-  const calendar = await calendarJobsForRange(env, input.from, input.to, bookingConfig.timeZone);
+  const calendar = await calendarJobsForRange(calendarEnv, input.from, input.to, timeZone);
   if (!calendar.ok) return empty(calendar.reason ?? 'calendar_unavailable');
   const bucket = bookingStore(env);
   if (!bucket) return empty('booking_store_not_configured');
@@ -356,7 +389,7 @@ export async function scheduleAvailabilityForRange(
   for (let cursor = input.from; cursor <= input.to; cursor = new Date(Date.parse(cursor + 'T12:00:00Z') + 86_400_000).toISOString().slice(0, 10)) dates.push(cursor);
   const jobsByDay = new Map<string, typeof calendar.jobs>();
   for (const job of calendar.jobs) {
-    const key = localDateKey(job.start, bookingConfig.timeZone);
+    const key = localDateKey(job.start, timeZone);
     const list = jobsByDay.get(key) ?? [];
     list.push(job); jobsByDay.set(key, list);
   }
@@ -373,7 +406,7 @@ export async function scheduleAvailabilityForRange(
     const resources: BookingResourceWindow[] = toBookingResourceWindows(staff, { lat: 0, lng: 0 });
     const availability = calculateScheduleAvailability({
       date,
-      timeZone: bookingConfig.timeZone,
+      timeZone,
       workdayStart: bookingConfig.workdayStart,
       workdayEnd: bookingConfig.workdayEnd,
       workdays: bookingConfig.workdays,
@@ -390,7 +423,7 @@ export async function scheduleAvailabilityForRange(
     }, formatLocalTime);
     let morning = false, afternoon = false, morningSlots = 0, afternoonSlots = 0;
     for (const slot of availability.slots) {
-      const local = new Intl.DateTimeFormat('en-US', { timeZone: bookingConfig.timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(slot.start));
+      const local = new Intl.DateTimeFormat('en-US', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(slot.start));
       const [hour = 0, minute = 0] = local.split(':').map(Number);
       const minutes = hour * 60 + minute;
       if (minutes >= 7 * 60 && minutes <= 8 * 60 + 30) { morning = true; morningSlots += 1; }
@@ -398,5 +431,5 @@ export async function scheduleAvailabilityForRange(
     }
     days.push({ date, enabled: true, morningAvailable: morning, afternoonAvailable: afternoon, morningSlots, afternoonSlots, available: availability.available, known: true, slotCount: availability.slots.length });
   }
-  return { ok: true, timeZone: bookingConfig.timeZone, days };
+  return { ok: true, timeZone, days };
 }

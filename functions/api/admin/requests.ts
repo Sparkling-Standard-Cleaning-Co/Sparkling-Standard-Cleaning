@@ -10,6 +10,7 @@ import { createCustomer, getCustomer } from '../../../src/lib/admin/crm.ts';
 import type { BookingEnv } from '../../../src/lib/booking/service.ts';
 import { onRequestPost as bookingAdminPost } from '../booking-admin.ts';
 import { sendBookingEmail, type BookingEmailKind } from '../../../src/lib/forms/booking-email.ts';
+import { DEPARTMENT_ADDRESSES, readCommunicationSettings, sendOperationalNotification } from '../../../src/lib/admin/communications.ts';
 import { updateCalendarEvent } from '../../../src/lib/booking/google-calendar.ts';
 import {
   beginBookingCommitment,
@@ -137,30 +138,116 @@ function parsePayload(value: unknown): Record<string, unknown> {
   }
 }
 
-const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/Chicago',
-  weekday: 'long',
-  month: 'long',
-  day: 'numeric',
-  year: 'numeric',
-});
-const TIME_FORMAT = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/Chicago',
-  hour: 'numeric',
-  minute: '2-digit',
-});
+const BULK_OPERATIONS = ['approve', 'archive', 'restore', 'deny', 'mark_test', 'delete_test'] as const;
+type BulkOperation = (typeof BULK_OPERATIONS)[number];
 
-function dateLabel(value: unknown): string {
-  const date = new Date(String(value ?? ''));
-  return Number.isFinite(date.getTime()) ? DATE_FORMAT.format(date) : '';
+interface BulkRow extends Record<string, unknown> {
+  id: string;
+  appointment_id: string | null;
 }
 
-function timeLabel(start: unknown, end: unknown): string {
+async function bulkRow(
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  actor: AdminActor,
+  requestId: string,
+): Promise<BulkRow | null> {
+  const branch = scoped(actor, 'r.branch_id');
+  return (await db
+    .prepare(
+      `SELECT r.*, a.id AS appointment_id, a.status AS appointment_status
+       FROM booking_requests r LEFT JOIN appointments a ON a.booking_request_id = r.id
+       WHERE r.id = ?${branch.sql} LIMIT 1`,
+    )
+    .bind(requestId, ...branch.bind)
+    .first<BulkRow>()) ?? null;
+}
+
+async function bulkEligibility(
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  operation: BulkOperation,
+  row: BulkRow,
+): Promise<{ ok: boolean; error?: string }> {
+  const status = String(row.status ?? '');
+  const appointmentStatus = String(row.appointment_status ?? '');
+  const appointmentActive = ['pending', 'confirmed', 'in_progress'].includes(appointmentStatus);
+  const paid = String(row.payment_status ?? 'unpaid').startsWith('paid');
+  if (operation === 'archive') {
+    if (row.archived_at) return { ok: true };
+    if (status === 'pending' || status === 'confirmed' || appointmentActive) {
+      return { ok: false, error: 'active_request_must_close_or_cancel' };
+    }
+    return { ok: true };
+  }
+  if (operation === 'restore') return { ok: true };
+  if (operation === 'approve') {
+    if (row.archived_at || row.closed_at || status !== 'pending') {
+      return { ok: false, error: 'request_not_approvable' };
+    }
+    return { ok: true };
+  }
+  if (operation === 'deny') {
+    if (row.archived_at || row.closed_at) return { ok: false, error: 'request_already_closed' };
+    if (status !== 'pending' || row.appointment_id) return { ok: false, error: 'request_not_deniable' };
+    if (paid || row.paid_at) return { ok: false, error: 'paid_request_requires_refund_review' };
+    return { ok: true };
+  }
+  if (operation === 'mark_test') {
+    if (/^RECURRING-rec_/i.test(String(row.quote_reference ?? ''))) {
+      return { ok: false, error: 'recurring_plan_records_are_not_test_data' };
+    }
+    return { ok: true };
+  }
+  if (Number(row.is_test) !== 1) return { ok: false, error: 'not_marked_test' };
+  if (paid || row.paid_at || Number(row.payment_amount_cents ?? 0) > 0) {
+    return { ok: false, error: 'financial_record_retained' };
+  }
+  if (row.appointment_id || status !== 'pending') {
+    return { ok: false, error: 'operational_record_retained' };
+  }
+  const reference = String(row.quote_reference ?? '');
+  const linked = await Promise.all([
+    db.prepare('SELECT COUNT(*) AS n FROM signing_requests WHERE booking_reference = ?').bind(reference).first<{ n: number }>(),
+    db.prepare('SELECT COUNT(*) AS n FROM invoices WHERE customer_id = ?').bind(String(row.customer_id ?? '')).first<{ n: number }>(),
+    db.prepare('SELECT COUNT(*) AS n FROM payment_events WHERE quote_reference = ?').bind(reference).first<{ n: number }>().catch(() => null),
+    db.prepare('SELECT COUNT(*) AS n FROM booking_commitments WHERE request_id = ?').bind(String(row.id)).first<{ n: number }>().catch(() => null),
+  ]);
+  if (linked.some((entry) => Number(entry?.n ?? 0) > 0)) {
+    return { ok: false, error: 'linked_evidence_retained' };
+  }
+  return { ok: true };
+}
+
+function branchTimeZone(branchId: unknown): string {
+  return String(branchId ?? '') === 'branch_tampa' ? 'America/New_York' : 'America/Chicago';
+}
+
+function branchZoneLabel(branchId: unknown): string {
+  return String(branchId ?? '') === 'branch_tampa' ? 'Eastern' : 'Central';
+}
+
+function dateLabel(value: unknown, branchId?: unknown): string {
+  const date = new Date(String(value ?? ''));
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: branchTimeZone(branchId),
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
+
+function timeLabel(start: unknown, end: unknown, branchId?: unknown): string {
   const first = new Date(String(start ?? ''));
   const second = new Date(String(end ?? ''));
   if (!Number.isFinite(first.getTime())) return '';
-  if (!Number.isFinite(second.getTime())) return TIME_FORMAT.format(first);
-  return `${TIME_FORMAT.format(first)} – ${TIME_FORMAT.format(second)} Central`;
+  const format = new Intl.DateTimeFormat('en-US', {
+    timeZone: branchTimeZone(branchId),
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  if (!Number.isFinite(second.getTime())) return format.format(first);
+  return `${format.format(first)} – ${format.format(second)} ${branchZoneLabel(branchId)}`;
 }
 
 function serviceLabel(payload: Record<string, unknown>): string {
@@ -238,11 +325,15 @@ async function sendForRequest(
   const address = text(row.line1 ? [row.line1, row.city, row.state, row.postal_code].filter(Boolean).join(', ') : payloadAddress(payload));
   const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
   const email = await customerEmail(db, (row.customer_id as string | null) ?? null);
+  const communication = await readCommunicationSettings(db).catch(() => null);
+  const bookingReplyTo = communication
+    ? DEPARTMENT_ADDRESSES[communication.settings.replyTo.bookingConfirmations]
+    : context.env.RESEND_REPLY_TO;
   const outcome = await sendBookingEmail(
     {
       ...(context.env.RESEND_API_KEY ? { RESEND_API_KEY: context.env.RESEND_API_KEY } : {}),
       ...(context.env.RESEND_FROM_EMAIL ? { RESEND_FROM_EMAIL: context.env.RESEND_FROM_EMAIL } : {}),
-      ...(context.env.RESEND_REPLY_TO ? { RESEND_REPLY_TO: context.env.RESEND_REPLY_TO } : {}),
+      ...(bookingReplyTo ? { RESEND_REPLY_TO: bookingReplyTo } : {}),
       PUBLIC_SITE_URL: context.env.PUBLIC_SITE_URL ?? new URL(context.request.url).origin,
     },
     email,
@@ -250,8 +341,8 @@ async function sendForRequest(
       kind,
       reference: String(row.quote_reference ?? row.id ?? ''),
       ...(customerName ? { customerName } : {}),
-      dateLabel: overrides.dateLabel ?? dateLabel(row.start_at),
-      timeLabel: overrides.timeLabel ?? timeLabel(row.start_at, row.end_at),
+      dateLabel: overrides.dateLabel ?? dateLabel(row.start_at, row.branch_id),
+      timeLabel: overrides.timeLabel ?? timeLabel(row.start_at, row.end_at, row.branch_id),
       address,
       ...(serviceLabel(payload) ? { service: serviceLabel(payload) } : {}),
       ...(overrides.reason ? { reason: overrides.reason } : {}),
@@ -268,6 +359,29 @@ async function sendForRequest(
     outcome,
     actorId: actor.id,
   });
+  const eventKey = kind === 'confirmation' ? 'booking_confirmation' : 'booking_change';
+  await sendOperationalNotification(db, context.env, {
+    eventKey,
+    subject: `${kind === 'confirmation' ? 'Booking confirmed' : `Booking ${kind}`} - ${String(row.quote_reference ?? row.id ?? '')}`,
+    text: [
+      `Action: ${kind}`,
+      `Reference: ${String(row.quote_reference ?? row.id ?? '')}`,
+      `Customer: ${customerName || 'not recorded'}`,
+      `Customer email: ${email || 'not recorded'}`,
+      `Property: ${address || 'not recorded'}`,
+      `Date: ${overrides.dateLabel ?? dateLabel(row.start_at, row.branch_id)}`,
+      `Time: ${overrides.timeLabel ?? timeLabel(row.start_at, row.end_at, row.branch_id)}`,
+      `Service: ${serviceLabel(payload) || 'not recorded'}`,
+      ...(overrides.reason ? [`Reason: ${overrides.reason}`] : []),
+      `Customer email outcome: ${outcome.status}`,
+      '',
+      'Open Operations -> Calendar & Requests to review the booking.',
+      'This internal notice does not include the customer secure signing link.',
+    ].join('\n'),
+    idempotencyKey: `booking-${String(row.id ?? '')}-${kind}-${Date.now()}`,
+    relatedType: 'booking_request',
+    ...(row.id ? { relatedId: String(row.id) } : {}),
+  }).catch(() => undefined);
   return { ...outcome, recipient: Boolean(email) };
 }
 
@@ -283,6 +397,9 @@ async function requestRow(
               p.label AS property_label, p.line1, p.city, p.state, p.postal_code, p.access_notes,
               a.id AS appointment_id, a.status AS appointment_status, a.reference AS appointment_reference,
               a.start_at AS appointment_start, a.end_at AS appointment_end,
+              (SELECT GROUP_CONCAT(tm.display_name, ', ')
+                 FROM appointment_resources ar JOIN team_members tm ON tm.id = ar.team_member_id
+                WHERE ar.appointment_id = a.id) AS assigned_names,
               (SELECT provider_event_id FROM calendar_links cl WHERE cl.appointment_id = a.id
                ORDER BY cl.last_synced_at DESC LIMIT 1) AS calendar_event_id
        FROM booking_requests r
@@ -308,6 +425,13 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
 
     const requestScope = scoped(actor, 'r.branch_id');
     const appointmentScope = scoped(actor, 'a.branch_id');
+    const now = new Date();
+    const appointmentFrom =
+      text(url.searchParams.get('from'), 30) ||
+      new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10) + 'T00:00:00.000Z';
+    const appointmentTo =
+      text(url.searchParams.get('to'), 30) ||
+      new Date(now.getTime() + 61 * 86_400_000).toISOString().slice(0, 10) + 'T23:59:59.999Z';
     const leadScope = scoped(actor, 'l.branch_id');
     const view = text(url.searchParams.get('view') ?? 'actionable', 20) || 'actionable';
     const query = text(url.searchParams.get('q'), 100);
@@ -333,11 +457,18 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
           OR p.line1 LIKE ? OR p.city LIKE ? OR p.postal_code LIKE ? OR r.payload_json LIKE ?)`
       : '';
     const searchBind = query ? Array.from({ length: 7 }, () => `%${query}%`) : [];
+    const bookingColumns = await db
+      .prepare('PRAGMA table_info(booking_requests)')
+      .all<{ name: string }>()
+      .catch(() => ({ results: [] as Array<{ name: string }> }));
+    const isTestSelect = (bookingColumns.results ?? []).some((row) => row.name === 'is_test')
+      ? 'r.is_test'
+      : '0 AS is_test';
     const [requests, appointments, reservationLeads] = await Promise.all([
       db.prepare(
         `SELECT r.id, r.customer_id, r.status, r.quote_reference, r.requested_date, r.start_at, r.end_at,
                 r.duration_minutes, r.payload_json, r.created_at, r.closed_at, r.closed_reason,
-                r.archived_at, r.duplicate_of_request_id, r.previous_status,
+                r.archived_at, r.duplicate_of_request_id, r.previous_status, ${isTestSelect},
                 r.payment_status, r.payment_reference, r.payment_amount_cents, r.paid_at,
                 c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
                 a.id AS appointment_id, a.status AS appointment_status,
@@ -352,13 +483,26 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       ).bind(...requestScope.bind, ...searchBind).all(),
       db.prepare(
         `SELECT a.id, a.status, a.start_at, a.end_at, a.reference, a.crew_size, a.source,
-                c.first_name, c.last_name, p.line1, p.city
+                a.duration_minutes, a.notes, a.customer_id, a.property_id, a.booking_request_id,
+                a.branch_id, a.recurring_plan_id, c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
+                br.payload_json AS request_payload, br.quote_reference,
+                (SELECT o.id FROM recurring_occurrences o
+                  WHERE o.appointment_id = a.id AND o.status = 'scheduled'
+                  ORDER BY o.occurrence_date LIMIT 1) AS recurring_occurrence_id,
+                (SELECT o.occurrence_date FROM recurring_occurrences o
+                  WHERE o.appointment_id = a.id AND o.status = 'scheduled'
+                  ORDER BY o.occurrence_date LIMIT 1) AS recurring_occurrence_date,
+                (SELECT GROUP_CONCAT(tm.display_name, ', ')
+                   FROM appointment_resources ar
+                   JOIN team_members tm ON tm.id = ar.team_member_id
+                  WHERE ar.appointment_id = a.id) AS assigned_names
          FROM appointments a
          LEFT JOIN customers c ON c.id = a.customer_id
          LEFT JOIN properties p ON p.id = a.property_id
-         WHERE 1 = 1 ${appointmentScope.sql}
-         ORDER BY a.start_at ASC LIMIT 200`,
-      ).bind(...appointmentScope.bind).all(),
+         LEFT JOIN booking_requests br ON br.id = a.booking_request_id
+         WHERE a.start_at >= ? AND a.start_at <= ? ${appointmentScope.sql}
+         ORDER BY a.start_at ASC LIMIT 400`,
+      ).bind(appointmentFrom, appointmentTo, ...appointmentScope.bind).all(),
       db.prepare(
         `SELECT l.id, l.status, l.quote_reference, l.created_at, c.first_name, c.last_name
          FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
@@ -382,7 +526,8 @@ async function detail(
   const row = await requestRow(db, actor, id);
   if (!row) throw new AdminAuthError(404, 'request_not_found');
   const customerId = (row.customer_id as string | null) ?? '';
-  const [contacts, properties, notifications, auditRows, pending] = await Promise.all([
+  const appointmentId = String(row.appointment_id ?? '');
+  const [contacts, properties, notifications, auditRows, pending, invoiceRow] = await Promise.all([
     customerId
       ? db.prepare('SELECT kind, value, is_primary FROM customer_contacts WHERE customer_id = ?').bind(customerId).all()
       : Promise.resolve({ results: [] }),
@@ -411,6 +556,15 @@ async function detail(
       )
       .bind(id, ...scoped(actor, 'r.branch_id').bind)
       .all(),
+    db
+      .prepare(
+        `SELECT id, number, status, total_cents, balance_cents, due_date, created_at
+         FROM invoices
+         WHERE booking_request_id = ?${appointmentId ? ' OR appointment_id = ?' : ''}
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .bind(...(appointmentId ? [id, appointmentId] : [id]))
+      .first<Record<string, unknown>>(),
   ]);
   const payload = parsePayload(row.payload_json);
   const location = text(row.line1 ? [row.line1, row.city, row.state, row.postal_code].filter(Boolean).join(', ') : payloadAddress(payload)).toLowerCase();
@@ -439,6 +593,7 @@ async function detail(
     audit: auditRows.results ?? [],
     possibleDuplicates,
     email: await customerEmail(db, customerId || null),
+    invoice: invoiceRow,
   };
 }
 
@@ -450,6 +605,195 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     requireCsrf(context.request, actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = text(body.action, 40);
+    if (action === 'bulk' || action === 'bulk_preview') {
+      const operation = text(body.operation, 40) as BulkOperation;
+      const ids = Array.isArray(body.requestIds)
+        ? body.requestIds
+            .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+            .map((value) => value.trim())
+            .slice(0, 100)
+        : [];
+      if (ids.length === 0) return json({ ok: false, error: 'bulk_selection_required' }, 400);
+      if (!BULK_OPERATIONS.includes(operation)) {
+        return json({ ok: false, error: 'bulk_operation_invalid' }, 400);
+      }
+      if ((operation === 'mark_test' || operation === 'delete_test') && actor.role !== 'owner') {
+        return json({ ok: false, error: 'owner_required' }, 403);
+      }
+      if (operation === 'mark_test' || operation === 'delete_test') {
+        const columns = await db
+          .prepare('PRAGMA table_info(booking_requests)')
+          .all<{ name: string }>()
+          .catch(() => ({ results: [] as Array<{ name: string }> }));
+        if (!(columns.results ?? []).some((row) => row.name === 'is_test')) {
+          return json({ ok: false, error: 'test_request_migration_required' }, 503);
+        }
+      }
+      const preview: Array<{ id: string; ok: boolean; error?: string }> = [];
+      for (const requestId of ids) {
+        const row = await bulkRow(db, actor, requestId);
+        if (!row) {
+          preview.push({ id: requestId, ok: false, error: 'request_not_found' });
+          continue;
+        }
+        preview.push({ id: requestId, ...(await bulkEligibility(db, operation, row)) });
+      }
+      const eligibleCount = preview.filter((entry) => entry.ok).length;
+      if (action === 'bulk_preview') {
+        return json({
+          ok: true,
+          operation,
+          total: preview.length,
+          eligible: eligibleCount,
+          ineligible: preview.length - eligibleCount,
+          results: preview,
+        });
+      }
+      if (body.confirm !== true) return json({ ok: false, error: 'bulk_confirmation_required' }, 400);
+      const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+      for (const requestId of ids) {
+        try {
+          const row = await bulkRow(db, actor, requestId);
+          if (!row) {
+            results.push({ id: requestId, ok: false, error: 'request_not_found' });
+            continue;
+          }
+          const eligible = await bulkEligibility(db, operation, row);
+          if (!eligible.ok) {
+            results.push({ id: requestId, ok: false, ...(eligible.error ? { error: eligible.error } : {}) });
+            continue;
+          }
+          if (operation === 'archive') {
+            if (!row.archived_at) {
+              await db
+                .prepare(
+                  `UPDATE booking_requests SET archived_at = CURRENT_TIMESTAMP,
+                     previous_status = status, archived_by_admin_user_id = ?, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?`,
+                )
+                .bind(actor.id, requestId)
+                .run();
+              await audit(db, {
+                actorUserId: actor.id,
+                action: 'request.bulk_archived',
+                entityType: 'booking_request',
+                entityId: requestId,
+              });
+            }
+            results.push({ id: requestId, ok: true });
+            continue;
+          }
+          if (operation === 'restore') {
+            if (row.archived_at) {
+              await db
+                .prepare('UPDATE booking_requests SET archived_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+                .bind(requestId)
+                .run();
+              await audit(db, {
+                actorUserId: actor.id,
+                action: 'request.bulk_restored',
+                entityType: 'booking_request',
+                entityId: requestId,
+              });
+            }
+            results.push({ id: requestId, ok: true });
+            continue;
+          }
+          if (operation === 'approve') {
+            const innerHeaders = new Headers({
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Origin: new URL(context.request.url).origin,
+            });
+            const cookie = context.request.headers.get('Cookie');
+            if (cookie) innerHeaders.set('Cookie', cookie);
+            const csrfToken = context.request.headers.get('X-CSRF-Token');
+            if (csrfToken) innerHeaders.set('X-CSRF-Token', csrfToken);
+            const innerResponse = await onRequestPost({
+              request: new Request(context.request.url, {
+                method: 'POST',
+                headers: innerHeaders,
+                body: JSON.stringify({ action: 'confirm', requestId, notify: false }),
+              }),
+              env: context.env,
+            });
+            const innerData = (await innerResponse.json().catch(() => ({}))) as Record<string, unknown>;
+            if (innerResponse.ok && innerData.ok) {
+              results.push({ id: requestId, ok: true });
+            } else {
+              results.push({
+                id: requestId,
+                ok: false,
+                error: String(innerData.error ?? `approval_failed_${innerResponse.status}`).slice(0, 120),
+              });
+            }
+            continue;
+          }
+          if (operation === 'deny') {
+            await db
+              .prepare(
+                `UPDATE booking_requests SET status = 'declined', closed_at = CURRENT_TIMESTAMP,
+                   closed_reason = ?, previous_status = 'pending', updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+              )
+              .bind('Declined by bulk action (no customer email sent)', requestId)
+              .run();
+            await audit(db, {
+              actorUserId: actor.id,
+              action: 'request.bulk_declined',
+              entityType: 'booking_request',
+              entityId: requestId,
+            });
+            results.push({ id: requestId, ok: true });
+            continue;
+          }
+          if (operation === 'mark_test') {
+            if (Number(row.is_test) !== 1) {
+              await db
+                .prepare(
+                  `UPDATE booking_requests SET is_test = 1, test_marked_at = CURRENT_TIMESTAMP,
+                     test_marked_by_admin_user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+                )
+                .bind(actor.id, requestId)
+                .run();
+              await audit(db, {
+                actorUserId: actor.id,
+                action: 'request.marked_test',
+                entityType: 'booking_request',
+                entityId: requestId,
+              });
+            }
+            results.push({ id: requestId, ok: true });
+            continue;
+          }
+          const reference = String(row.quote_reference ?? '');
+          await db.prepare('DELETE FROM booking_holds WHERE request_id = ?').bind(requestId).run().catch(() => undefined);
+          await db.prepare('DELETE FROM booking_requests WHERE id = ?').bind(requestId).run();
+          await audit(db, {
+            actorUserId: actor.id,
+            action: 'request.test_record_deleted',
+            entityType: 'booking_request',
+            entityId: requestId,
+            detail: `reference=${reference}`,
+          });
+          results.push({ id: requestId, ok: true });
+        } catch (error) {
+          results.push({
+            id: requestId,
+            ok: false,
+            error: error instanceof Error ? error.message.slice(0, 120) : 'bulk_item_failed',
+          });
+        }
+      }
+      return json({
+        ok: true,
+        operation,
+        total: ids.length,
+        succeeded: results.filter((entry) => entry.ok).length,
+        failed: results.filter((entry) => !entry.ok).length,
+        results,
+      });
+    }
     const requestId = text(body.requestId, 120);
     if (!requestId) return json({ ok: false, error: 'request_required' }, 400);
     const row = await requestRow(db, actor, requestId);
@@ -598,9 +942,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         try {
           const result = await confirmManualBooking(context.env, db, actor, requestId, teamMemberIds);
           const confirmedRow = await requestRow(db, actor, requestId);
-          const email = confirmedRow
-            ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
-            : { status: 'skipped_no_email', recipient: false };
+          const email = body.notify === false
+            ? { status: 'skipped_no_email', recipient: false }
+            : confirmedRow
+              ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
+              : { status: 'skipped_no_email', recipient: false };
           return json({ ok: true, ...result, email });
         } catch (error) {
           return json(
@@ -656,9 +1002,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           eventId,
         ).catch(() => null);
         const confirmedRow = await requestRow(db, actor, requestId);
-        const email = confirmedRow
-          ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
-          : { status: 'skipped_no_email', recipient: false };
+        const email = body.notify === false
+          ? { status: 'skipped_no_email', recipient: false }
+          : confirmedRow
+            ? await sendForRequest(context, db, actor, confirmedRow, 'confirmation')
+            : { status: 'skipped_no_email', recipient: false };
         return json({
           ok: true,
           ...result,
@@ -762,8 +1110,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             .bind(result.start, result.end, requestId)
             .run();
           const email = await sendForRequest(context, db, actor, row, 'proposal', {
-            dateLabel: dateLabel(result.start),
-            timeLabel: timeLabel(result.start, result.end),
+            dateLabel: dateLabel(result.start, row.branch_id),
+            timeLabel: timeLabel(result.start, result.end, row.branch_id),
           });
           return json({ ok: true, slot: { start: result.start, end: result.end }, email });
         } catch (error) {
@@ -806,8 +1154,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         detail: `${date} ${newStart} - ${newEnd}`,
       });
       const email = await sendForRequest(context, db, actor, row, 'proposal', {
-        dateLabel: dateLabel(newStart),
-        timeLabel: timeLabel(newStart, newEnd),
+        dateLabel: dateLabel(newStart, row.branch_id),
+        timeLabel: timeLabel(newStart, newEnd, row.branch_id),
       });
       return json({ ok: true, slot, email });
     }
@@ -845,10 +1193,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
               ? { teamMemberIds: body.teamMemberIds.map((value) => String(value)).filter(Boolean) }
               : {}),
           });
-          const email = await sendForRequest(context, db, actor, row, 'reschedule', {
-            dateLabel: dateLabel(result.start),
-            timeLabel: timeLabel(result.start, result.end),
-          });
+          const email = body.notify === false
+            ? { status: 'skipped_not_requested', recipient: false }
+            : await sendForRequest(context, db, actor, row, 'reschedule', {
+                dateLabel: dateLabel(result.start, row.branch_id),
+                timeLabel: timeLabel(result.start, result.end, row.branch_id),
+              });
           return json({ ok: true, slot: { start: result.start, end: result.end }, email });
         } catch (error) {
           return json(
@@ -921,7 +1271,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           await updateCalendarEvent(context.env, eventId, {
             start: String(row.start_at),
             end: String(row.end_at),
-            timeZone: 'America/Chicago',
+            timeZone: branchTimeZone(row.branch_id),
           }).catch(() => undefined);
         }
         return json({ ok: false, error: 'reschedule_recovery_required' }, 502);
@@ -933,10 +1283,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         entityId: requestId,
         detail: `${date} ${newStart} - ${newEnd}`,
       });
-      const email = await sendForRequest(context, db, actor, row, 'reschedule', {
-        dateLabel: dateLabel(newStart),
-        timeLabel: timeLabel(newStart, newEnd),
-      });
+      const email = body.notify === false
+        ? { status: 'skipped_not_requested', recipient: false }
+        : await sendForRequest(context, db, actor, row, 'reschedule', {
+            dateLabel: dateLabel(newStart, row.branch_id),
+            timeLabel: timeLabel(newStart, newEnd, row.branch_id),
+          });
       return json({ ok: true, slot, email });
     }
 

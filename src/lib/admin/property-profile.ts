@@ -20,6 +20,9 @@ export interface NormalizedProperty {
   city: string;
   state: string;
   postalCode: string;
+  latitude: number | null;
+  longitude: number | null;
+  precision: 'exact' | 'street' | 'approximate' | 'zip';
   accessNotes: string;
   parkingNotes: string;
   propertyType: string;
@@ -40,6 +43,13 @@ function text(value: unknown, max = 500): string {
 
 function flag(value: unknown): boolean {
   return value === true || value === 1 || value === '1' || value === 'yes';
+}
+
+function coordinate(value: unknown, min: number, max: number): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) return null;
+  return parsed;
 }
 
 function optionalInteger(
@@ -79,14 +89,31 @@ export function normalizePropertyInput(
   if (postalCode && !/^\d{5}(?:-\d{4})?$/.test(postalCode)) {
     throw new AdminAuthError(400, 'property_postal_code_invalid');
   }
+  const rawLatitude = coordinate(input.latitude, -90, 90);
+  const rawLongitude = coordinate(input.longitude, -180, 180);
+  if (
+    (input.latitude !== undefined && input.latitude !== '' && rawLatitude === null) ||
+    (input.longitude !== undefined && input.longitude !== '' && rawLongitude === null)
+  ) {
+    throw new AdminAuthError(400, 'property_coordinates_invalid');
+  }
+  const hasCoordinates =
+    rawLatitude !== null && rawLongitude !== null && !(rawLatitude === 0 && rawLongitude === 0);
+  const requestedPrecision = text(input.precision, 20);
+  const precision = ['exact', 'street', 'approximate', 'zip'].includes(requestedPrecision)
+    ? (requestedPrecision as 'exact' | 'street' | 'approximate' | 'zip')
+    : 'exact';
 
   return {
     label: text(input.label ?? input.propertyLabel, 80) || 'Service property',
     line1,
-    line2: text(input.line2 ?? input.addressLine2, 120),
+    line2: text(input.line2 ?? input.addressLine2 ?? input.addressUnit, 120),
     city: text(input.city, 80),
     state,
     postalCode,
+    latitude: hasCoordinates ? rawLatitude : null,
+    longitude: hasCoordinates ? rawLongitude : null,
+    precision,
     accessNotes: text(input.accessNotes ?? input.access_notes, 1000),
     parkingNotes: text(input.parkingNotes ?? input.parking_notes, 1000),
     propertyType,

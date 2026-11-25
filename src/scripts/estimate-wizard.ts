@@ -343,6 +343,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
   let bookingCalendar: BookingCalendarHandle | null = null;
   let bookingFinalizedKey = '';
   let bookingFinalizeNote = '';
+  let bookingFinalizedStatus = '';
 
   let currentStep = 1;
   let location: ConfirmedLocation | null = null;
@@ -378,10 +379,16 @@ function initEstimateWizard(form: HTMLFormElement): void {
   }
 
   function stackingWithSupport(): boolean {
-    return (
-      appliedPromotion?.supportiveStackable === true &&
-      latestResult?.pricing.discount?.source === 'supportive'
-    );
+    // Benefits are scoped by charge line. A first-visit promotion and the
+    // ongoing Community Support rate are independent, never compounded on the
+    // same service line.
+    return false;
+  }
+
+  function ongoingDiscount(result: EstimateResult) {
+    return result.ongoing?.pricing.discounts.find(
+      (discount) => discount.source === 'supportive',
+    ) ?? result.ongoing?.pricing.discounts[0] ?? null;
   }
 
   function winningPromotion(): AppliedPromotion | null {
@@ -483,7 +490,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     );
     const submission = submissionAddress();
     return {
-      serviceType: radioValue('serviceType') as ServiceType | undefined,
+      serviceType: currentServiceType() as ServiceType | undefined,
       propertyType: textValue('propertyType') as EstimateInput['propertyType'],
       squareFeet: numberValue('squareFeet'),
       bedrooms: numberValue('bedrooms'),
@@ -549,6 +556,52 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return result.ongoing ? 'First Visit — Deep Cleaning' : 'Estimated Price';
   }
 
+  function updateRecurringDeepPricing(result: EstimateResult): void {
+    const block = form.querySelector<HTMLElement>('[data-recurring-deep-pricing]');
+    if (!block) return;
+    const firstEl = block.querySelector<HTMLElement>('[data-recurring-deep-first]');
+    const rhythmEl = block.querySelector<HTMLElement>('[data-recurring-deep-rhythm]');
+    const ongoingEl = block.querySelector<HTMLElement>('[data-recurring-deep-ongoing]');
+    const savingEl = block.querySelector<HTMLElement>('[data-recurring-deep-saving]');
+    if (!requiresInitialDeepClean()) {
+      block.hidden = true;
+      if (firstEl) firstEl.textContent = 'calculated after your home details';
+      if (rhythmEl) rhythmEl.textContent = 'maintenance';
+      if (ongoingEl) ongoingEl.textContent = 'calculated after your home details';
+      if (savingEl) savingEl.hidden = true;
+      return;
+    }
+    block.hidden = false;
+    if (!result.ongoing || result.status !== 'estimated') {
+      if (firstEl) firstEl.textContent = 'calculated after your home details';
+      if (rhythmEl) {
+        const current = textValue('frequency');
+        const rhythm = current && current in FREQUENCY_RHYTHMS
+          ? FREQUENCY_RHYTHMS[current as keyof typeof FREQUENCY_RHYTHMS]
+          : 'maintenance';
+        rhythmEl.textContent = `${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)}`;
+      }
+      if (ongoingEl) ongoingEl.textContent = 'calculated after your home details';
+      if (savingEl) savingEl.hidden = true;
+      return;
+    }
+    const first = latestQuote?.amount ?? result.expectedPrice ?? result.low;
+    if (firstEl) firstEl.textContent = typeof first === 'number' ? formatUsd(first) : 'calculated after your home details';
+    if (rhythmEl) {
+      const rhythm = FREQUENCY_RHYTHMS[result.ongoing.frequency] ?? result.ongoing.frequency;
+      rhythmEl.textContent = `${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)}`;
+    }
+    if (ongoingEl) ongoingEl.textContent = formatUsd(result.ongoing.perVisitPrice);
+    if (savingEl) {
+      const allocation = ongoingDiscount(result);
+      savingEl.hidden = !allocation;
+      const savings = Math.max(0, result.ongoing.regularPerVisitPrice - result.ongoing.perVisitPrice);
+      savingEl.textContent = allocation
+        ? `${allocation.label}: -${formatUsd(savings, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular recurring rate.`
+        : '';
+    }
+  }
+
   function recalc(): EstimateResult {
     const input = gatherInput();
     const result = calculateEstimate(input, buildContext());
@@ -563,6 +616,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
             destinationConfirmed: location !== null,
           })
         : null;
+    updateRecurringDeepPricing(result);
     discountQuoteChanged();
     renderResult(result);
     renderAddonPrices(result);
@@ -667,7 +721,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const ongoing = result.ongoing;
         if (ongoing) {
           liveOngoing.hidden = false;
-          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are ${formatUsd(ongoing.perVisitPrice)} each.`;
+          const allocation = ongoingDiscount(result);
+          const savings = Math.max(0, ongoing.regularPerVisitPrice - ongoing.perVisitPrice);
+          const allocationCopy = allocation
+            ? ` ${allocation.label}: -${formatUsd(savings, { forceCents: true })} off the ${formatUsd(ongoing.regularPerVisitPrice, { forceCents: true })} regular rate.`
+            : '';
+          liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are ${formatUsd(ongoing.perVisitPrice)} each.${allocationCopy}`;
         } else {
           liveOngoing.hidden = true;
           liveOngoing.textContent = '';
@@ -734,8 +793,17 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
   }
 
-  function currentServiceType(): string | undefined {
+  function baseServiceType(): string | undefined {
     return radioValue('serviceType');
+  }
+
+  function deepCleaningSelected(): boolean {
+    return form.querySelector<HTMLInputElement>('[data-deep-cleaning-input]')?.checked === true;
+  }
+
+  function currentServiceType(): string | undefined {
+    const base = baseServiceType();
+    return base === 'standard' && deepCleaningSelected() ? 'deep' : base;
   }
 
   // ── Transparent add-on prices (from the SAME breakdown as the total) ──────
@@ -908,7 +976,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       result.status === 'custom_confirmation_required' &&
       result.addons.some((addon) => addon.customQuote);
     if (result.status !== 'estimated' && !partial) return [];
-    const tax = taxPresentationForService(radioValue('serviceType'));
+    const tax = taxPresentationForService(currentServiceType());
     const lines: Array<{ label: string; value: string; strong?: boolean; detail?: string; emphasis?: 'saving' | 'tender' }> = [];
     const firstVisit = Boolean(result.ongoing);
     const winner = winningPromotion();
@@ -916,7 +984,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       lines.push({ label: 'Minimum visit price', value: formatUsd(p.basePrice) });
     } else {
       lines.push({
-        label: firstVisit ? 'True Deep Cleaning Price' : 'Base cleaning',
+        label: firstVisit ? 'Initial Deep Cleaning (regular price)' : 'Base cleaning',
         value: formatUsd(p.basePrice, { forceCents: true }),
       });
     }
@@ -1268,7 +1336,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const rhythm =
           FREQUENCY_RHYTHMS[result.ongoing.frequency] ?? result.ongoing.frequency;
         reservationOngoing.hidden = false;
-        reservationOngoing.textContent = `${formatUsd(result.ongoing.perVisitPrice)} — ${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)} Thereafter`;
+        const allocation = ongoingDiscount(result);
+        const regular = formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true });
+        const rate = formatUsd(result.ongoing.perVisitPrice, { forceCents: true });
+        const savings = Math.max(0, result.ongoing.regularPerVisitPrice - result.ongoing.perVisitPrice);
+        const allocationCopy = allocation
+          ? ` · ${allocation.label}: -${formatUsd(savings, { forceCents: true })} · Your rate: ${rate} per ${rhythm} visit (regular ${regular})`
+          : ` · ${rate} per ${rhythm} visit`;
+        reservationOngoing.textContent = `Recurring maintenance${allocationCopy}`;
       } else {
         reservationOngoing.hidden = true;
         reservationOngoing.textContent = '';
@@ -1319,6 +1394,15 @@ function initEstimateWizard(form: HTMLFormElement): void {
             'Ongoing visits',
             `${formatUsd(result.ongoing.perVisitPrice)} per ${FREQUENCY_RHYTHMS[result.ongoing.frequency]} visit`,
           );
+          const allocation = ongoingDiscount(result);
+          if (allocation) {
+            const savings = Math.max(0, result.ongoing.regularPerVisitPrice - result.ongoing.perVisitPrice);
+            addSummaryRow(
+              cleaningRows,
+              'Recurring benefit',
+              `${allocation.label}: -${formatUsd(savings, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular rate`,
+            );
+          }
         }
         const homeParts = [
           input.propertyType ? input.propertyType.charAt(0).toUpperCase() + input.propertyType.slice(1) : '',
@@ -1849,7 +1933,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
   // ── Conditional fields and owner policies ────────────────────────────────
   function requiresInitialDeepClean(): boolean {
-    return radioValue('serviceType') === 'standard' && RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
+    return baseServiceType() === 'standard' && !deepCleaningSelected() && RECURRING_FREQUENCIES.has(textValue('frequency') ?? '');
   }
 
   /**
@@ -1875,7 +1959,21 @@ function initEstimateWizard(form: HTMLFormElement): void {
 
     const frequencyField = form.querySelector<HTMLElement>('[data-frequency-field]');
     const frequencySelect = form.querySelector<HTMLSelectElement>('#est-frequency');
-    const asksFrequency = !service || serviceAsksFrequency(service);
+    const deepField = form.querySelector<HTMLElement>('[data-deep-cleaning]');
+    const deepInput = form.querySelector<HTMLInputElement>('[data-deep-cleaning-input]');
+    const oneTimeNote = form.querySelector<HTMLElement>('[data-one-time-note]');
+    const frequencyValue = textValue('frequency') ?? '';
+    const deepChosen = deepCleaningSelected();
+    const moveCleaning = service === 'move_in_out';
+    const asksFrequency = !service || (serviceAsksFrequency(service) && !moveCleaning && !deepChosen);
+    if (deepField) {
+      // Never offer the optional reset before the customer has selected a
+      // frequency. Recurring arrangements receive the required first-visit
+      // Deep Cleaning notice instead of this optional checkbox.
+      const deepAvailable = service === 'standard' && (deepChosen || frequencyValue === 'one_time');
+      deepField.hidden = !deepAvailable;
+      if (!deepAvailable && deepInput) deepInput.checked = false;
+    }
     if (frequencyField) {
       frequencyField.hidden = !asksFrequency;
     }
@@ -1886,6 +1984,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         clearFieldError(frequencySelect);
       }
     }
+    if (oneTimeNote) oneTimeNote.hidden = !(moveCleaning || deepChosen);
 
     const deepRequired = requiresInitialDeepClean();
     for (const wrapper of form.querySelectorAll<HTMLElement>('[data-recurring-deep]')) {
@@ -2068,6 +2167,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const selected = bookingCalendar?.selection();
         bookingFinalizedKey = '';
         bookingFinalizeNote = '';
+        bookingFinalizedStatus = '';
         updateAppointmentSummary();
         const alternatives = form.querySelector<HTMLElement>('[data-booking-alternatives]');
         if (alternatives) {
@@ -2154,10 +2254,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (addressCardEl) addressCardEl.hidden = false;
     if (addressDetailsEl) addressDetailsEl.hidden = true;
     setSchedulingLocked(true);
+    syncConditionalFields();
     syncRevealGroups(false);
     addressDetailsRevealed = false;
     bookingFinalizedKey = '';
     bookingFinalizeNote = '';
+    bookingFinalizedStatus = '';
     photosDeferred = false;
     hidePhotoGate();
     clearAllErrors();
@@ -2327,8 +2429,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
       // fields so the owner email can show both without any ambiguity.
       if (result.ongoing) {
         fields.first_visit_total = String(latestQuote.amount);
+        fields.ongoing_regular_price_per_visit = String(result.ongoing.regularPerVisitPrice);
         fields.ongoing_price_per_visit = String(result.ongoing.perVisitPrice);
         fields.ongoing_frequency = result.ongoing.frequency;
+        const allocation = ongoingDiscount(result);
+        if (allocation) {
+          fields.ongoing_discount_label = allocation.label;
+          fields.ongoing_discount_amount = allocation.amount.toFixed(2);
+        }
       }
     }
     // Customer photos (optional): private storage references only — the
@@ -2388,8 +2496,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
         return { ok: true, url: data.url };
       }
       if (data.error === 'documents_required' && data.signingUrl) {
+        // This is a successful handoff to signing, not a payment failure.
+        // Navigating immediately avoids a red error flash before the page changes.
         window.location.assign(data.signingUrl);
-        return { ok: false, error: data.error };
+        return { ok: true, url: data.signingUrl };
       }
       if (data.error) {
         console.warn('[secure-checkout]', data.error, data.reason ?? '');
@@ -2544,6 +2654,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       button.addEventListener('click', () => {
         bookingCalendar?.selectSlot(slot.start, slot.end, slot.startLabel);
         bookingFinalizedKey = '';
+        bookingFinalizedStatus = '';
         container.hidden = true;
         container.innerHTML = '';
         updateAppointmentSummary();
@@ -2561,9 +2672,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
   async function finalizeBookingForSubmit(result: EstimateResult): Promise<{
     blockedPayment: boolean;
     note: string;
+    status: string;
   }> {
     if (!bookingCalendar || result.status !== 'estimated' || !latestQuote) {
-      return { blockedPayment: false, note: '' };
+      return { blockedPayment: false, note: '', status: '' };
     }
     const submission = submissionAddress();
     const fallback = submission.location ? null : zipReferenceFor(submission.zip);
@@ -2573,7 +2685,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
         ? { lat: fallback.lat, lng: fallback.lng }
         : null;
     if (!destination) {
-      return { blockedPayment: false, note: 'Your preferred date is saved; we will confirm the time with you.' };
+      return {
+        blockedPayment: false,
+        note: 'Your preferred date is saved; we will confirm the time with you.',
+        status: 'none',
+      };
     }
     const durationMinutes = Math.max(
       bookingConfig.minimumJobMinutes,
@@ -2587,7 +2703,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
       destination.lng.toFixed(5),
     ].join('|');
     if (key === bookingFinalizedKey) {
-      return { blockedPayment: false, note: bookingFinalizeNote };
+      return {
+        blockedPayment: bookingFinalizedStatus !== 'held',
+        note: bookingFinalizeNote,
+        status: bookingFinalizedStatus,
+      };
     }
     bookingFinalizedKey = key;
     const outcome = await bookingCalendar.finalize({
@@ -2599,11 +2719,13 @@ function initEstimateWizard(form: HTMLFormElement): void {
         : `ZIP ${submission.zip}`,
     });
     bookingFinalizeNote = outcome.message;
+    bookingFinalizedStatus = outcome.status;
     renderBookingAlternatives(outcome.alternatives, outcome.message);
     updateAppointmentSummary();
     return {
-      blockedPayment: outcome.status === 'alternatives',
+      blockedPayment: outcome.status !== 'held',
       note: outcome.message,
+      status: outcome.status,
     };
   }
 
@@ -2654,8 +2776,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
         setPayNowBusy(false);
         if (status) {
           status.dataset.state = 'info';
+          const schedulingCopy = finalized.note.trim();
           status.textContent =
-            'That start time is no longer available with your final details. Choose an available time above, or reserve without paying and we will help.';
+            finalized.status === 'alternatives'
+              ? `${schedulingCopy || 'That start time is no longer available with your final details.'} No payment has been taken. Choose an available time above, or reserve without paying.`
+              : 'We could not confirm a live held slot for that arrival time, so secure payment cannot start yet. No payment has been taken. Choose another available time or reserve without paying.';
         }
         return;
       }
@@ -3231,11 +3356,14 @@ function initEstimateWizard(form: HTMLFormElement): void {
       const legacy = service && ['standard', 'deep', 'move_in_out', 'str_turnover'].includes(service) ? service : null;
       const serviceValue = preset?.serviceType ?? legacy;
       if (serviceValue) {
-        const radio = form.querySelector<HTMLInputElement>(`input[name="serviceType"][value="${serviceValue}"]`);
+        const targetValue = serviceValue === 'deep' ? 'standard' : serviceValue === 'str_turnover' ? 'standard' : serviceValue;
+        const radio = form.querySelector<HTMLInputElement>(`input[name="serviceType"][value="${targetValue}"]`);
         if (radio) {
           radio.checked = true;
           radio.dispatchEvent(new Event('change', { bubbles: true }));
         }
+        const deepInput = form.querySelector<HTMLInputElement>('[data-deep-cleaning-input]');
+        if (deepInput) deepInput.checked = serviceValue === 'deep';
       }
       if (preset?.frequency) {
         const select = form.querySelector<HTMLSelectElement>('#est-frequency');
@@ -3253,7 +3381,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (frequency && ['weekly', 'biweekly', 'monthly', 'one_time'].includes(frequency)) {
       // A deep-linked rhythm only applies when the selected service genuinely
       // supports it (e.g. ?service=deep ignores ?frequency=weekly).
-      const currentService = radioValue('serviceType') as EstimateInput['serviceType'] | undefined;
+      const currentService = currentServiceType() as EstimateInput['serviceType'] | undefined;
       const compatible = !currentService || serviceSupportsFrequency(currentService, frequency as EstimateInput['frequency']);
       if (compatible) {
         const select = form.querySelector<HTMLSelectElement>('#est-frequency');
@@ -3265,6 +3393,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
 
     syncConditionalFields();
+    syncRevealGroups(false);
     showStep(currentStep);
   }
   form.addEventListener('estimate:pricing-updated', () => {
