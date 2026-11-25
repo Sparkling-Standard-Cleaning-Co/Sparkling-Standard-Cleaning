@@ -595,8 +595,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
     if (savingEl) {
       const allocation = ongoingDiscount(result);
       savingEl.hidden = !allocation;
+      const savings = Math.max(0, result.ongoing.regularPerVisitPrice - result.ongoing.perVisitPrice);
       savingEl.textContent = allocation
-        ? `${allocation.label} (${allocation.percent}%): -${formatUsd(allocation.amount, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular recurring rate.`
+        ? `${allocation.label}: -${formatUsd(savings, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular recurring rate.`
         : '';
     }
   }
@@ -721,8 +722,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
         if (ongoing) {
           liveOngoing.hidden = false;
           const allocation = ongoingDiscount(result);
+          const savings = Math.max(0, ongoing.regularPerVisitPrice - ongoing.perVisitPrice);
           const allocationCopy = allocation
-            ? ` ${allocation.label} (${allocation.percent}%): -${formatUsd(allocation.amount, { forceCents: true })} off the ${formatUsd(ongoing.regularPerVisitPrice, { forceCents: true })} regular rate.`
+            ? ` ${allocation.label}: -${formatUsd(savings, { forceCents: true })} off the ${formatUsd(ongoing.regularPerVisitPrice, { forceCents: true })} regular rate.`
             : '';
           liveOngoing.textContent = `After the required first-visit Deep Cleaning above, ongoing ${FREQUENCY_RHYTHMS[ongoing.frequency]} visits are ${formatUsd(ongoing.perVisitPrice)} each.${allocationCopy}`;
         } else {
@@ -1337,8 +1339,9 @@ function initEstimateWizard(form: HTMLFormElement): void {
         const allocation = ongoingDiscount(result);
         const regular = formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true });
         const rate = formatUsd(result.ongoing.perVisitPrice, { forceCents: true });
+        const savings = Math.max(0, result.ongoing.regularPerVisitPrice - result.ongoing.perVisitPrice);
         const allocationCopy = allocation
-          ? ` · ${allocation.label} (${allocation.percent}%): -${formatUsd(allocation.amount, { forceCents: true })} · Your rate: ${rate} per ${rhythm} visit (regular ${regular})`
+          ? ` · ${allocation.label}: -${formatUsd(savings, { forceCents: true })} · Your rate: ${rate} per ${rhythm} visit (regular ${regular})`
           : ` · ${rate} per ${rhythm} visit`;
         reservationOngoing.textContent = `Recurring maintenance${allocationCopy}`;
       } else {
@@ -1393,10 +1396,11 @@ function initEstimateWizard(form: HTMLFormElement): void {
           );
           const allocation = ongoingDiscount(result);
           if (allocation) {
+            const savings = Math.max(0, result.ongoing.regularPerVisitPrice - result.ongoing.perVisitPrice);
             addSummaryRow(
               cleaningRows,
               'Recurring benefit',
-              `${allocation.label} (${allocation.percent}%): -${formatUsd(allocation.amount, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular rate`,
+              `${allocation.label}: -${formatUsd(savings, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular rate`,
             );
           }
         }

@@ -965,7 +965,7 @@ async function verifyResidentialPayment(
     recurring = {
       frequency: verification.ongoing.frequency,
       regularPerVisitCents,
-      discountCents: allocation ? cents(allocation.amount) : Math.max(0, regularPerVisitCents - perVisitCents),
+      discountCents: Math.max(0, regularPerVisitCents - perVisitCents),
       discountLabel: allocation?.label ?? '',
       perVisitCents,
     };
