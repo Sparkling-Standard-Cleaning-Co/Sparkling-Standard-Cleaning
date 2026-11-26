@@ -23,12 +23,14 @@ no paid service and no public Tampa activation were introduced.
   agreement packet and a standard signing request through the existing document
   system; a signed request is synchronized back to the proposal with signer name,
   email and timestamp.
+- Proposals expire automatically after their expiration date; sending an expired proposal is rejected.
+- Customer files now list the customer's commercial proposals and contracts with direct proposal navigation.
 - Contracts are created only from accepted proposals, default to Net 15, and
   generate period invoices idempotently. Invoices use the existing ledger and
   invoice numbering. The next billing date advances only after creation.
 - Facility contacts (billing/facility/manager/authorized) and walkthrough records
   are stored per property. Access instructions use the existing property record.
-- Admin UI: **Commercial Accounts** — proposal list/editor, live server totals on
+- Admin UI: **Commercial Accounts** — proposal list/editor, print preview, live server totals on
   save, publish/send, revision, contract creation, invoice generation, facility
   contacts and walkthroughs. Printable/electronic agreement content is generated
   server-side from the same snapshot.
@@ -55,6 +57,8 @@ builds a location/area/task proposal and asserts the exact server payload.
   computes overtime after 40 hours per Central workweek at 1.5×, includes
   adjustments (travel/bonus/deduction), requires calculation before owner
   approval, locks approved periods and exports CSV.
+- Owners can record an employee callout, which creates the availability block and sends the employee-callout notice. Late clock-ins over 10 minutes send the employee-late notice and appear as late-arrival warnings in the timekeeping summary.
+- Employees can receive an onboarding agreement packet through the existing document-signing system from their employee file.
 - Employee portal adds training (read + self-complete), published shifts,
   approved earnings, time-off request/cancel and the existing clock, jobs,
   documents, checklists and correction flows.
@@ -91,7 +95,7 @@ staffing is configured and public activation stays owner-controlled.
 ## Deployment
 
 - Production migrations 064-066 applied before code deployment; 66 migrations, 123 live tables (122 application tables plus _cf_KV), 0 foreign-key violations.
-- Cloudflare Pages production deployment 2ef5eebb-f770-450b-9508-307996bb0e32 from application code f03b36; main and production-safe identical.
+- Cloudflare Pages production deployment 372e67c4-96a4-4dee-b2d3-b6eda3e24cc8 from application code 90b7ab5; main and production-safe identical.
 - Fresh complete backup after migration (run 45729049782): archive sparkling-standard-backup-2026-11-26T00-29-54-complete.ssbk, 10,813,677 bytes, 227 files, SHA-256 49b688bc035ba83fe3bad67cb01f19b603378a42951f93b7b13d86fbe28e1d14, R2 + OneDrive verified, isolated restore 122 application tables / 66 migrations, 0 FK violations, 0 missing R2 references.
 - Unauthenticated /api/admin/commercial, /api/admin/employees and /api/employee/requests return 401.
 
