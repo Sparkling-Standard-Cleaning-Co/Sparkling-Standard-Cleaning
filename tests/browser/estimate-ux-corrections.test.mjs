@@ -284,7 +284,7 @@ test('confirming the address lands on the next question instead of dropping belo
   }
 });
 
-﻿test('entering the final step frames the estimate reveal, then keeps it stable', async () => {
+test('entering the final step frames the estimate reveal, then keeps it stable', async () => {
   const { context, page } = await setupPage({ viewport: { width: 390, height: 844 } });
   try {
     await completeToFinalStep(page);

@@ -294,7 +294,7 @@ test('completed steps can be revisited from the navigator without losing answers
 
 // ── Validation blocks advancement ────────────────────────────────────────────
 
-﻿test('step 1 requires a verified address before a preferred date and time', async () => {
+test('step 1 requires a verified address before a preferred date and time', async () => {
   const { context, page } = await openWizard(390, 900);
   try {
     await page.click('[data-next]');

@@ -1065,7 +1065,7 @@ test('checkout accepts a confirmed property pin for structural payment eligibili
   assert.equal(provider.postCount(), 1, 'a server-priced checkout session is created');
 });
 
-﻿async function activeCheckoutPromotion(
+async function activeCheckoutPromotion(
   db: TestD1,
   input: {
     code: string;
