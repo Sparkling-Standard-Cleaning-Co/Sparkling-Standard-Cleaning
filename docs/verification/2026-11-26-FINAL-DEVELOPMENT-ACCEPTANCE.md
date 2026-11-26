@@ -127,19 +127,45 @@ notes, timezone, duplicate prevention and pause.
 | Check | Result |
 | --- | --- |
 | Unit `npm test` | 1,167 tests - 1,166 pass, 0 fail, 1 pre-existing skip |
-| Browser `npm run test:browser` | 288/288 (see deployment closeout for final run) |
+| Browser `npm run test:browser` | 288/288 |
 | `astro check` | 0 errors |
 | Build | 41 pages |
 | Validate | 2,636 links, SEO and checklist checks pass |
 | Smoke | 21 pages |
-| Migration | 0067 additive; applied before deployment |
+| Migration | 0067 applied before deployment |
 | Live financial/customer actions | none created |
 
 ## Deployment closeout
 
-Deployment identity, migration application, production verification and final
-backup evidence are recorded in the final release report and updated in
-`AGENTS.md`.
+- Branch: `main` and `production-safe` at application commit
+  `00b83760705fad880309d410253edc00f9a810a6`.
+- Production migration run `45767421379`: `0067` applied; 67 migrations, 124
+  live tables including `_cf_KV`, 0 foreign-key violations.
+- CI `45767562445` (main) and `45767410634` (production-safe): validate and
+  browser jobs succeeded.
+- Cloudflare Pages deployment ID was not retrievable with the configured API
+  token (Pages read returned 403). Live production was verified instead:
+  `/admin/` served
+  `index.astro_astro_type_script_index_0_lang.Dlpffw2w.js` with SHA-256
+  `6a4be9fd8e553dcd0157a352fdfff30a02a2ae39733d875a6955c26fce3f177a`,
+  identical to the commit build. The live residential checkout page contains
+  none of the removed paragraphs and still renders the Terms checkbox, Pay Now
+  and Pay Later controls. `/terms/` still carries the statutory cancellation
+  right.
+- Unauthenticated `GET /api/admin/commercial`, `/api/admin/employees` and
+  `/api/employee/requests` each returned 401.
+- No live customer email, charge, refund, booking, signature, payroll
+  disbursement or review invitation was created.
+
+## Final backup and restore
+
+- Workflow run `45767758027`: **success**.
+- Archive: `sparkling-standard-backup-2026-11-26T06-23-17-complete.ssbk`,
+  10,818,232 bytes, 227 files.
+- SHA-256: `afea23530af781970412453f6991f78a2a5831251db7ec3983e033cd292f41e`.
+- R2 copy verified, OneDrive copy verified, isolated restore passed with 123
+  restored tables and 67 migrations; local archive verification reported
+  integrity ok across 124 tables in the production SQL export.
 
 ## Limitations
 

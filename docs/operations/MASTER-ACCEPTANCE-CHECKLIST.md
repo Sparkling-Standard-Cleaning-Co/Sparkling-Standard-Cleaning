@@ -123,7 +123,9 @@ deployed. External blockers are named explicitly.
 
 ### Final verification and infrastructure
 
-- [ ] Final complete encrypted backup after the release (owner-triggered or admin control plane)
+- [x] Final complete encrypted backup after the release: run `45767758027`,
+      archive `sparkling-standard-backup-2026-11-26T06-23-17-complete.ssbk`,
+      R2 + OneDrive verified, isolated restore 123 tables / 67 migrations
 - [ ] Rotate backup Worker GITHUB_DISPATCH_TOKEN to a fine-grained Actions-only token (owner-only)
 - [x] No SMS, payroll disbursement, paid service or public Tampa activation introduced
 - [x] No DEFEND changes

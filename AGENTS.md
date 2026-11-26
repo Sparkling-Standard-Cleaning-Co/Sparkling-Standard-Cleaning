@@ -84,7 +84,40 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-26 commercial, employee, payroll, training and Tampa readiness):**
+- **Current release (2026-11-26 final development and operational acceptance):** application code
+  `00b8376` on `main` and `production-safe`, migration `0067_financial_accuracy_and_commercial_scheduling.sql`
+  applied before deployment (67 production migrations, 124 live tables including `_cf_KV`, 0
+  foreign-key violations). Checkout now omits the three owner-requested explanatory paragraphs while
+  preserving Terms/Privacy consent, gift and promotion calculations, photo requirements, Community
+  Support, Pay Now/Pay Later and mobile sticky actions; the statutory cancellation disclosure remains
+  in `/terms/#cancellation-rescheduling`. Payroll now uses a weighted-average regular rate for mixed
+  rate workweeks, includes compensable travel, paid breaks and nondiscretionary pay, respects
+  branch time-zone workweeks (Chicago/New York), handles partial pay periods and week-boundary
+  splits, rejects overlapping periods, invalidates stale calculations, verifies a source fingerprint
+  before approval and locks approved periods. Commercial contracts preserve the signed proposal
+  snapshot; first invoices reconcile recurring service, one-time charges, nonrecurring add-ons,
+  discounts and tax to the signed first-invoice total; subsequent invoices advance one anchored
+  billing period at a time without skipping; invoice creation and contract linkage are atomic.
+  Accepted contracts can now be previewed and converted into recurring plans, Job Files, calendar
+  events and invoices from **Admin -> Commercial Accounts -> Service schedule**, with facility
+  scope, access instructions, crew size and required qualifications preserved. Verified: unit
+  **1,167** (1,166 pass, 1 pre-existing skip), browser **288/288**, `astro check` 0 errors, 41 pages,
+  2,636 links, smoke 21 pages; CI `45767562445` and `45767410634` green. Production migration run
+  `45767421379` (67 migrations, 124 tables, 0 foreign-key violations) and live admin asset
+  `index.astro_astro_type_script_index_0_lang.Dlpffw2w.js` SHA-256
+  `6a4be9fd8e553dcd0157a352fdfff30a02a2ae39733d875a6955c26fce3f177a` matched the commit build;
+  unauthenticated admin/employee APIs returned 401 and the live checkout rendered the removals.
+  Final complete backup run `45767758027`: archive
+  `sparkling-standard-backup-2026-11-26T06-23-17-complete.ssbk`, 10,818,232 bytes, 227 files,
+  SHA-256 `afea23530af781970412453f6991f78a2a5831251db7ec3983e033cd292f41e`, R2 and OneDrive
+  verified, isolated restore 123 tables / 67 migrations. Cloudflare Pages deployment ID was not
+  retrievable because the configured API token returns 403 for Pages reads; live asset identity was
+  verified instead. No live customer email, charge, refund, booking, signature, payroll
+  disbursement, review invitation or public Tampa activation occurred. Owner action remains: rotate
+  the backup Worker GitHub token to a fine-grained Actions-only token. Evidence:
+  `docs/verification/2026-11-26-FINAL-DEVELOPMENT-ACCEPTANCE.md` and
+  `docs/operations/MASTER-ACCEPTANCE-CHECKLIST.md`.
+- **Prior release (2026-11-26 commercial, employee, payroll, training and Tampa readiness):**
   application code `106696d` on `main` and `production-safe` (identical), Cloudflare Pages production
   deployment `aa3da477-d130-426d-9dad-883bdcf6affb`, verified live. Migrations `0064`-`0066` add
   commercial proposals/contracts/facility contacts/walkthroughs, employee onboarding/training/quality/
