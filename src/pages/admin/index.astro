@@ -491,6 +491,7 @@ import {
                 <label>Service <select name="engine" data-quick-engine><option value="residential">Residential cleaning</option><option value="str">Short-term rental turnover</option><option value="commercial">Commercial cleaning</option><option value="church">Church cleaning</option></select></label>
                 <label>Service type <select name="serviceType" data-quick-service><option value="standard">Residential maintenance</option><option value="deep">Deep cleaning</option><option value="move_in_out">Move-in / move-out</option></select></label>
                 <label>Frequency <select name="frequency">{FREQUENCY_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
+                <label>Crew size <select name="crewSize" data-quick-crew><option value="1">1 cleaner</option><option value="2">2 cleaners (approved maximum)</option></select></label>
                 <div class="admin-field--wide admin-form admin-form--grid" data-quick-residential>
                   <label>Property type <select name="propertyType">{PROPERTY_TYPE_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
                   <label>Square feet <input name="squareFeet" type="number" min={RESIDENTIAL_INPUT_LIMITS.squareFeet.min} max={RESIDENTIAL_INPUT_LIMITS.squareFeet.max} step={RESIDENTIAL_INPUT_LIMITS.squareFeet.step} /></label>
@@ -501,7 +502,7 @@ import {
                   <label>Pets <select name="pets">{PET_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
                   <label>Condition <select name="condition">{CONDITION_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
                   <label>Last professional clean <select name="lastClean">{LAST_CLEAN_OPTIONS.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>
-                  <label class="admin-field--wide"><input type="checkbox" name="supportiveEligible" value="yes" /> Community Support eligibility (10% - client attestation only)</label>
+                  <label class="admin-field--wide admin-check"><input type="checkbox" name="supportiveEligible" value="yes" /> <span>Community Support eligibility (10% - client attestation only)</span></label>
                 </div>
                 <div class="admin-field--wide admin-form admin-form--grid" data-quick-facility hidden>
                   <label>Facility type <select name="facilityType">{COMMERCIAL_FACILITY_TYPES.map((option) => <option value={option.value}>{option.label}</option>)}</select></label>

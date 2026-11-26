@@ -15,6 +15,8 @@ import { normalizeRichDocumentHtml, renderDocumentHtml } from '../lib/documents/
 import { DOCUMENT_BRAND_CSS, renderBrandedDocumentHtml } from '../lib/documents/branding.ts';
 import { displayVersion } from '../lib/documents/version-labels.ts';
 import { formatLaborAndSite } from '../lib/format/duration.ts';
+import { bookingConfig } from '../config/booking';
+import { effectiveCapacityPerMinute } from '../lib/booking/crew';
 
 interface AdminActor {
   id: string;
@@ -3746,6 +3748,9 @@ interface QuickQuoteView {
   discountLabel: string | null;
   ongoingPerVisitCents: number | null;
   ongoingFrequency: string | null;
+  crewSize: number | null;
+  ongoingLaborHours: number | null;
+  ongoingDurationMinutes: number | null;
   pricingVersion: string;
   serviceCode: string;
   message: string | null;
@@ -3794,6 +3799,7 @@ function quickPayload(): Record<string, unknown> {
     serviceDate: quickValue('serviceDate'),
     engine: quickValue('engine'),
     serviceType: quickValue('serviceType'),
+    crewSize: quickValue('crewSize'),
     propertyType: quickValue('propertyType'),
     squareFeet: quickValue('squareFeet'),
     bedrooms: quickValue('bedrooms'),
@@ -3835,6 +3841,10 @@ function syncQuickEngine(): void {
     service.closest('label')?.toggleAttribute('hidden', facility);
     if (facility) service.value = 'standard';
   }
+  const bedsLabel = quickField('beds')?.closest('label');
+  if (bedsLabel) bedsLabel.hidden = engine !== 'str';
+  const crewField = document.querySelector<HTMLElement>('[data-quick-crew]')?.closest('label');
+  if (crewField) crewField.hidden = facility;
   const note = document.querySelector<HTMLElement>('[data-quick-benefit-note]');
   if (note) {
     note.textContent = quickValue('customerId')
@@ -4036,31 +4046,63 @@ function applyQuickProperty(): void {
   window.refreshAdminAddressFields?.(quickForm() ?? document);
 }
 
+function quickOnSiteMinutes(laborHours: number, crewSize: number): number {
+  const capacity = effectiveCapacityPerMinute(crewSize, bookingConfig.crewEfficiency);
+  return Math.min(
+    bookingConfig.maximumJobMinutes,
+    Math.max(bookingConfig.minimumJobMinutes, Math.ceil((laborHours * 60) / capacity / 15) * 15),
+  );
+}
+
+function quickCrewPlanning(laborHours: number | null): string {
+  if (!laborHours || laborHours <= 0) return '';
+  const rows = [1, 2, 3].map((crewSize) => {
+    const minutes = quickOnSiteMinutes(laborHours, crewSize);
+    const hourly = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    const duration = remainder ? hourly + 'h ' + String(remainder).padStart(2, '0') + 'm' : hourly + 'h';
+    const supported = crewSize <= bookingConfig.maxCrewSize;
+    return '<tr><td>' + crewSize + ' cleaner' + (crewSize === 1 ? '' : 's') + (supported ? '' : ' (not currently supported)') + '</td><td style="text-align:right">' + esc(duration) + '</td></tr>';
+  }).join('');
+  return '<details class="admin-detail-toggle"><summary>Crew planning and on-site time</summary><div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Crew</th><th>On-site time</th></tr></thead><tbody>' + rows + '</tbody></table></div><p class="admin-muted">Uses the approved crew-efficiency model. The current approved maximum is ' + bookingConfig.maxCrewSize + ' cleaners. A start that would finish after 7:00 PM is not offered; choose an earlier time or a larger approved crew.</p></details>';
+}
+
 function renderQuickQuote(quote: QuickQuoteView): void {
   const target = document.querySelector<HTMLElement>('[data-quick-result]');
   if (!target) return;
   if (quote.status !== 'priced') {
-    target.innerHTML = `<p class="admin-error">${esc(quote.message ?? 'This scope needs personal confirmation.')}</p>`;
+    target.innerHTML = '<p class="admin-error">' + esc(quote.message ?? 'This scope needs personal confirmation.') + '</p>';
     return;
   }
   const rows: Array<[string, string]> = [];
   if (quote.cleaningSubtotalCents !== null) rows.push(['Cleaning service', money(quote.cleaningSubtotalCents)]);
   if (quote.extrasSubtotalCents) rows.push(['Extras', money(quote.extrasSubtotalCents)]);
   if (quote.travelAdjustmentCents) rows.push(['Travel adjustment', money(quote.travelAdjustmentCents)]);
-  if (quote.discountAmountCents) rows.push([quote.discountLabel ?? 'Discount', `-${money(quote.discountAmountCents)}`]);
-  rows.push(['Estimated total', money(quote.totalCents)]);
-  if (quote.ongoingPerVisitCents !== null) {
-    rows.push([`Ongoing ${titleCase(quote.ongoingFrequency ?? 'visit')} visit`, money(quote.ongoingPerVisitCents)]);
-  }
-  const estimateLabel = quickEstimateNumber ? `Estimate #${quickEstimateNumber}` : 'Estimate';
-  target.innerHTML = `<div class="admin-card">
-    <h3>${esc(estimateLabel)}</h3>
-    <p><strong>${esc(money(quote.totalCents))}</strong>${quote.range ? ` <span class="admin-muted">(${esc(money(quote.range.low))} - ${esc(money(quote.range.high))})</span>` : ''}</p>
-    <p class="admin-muted">${esc(formatLaborAndSite(quote.laborHours, quote.durationMinutes))}${quote.travel?.oneWayMiles !== null && quote.travel?.oneWayMiles !== undefined ? ` · ${esc(quote.travel.oneWayMiles)} mi one way${quote.travel.verified ? ' verified' : ' preliminary'}` : ''}</p>
-    ${quote.entitlement ? `<p class="admin-muted">${esc(quote.entitlement.label)} ${esc(quote.entitlement.percent)}% account benefit applied.</p>` : ''}
-    <div class="admin-table-scroll"><table class="admin-table"><tbody>${rows.map(([label, value]) => `<tr><td>${esc(label)}</td><td style="text-align:right">${esc(value)}</td></tr>`).join('')}</tbody></table></div>
-    <details class="admin-detail-toggle"><summary>Pricing diagnostics</summary><p class="admin-muted">Pricing version ${esc(quote.pricingVersion)}</p></details>
-  </div>`;
+  if (quote.discountAmountCents) rows.push([quote.discountLabel ?? 'Discount', '-' + money(quote.discountAmountCents)]);
+  rows.push(['Initial visit total', money(quote.totalCents)]);
+  const estimateLabel = quickEstimateNumber ? 'Estimate #' + quickEstimateNumber : 'Estimate';
+  const initialCrew = quote.crewSize ?? 1;
+  const travelNote =
+    quote.travel?.oneWayMiles !== null && quote.travel?.oneWayMiles !== undefined
+      ? quote.travel.oneWayMiles + ' mi one way' + (quote.travel.verified ? ' verified' : ' preliminary')
+      : '';
+  const initialBlock =
+    '<section data-quick-initial><h3>' + (quote.ongoingPerVisitCents !== null ? 'Initial Deep Cleaning (first visit)' : 'Estimate') + '</h3>' +
+    '<p><strong>' + esc(money(quote.totalCents)) + '</strong>' + (quote.range ? ' <span class="admin-muted">(' + esc(money(quote.range.low)) + ' - ' + esc(money(quote.range.high)) + ')</span>' : '') + '</p>' +
+    '<p class="admin-muted">' + esc(formatLaborAndSite(quote.laborHours, quote.durationMinutes)) + ' - ' + initialCrew + ' cleaner' + (initialCrew === 1 ? '' : 's') + (travelNote ? ' - ' + esc(travelNote) : '') + '</p>' +
+    (quote.entitlement ? '<p class="admin-muted">' + esc(quote.entitlement.label) + ' ' + esc(quote.entitlement.percent) + '% account benefit applied.</p>' : '') +
+    '<div class="admin-table-scroll"><table class="admin-table"><tbody>' + rows.map(([label, value]) => '<tr><td>' + esc(label) + '</td><td style="text-align:right">' + esc(value) + '</td></tr>').join('') + '</tbody></table></div>' +
+    quickCrewPlanning(quote.laborHours) + '</section>';
+  const ongoingBlock =
+    quote.ongoingPerVisitCents !== null
+      ? '<section data-quick-ongoing style="margin-top:1rem;border-top:1px solid var(--color-border);padding-top:1rem;"><h3>Ongoing ' + esc(titleCase(quote.ongoingFrequency ?? 'visit')) + ' maintenance</h3>' +
+        '<p><strong>' + esc(money(quote.ongoingPerVisitCents)) + ' per visit</strong></p>' +
+        '<p class="admin-muted">' + esc(formatLaborAndSite(quote.ongoingLaborHours, quote.ongoingDurationMinutes)) + ' - ' + initialCrew + ' cleaner' + (initialCrew === 1 ? '' : 's') + '</p>' +
+        '<p class="admin-muted">Starts on the visit after the initial Deep Cleaning. The first visit and ongoing maintenance are separate calculations.</p>' +
+        quickCrewPlanning(quote.ongoingLaborHours) + '</section>'
+      : '';
+  target.innerHTML = '<div class="admin-card"><h3>' + esc(estimateLabel) + '</h3>' + initialBlock + ongoingBlock +
+    '<details class="admin-detail-toggle"><summary>Pricing diagnostics</summary><p class="admin-muted">Pricing version ' + esc(quote.pricingVersion) + '</p></details></div>';
 }
 
 async function quickCalculate(): Promise<QuickQuoteView | null> {
@@ -4238,10 +4280,18 @@ async function quickConvertTimes(): Promise<void> {
     status.textContent = 'Choose a date first.';
     return;
   }
+  if (!quickLastQuote) {
+    status.textContent = 'Recalculate the estimate after changing inputs before checking availability.';
+    return;
+  }
+  const crewSize = Math.min(bookingConfig.maxCrewSize, Math.max(1, Math.round(Number(data.get('crewSize')) || 1)));
+  const durationMinutes = quickLastQuote.laborHours && quickLastQuote.laborHours > 0
+    ? quickOnSiteMinutes(quickLastQuote.laborHours, crewSize)
+    : quickLastQuote.durationMinutes ?? 120;
   status.textContent = 'Checking real availability...';
   try {
     const result = await api<{ availability?: { ok: boolean; reason?: string; slots: Array<{ start: string; end: string; label: string }> } }>(
-      `/api/admin/bookings?view=availability&customerId=${encodeURIComponent(customerId)}&propertyId=${encodeURIComponent(propertyId)}&date=${encodeURIComponent(date)}&durationMinutes=${encodeURIComponent(String(quickLastQuote?.durationMinutes ?? 120))}&crewSize=${encodeURIComponent(String(data.get('crewSize') ?? '1'))}`,
+      `/api/admin/bookings?view=availability&customerId=${encodeURIComponent(customerId)}&propertyId=${encodeURIComponent(propertyId)}&date=${encodeURIComponent(date)}&durationMinutes=${encodeURIComponent(String(durationMinutes))}&crewSize=${encodeURIComponent(String(crewSize))}`,
     );
     const availability = result.availability;
     const select = form.elements.namedItem('start') as HTMLSelectElement | null;
@@ -4270,6 +4320,18 @@ async function loadQuickEstimate(): Promise<void> {
     promotionSelect.innerHTML = `<option value="">Automatic eligible benefit</option>${active.map((promotion) => `<option value="${esc(promotion.code)}">${esc(promotion.name)} (${esc(promotion.code)})</option>`).join('')}`;
   }
   syncQuickEngine();
+  const form = quickForm();
+  if (form && form.dataset.quickStaleBound !== '1') {
+    form.dataset.quickStaleBound = '1';
+    form.addEventListener('input', () => {
+      if (!quickLastQuote) return;
+      quickLastQuote = null;
+      const target = document.querySelector<HTMLElement>('[data-quick-result]');
+      if (target && target.querySelector('[data-quick-initial]') && !target.querySelector('[data-quick-stale]')) {
+        target.insertAdjacentHTML('afterbegin', '<p class="admin-status-message" data-quick-stale role="status">Inputs changed. Recalculate before saving, emailing or converting this estimate.</p>');
+      }
+    });
+  }
   await loadQuickList();
 }
 

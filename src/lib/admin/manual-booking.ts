@@ -25,6 +25,7 @@ import {
   type FlooringType,
 } from '../estimate/commercial.ts';
 import { selectInstantAmount } from '../estimate/quote.ts';
+import { effectiveCapacityPerMinute } from '../booking/crew.ts';
 import { validateEstimateInput } from '../estimate/validation.ts';
 import type {
   Condition,
@@ -89,6 +90,7 @@ export interface ManualEstimateInput {
   pets?: PetSituation | undefined;
   supportiveEligible?: boolean | undefined;
   promotionCode?: string | undefined;
+  crewSize?: number | undefined;
   pricingMethod?: 'estimated' | 'custom' | undefined;
   customPrice?: number | undefined;
   discountType?: 'none' | 'percent' | 'fixed' | undefined;
@@ -121,6 +123,9 @@ export interface ManualQuote {
   discountLabel: string | null;
   ongoingPerVisitCents: number | null;
   ongoingFrequency: string | null;
+  crewSize: number | null;
+  ongoingLaborHours: number | null;
+  ongoingDurationMinutes: number | null;
   tier: 'A' | 'B' | 'C' | null;
   pricingVersion: string;
   serviceCode: string;
@@ -219,6 +224,7 @@ export function normalizeInput(raw: Record<string, unknown>): ManualEstimateInpu
     pets: text(raw.pets, 30) as PetSituation,
     supportiveEligible: flag(raw.supportiveEligible),
     promotionCode: text(raw.promotionCode, 40),
+    crewSize: numberOrUndefined(raw.crewSize),
     pricingMethod: raw.pricingMethod === 'custom' ? 'custom' : 'estimated',
     customPrice: numberOrUndefined(raw.customPrice),
     discountType: raw.discountType === 'percent' || raw.discountType === 'fixed' ? raw.discountType : 'none',
@@ -534,6 +540,18 @@ interface PriceContext {
  * Quick Estimates both call this function, so the four engines, promotion
  * rules, travel economics and service history rules can never diverge.
  */
+export function scheduledOnSiteMinutes(laborHours: number, crewSize: number): number {
+  const capacity = effectiveCapacityPerMinute(crewSize, bookingConfig.crewEfficiency);
+  const raw = (laborHours * 60) / capacity;
+  return Math.min(
+    bookingConfig.maximumJobMinutes,
+    Math.max(
+      bookingConfig.minimumJobMinutes,
+      Math.ceil(raw / 15) * 15,
+    ),
+  );
+}
+
 export async function priceEstimateInput(
   env: ManualBookingEnv,
   db: D1Database,
@@ -607,6 +625,9 @@ export async function priceEstimateInput(
       discountLabel: price.discount?.applied ? price.discount.label : null,
       ongoingPerVisitCents: null,
       ongoingFrequency: null,
+      crewSize: null,
+      ongoingLaborHours: null,
+      ongoingDurationMinutes: null,
       tier: workload.tier,
       message: priced ? null : 'This facility scope requires personal review.',
       entitlement: null,
@@ -634,6 +655,9 @@ export async function priceEstimateInput(
       discountLabel: null,
       ongoingPerVisitCents: null,
       ongoingFrequency: null,
+      crewSize: null,
+      ongoingLaborHours: null,
+      ongoingDurationMinutes: null,
       tier: null,
       message: validation.issues[0] ?? 'Complete the estimate inputs.',
       entitlement: null,
@@ -696,15 +720,18 @@ export async function priceEstimateInput(
         subtotal: Math.max(0, Math.round((estimate.pricing.subtotal * 100 - appliedDiscountCents) / 100)),
       }
     : estimate.pricing;
+  const selectedCrewSize = Math.min(
+    bookingConfig.maxCrewSize,
+    Math.max(1, Math.round(Number(input.crewSize) || bookingConfig.defaultCrewSize)),
+  );
   const durationMinutes = estimate.pricing.totalLaborHours > 0
-    ? Math.min(
-        bookingConfig.maximumJobMinutes,
-        Math.max(
-          bookingConfig.minimumJobMinutes,
-          Math.ceil((estimate.pricing.totalLaborHours * 60) / bookingConfig.defaultCrewSize),
-        ),
-      )
+    ? scheduledOnSiteMinutes(estimate.pricing.totalLaborHours, selectedCrewSize)
     : null;
+  const ongoingLaborHours = estimate.ongoing?.laborHours ?? null;
+  const ongoingDurationMinutes =
+    ongoingLaborHours !== null && ongoingLaborHours > 0
+      ? scheduledOnSiteMinutes(ongoingLaborHours, selectedCrewSize)
+      : null;
   return {
     ...base,
     status: priced ? 'priced' as const : 'custom_confirmation_required' as const,
@@ -737,6 +764,9 @@ export async function priceEstimateInput(
         )
       : null,
     ongoingFrequency: estimate.ongoing?.frequency ?? null,
+    crewSize: selectedCrewSize,
+    ongoingLaborHours,
+    ongoingDurationMinutes,
     tier: null,
     message: priced ? null : estimate.message ?? 'This scope requires personal confirmation.',
     entitlement: entitlement
@@ -962,12 +992,9 @@ export async function createManualBooking(
   if (!destination) throw new AdminAuthError(400, 'property_destination_missing');
   const crew = await staffResourceSelection(db, input.teamMemberIds ?? []);
   const crewSize = Math.max(1, input.teamMemberIds?.length || input.crewSize || 1);
-  const duration = Math.min(
+  const duration = quote.durationMinutes ?? Math.min(
     bookingConfig.maximumJobMinutes,
-    Math.max(
-      bookingConfig.minimumJobMinutes,
-      Math.ceil((quote.laborHours ?? 1) * 60 / crewSize),
-    ),
+    Math.max(bookingConfig.minimumJobMinutes, Math.ceil((quote.laborHours ?? 1) * 60 / crewSize)),
   );
   const end = slotEnd(input.start, duration);
   const availability = await deps.availability(env, {
@@ -1237,6 +1264,9 @@ export async function createCompletedService(
     discountLabel,
     ongoingPerVisitCents: null,
     ongoingFrequency: null,
+    crewSize: null,
+    ongoingLaborHours: null,
+    ongoingDurationMinutes: null,
     tier: null,
     pricingVersion: 'admin-completed.v1',
     serviceCode,

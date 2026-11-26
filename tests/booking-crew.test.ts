@@ -161,3 +161,11 @@ test('legacy fixed-duration availability is unchanged without labor hours', asyn
   assert.equal(afternoon.crewSize, 1);
   assert.equal(afternoon.endLabel, '4:30 PM');
 });
+
+import { scheduledOnSiteMinutes } from '../src/lib/admin/manual-booking.ts';
+
+test('quote crew planning converts labor hours to on-site time with approved efficiency', () => {
+  assert.equal(scheduledOnSiteMinutes(6.75, 1), 405);
+  assert.equal(scheduledOnSiteMinutes(6.75, 2), 225);
+  assert.equal(scheduledOnSiteMinutes(6.75, 3), 150);
+});
