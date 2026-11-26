@@ -290,7 +290,9 @@ function renderEmployeeMember(): void {
       <label>Name <input name="displayName" value="${escE(member.display_name)}" required /></label>
       <label>Email <input name="email" type="email" value="${escE(member.email)}" /></label>
       <label>Phone <input name="phone" value="${escE(member.phone)}" /></label>
+      <label>Branch <select name="branchId"><option value="branch_pensacola"${member.branch_id === 'branch_pensacola' ? ' selected' : ''}>Pensacola</option><option value="branch_tampa"${member.branch_id === 'branch_tampa' ? ' selected' : ''}>Tampa</option></select></label>
       <label>Status <select name="status"><option value="active"${member.status === 'active' ? ' selected' : ''}>Active</option><option value="inactive"${member.status === 'inactive' ? ' selected' : ''}>Inactive</option></select></label>
+      <label class="admin-field--wide">Qualifications (comma separated) <input name="dispatchServices" value="${escE(JSON.parse(String(member.dispatch_services_json ?? '[]')).join(', '))}" /></label>
       <label><input type="checkbox" name="isBookable"${Number(member.is_bookable) === 1 ? ' checked' : ''} /> Bookable</label>
       <label>Hire date <input name="hireDate" type="date" value="${escE(member.hire_date ?? '')}" /></label>
       <label>Emergency contact <input name="emergencyContactName" value="${escE(member.emergency_contact_name ?? '')}" /></label>
@@ -414,7 +416,14 @@ document.querySelector<HTMLElement>('[data-admin-view="employees"]')?.addEventLi
     run(employeePost({ action: 'onboarding_status', taskId: id, status: 'completed' }).then(() => loadEmployeeMember(employeeState.selectedMember)));
   }
   if (action === 'training-complete') {
-    run(employeePost({ action: 'complete_training', assignmentId: id }).then(() => loadEmployeeMember(employeeState.selectedMember)));
+    const score = window.prompt('Assessment score (0–100, optional)', '');
+    run(
+      employeePost({
+        action: 'complete_training',
+        assignmentId: id,
+        ...(score && Number.isFinite(Number(score)) ? { score: Number(score) } : {}),
+      }).then(() => loadEmployeeMember(employeeState.selectedMember)),
+    );
   }
   if (action === 'timeoff-approve' || action === 'timeoff-decline') {
     run(

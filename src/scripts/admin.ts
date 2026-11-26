@@ -6,7 +6,7 @@ import {
 } from '../lib/password-policy.ts';
 import { loadPricingView } from './pricing-admin';
 import { loadBranchView } from './admin-branches';
-import { loadCommercial } from './admin-commercial';
+import { loadCommercial, openCommercialProposalFromCustomer } from './admin-commercial';
 import { loadEmployees } from './admin-employees';
 import './admin-address-autocomplete';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
@@ -2195,6 +2195,8 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
   const communications = (data.communications as Array<Record<string, unknown>>) ?? [];
   const jobMedia = (data.jobMedia as Array<Record<string, unknown>>) ?? [];
   const timeline = (data.timeline as Array<Record<string, unknown>>) ?? [];
+  const commercialProposals = (data.commercialProposals as Array<Record<string, unknown>>) ?? [];
+  const commercialContracts = (data.commercialContracts as Array<Record<string, unknown>>) ?? [];
   const documentRequests = (data.signingRequests as Array<Record<string, unknown>> | undefined)?.length
     ? (data.signingRequests as Array<Record<string, unknown>>)
     : await api<{ requests?: Array<Record<string, unknown>> }>(
@@ -2264,6 +2266,25 @@ async function openCustomer(customerId: string): Promise<void> {  const data = a
     <h3>Properties</h3>
     ${properties.map((property) => `<div class="admin-record"><strong>${esc(property.label)}${Number(property.is_primary) === 1 ? ' · Primary' : ''}</strong>${propertyProfileSummary(property)}<details class="admin-detail-toggle"><summary>Edit property</summary><form class="admin-form" style="max-width:none" data-form="property-update"><input type="hidden" name="customerId" value="${esc(customerId)}" /><input type="hidden" name="propertyId" value="${esc(property.id)}" />${propertyFields(property)}<label>Status <select name="status"><option value="active"${property.status !== 'archived' ? ' selected' : ''}>Active</option><option value="archived"${property.status === 'archived' ? ' selected' : ''}>Archived</option></select></label><button class="btn btn--secondary btn--small" type="submit">Save property</button></form></details></div>`).join('') || '<p class="admin-muted">No properties.</p>'}
     <details class="admin-detail-toggle"><summary>Add a property</summary><form class="admin-form" style="max-width:none" data-form="property-add"><input type="hidden" name="customerId" value="${esc(customerId)}" />${propertyFields({})}<button class="btn btn--secondary btn--small" type="submit">Add property</button></form></details>
+    <h3>Commercial proposals and contracts</h3>
+    ${
+      commercialProposals.length
+        ? commercialProposals
+            .map(
+              (proposal) => `<div class="admin-record"><p><strong>${esc(proposal.proposal_number)}</strong> · ${esc(proposal.title)} · ${esc(titleCase(String(proposal.status ?? '')))}</p><p class="admin-muted">Recurring ${esc(money(proposal.recurring_total_cents))} · first invoice ${esc(money(proposal.first_invoice_total_cents))}${proposal.expiration_date ? ` · expires ${esc(proposal.expiration_date)}` : ''}</p><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="commercial-proposal-open" data-id="${esc(proposal.id)}">Open proposal</button></div></div>`,
+            )
+            .join('')
+        : '<p class="admin-muted">No commercial proposals.</p>'
+    }
+    ${
+      commercialContracts.length
+        ? `<p class="admin-muted">Contracts: ${commercialContracts
+            .map(
+              (contract) => `${esc(titleCase(String(contract.status ?? '')))} ${esc(contract.billing_frequency)} (${esc(money(contract.recurring_total_cents))}, next ${esc(contract.next_invoice_date || '—')})`,
+            )
+            .join('; ')}</p>`
+        : ''
+    }
     <h3>Jobs</h3>
     ${appointments.length ? appointments.map((appointment) => `<div class="admin-record"><p><strong>${esc(appointment.reference)}</strong> · ${esc(titleCase(String(appointment.status ?? '')))} · ${esc(dateTime(appointment.start_at))}</p><p class="admin-muted">${esc(jobMedia.filter((media) => String(media.appointment_id) === String(appointment.id)).length)} photo(s) linked</p><div class="admin-actions"><button class="btn btn--secondary btn--small" type="button" data-admin-action="job-open" data-id="${esc(appointment.id)}">Open Job File</button><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-invoice-open" data-id="${esc(appointment.id)}">${invoices.some((invoice) => String(invoice.appointment_id) === String(appointment.id)) ? 'Open Invoice' : 'Create Invoice'}</button></div></div>`).join('') : '<p class="admin-muted">No jobs are recorded.</p>'}
     <h3>Payments</h3>
@@ -5193,12 +5214,14 @@ async function loadTimekeeping(): Promise<void> {
       const overtime = employees.reduce((total, employee) => total + Number((employee.totals as Record<string, unknown>)?.overtimeMinutes ?? 0), 0);
       const openCount = employees.filter((employee) => employee.openInterval).length;
       const missing = employees.filter((employee) => employee.missingClockOut).length;
+      const late = employees.reduce((total, employee) => total + (((employee.lateArrivals as Array<Record<string, unknown>>) ?? []).length), 0);
       summary.innerHTML = [
         ['Week', `${esc(data.weekStart)} ? ${esc(data.weekEnd)}`],
         ['Compensated hours', (totalWork / 60).toFixed(2)],
         ['Overtime hours', (overtime / 60).toFixed(2)],
         ['Open shifts', openCount],
         ['Missing clock-outs', missing],
+        ['Late arrivals (over 10 min)', late],
       ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
     }
 
@@ -5206,7 +5229,14 @@ async function loadTimekeeping(): Promise<void> {
     if (employeeTarget) {
       renderTable(employeeTarget, ['Employee', 'Work', 'Rest', 'Meal', 'Overtime', 'Est. gross', 'State'], employees.map((employee) => {
         const totals = (employee.totals as Record<string, unknown>) ?? {};
-        const state = employee.missingClockOut ? 'Missing clock-out' : employee.openInterval ? 'On the clock' : '?';
+        const lateCount = ((employee.lateArrivals as Array<Record<string, unknown>>) ?? []).length;
+        const state = employee.missingClockOut
+          ? 'Missing clock-out'
+          : lateCount > 0
+            ? `${lateCount} late arrival${lateCount === 1 ? '' : 's'}`
+            : employee.openInterval
+              ? 'On the clock'
+              : '?';
         return [
           esc(employee.display_name),
           esc(totals.workLabel),
@@ -9841,6 +9871,18 @@ document.querySelector<HTMLButtonElement>('[data-quick-convert-check]')?.addEven
     const status = document.querySelector<HTMLElement>('[data-quick-convert-status]');
     if (status) status.textContent = friendly(error);
   });
+});
+
+document.addEventListener('click', (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>(
+    '[data-admin-action="commercial-proposal-open"]',
+  );
+  if (!target) return;
+  const id = target.dataset.id ?? '';
+  if (!id) return;
+  void loadView('commercial')
+    .then(() => openCommercialProposalFromCustomer(id))
+    .catch((error) => setAppError(friendly(error)));
 });
 
 void loadAuth();

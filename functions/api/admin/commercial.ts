@@ -13,7 +13,9 @@ import {
   listCommercialProposals,
   listPropertyContacts,
   listWalkthroughs,
+  calculateProposalTotals,
   publishCommercialProposal,
+  renderProposalHtml,
   sendCommercialProposal,
   syncProposalSigningStatus,
   updateCommercialProposal,
@@ -78,6 +80,36 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const url = new URL(context.request.url);
     const view = text(url.searchParams.get('view'), 30) || 'all';
     const scopeBranch = actor.role === 'owner' ? null : actor.branchId;
+    if (view === 'proposal_preview') {
+      const id = text(url.searchParams.get('id'), 100);
+      const proposal = await getCommercialProposal(db, actor, id);
+      const scope = (proposal.scope ?? {}) as never;
+      const totals = calculateProposalTotals({
+        scope,
+        taxRateBps: Number(proposal.tax_rate_bps) || 0,
+        discountCents: Number(proposal.discount_cents) || 0,
+      });
+      const html = renderProposalHtml({
+        proposalNumber: String(proposal.proposal_number),
+        title: String(proposal.title),
+        customerName:
+          String(proposal.company_name ?? '').trim() ||
+          [proposal.first_name, proposal.last_name].filter(Boolean).join(' '),
+        propertyLine: [proposal.property_label, proposal.line1, proposal.city, proposal.state, proposal.postal_code]
+          .filter(Boolean)
+          .join(', '),
+        billingFrequency: String(proposal.billing_frequency) as never,
+        paymentTerms: String(proposal.payment_terms),
+        expirationDate: String(proposal.expiration_date ?? ''),
+        notes: String(proposal.notes ?? ''),
+        terms: String(proposal.terms ?? ''),
+        scope,
+        totals,
+      });
+      return new Response(html, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+      });
+    }
     if (view === 'proposal') {
       const id = text(url.searchParams.get('id'), 100);
       if (!id) return json({ ok: false, error: 'proposal_required' }, 400);

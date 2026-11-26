@@ -248,7 +248,7 @@ async function loadMe(): Promise<void> {
     renderJobs();
     await loadTime();
     await loadEmployeeDocuments();
-    await loadSelfService();
+    await loadSelfService().catch(() => undefined);
   } catch (error) {
     if (String((error as Error).message) === 'employee_profile_missing' || String((error as Error).message) === 'employee_profile_inactive') {
       if (gate) gate.hidden = false;

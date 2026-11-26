@@ -84,34 +84,28 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-25 P0 residential corrections, backup closeout and communications expansion):**
-  application code `43922c9` on `main` and `production-safe` (identical), Cloudflare Pages production
-  deployment `e3616887-95be-4c4e-a84d-7671982b0067`, verified live. Migration `0063` adds
-  `appointments.staffing_pending` and `staffing_reason` (63 production migrations; the D1 export has
-  106 application tables, live `sqlite_master` 107 including `_cf_KV`, 0 foreign-key violations).
-  Morning/Afternoon default to 7:00 AM / 12:30 PM with the earliest real fallback. Quoted labor
-  hours are converted to the smallest crew that finishes before 7:00 PM; a required second cleaner
-  no longer rejects the afternoon slot. A feasible but unstaffed time becomes a paid/Pay-Later
-  **staffing-pending reservation**: slot, price and payment are preserved, the customer sees a
-  disclosure, both payment paths remain, and a critical admin/owner notice plus dashboard, calendar
-  and Job File warnings stay until the crew is assigned. The Terms/Privacy modal decodes Cloudflare's
-  encoded email and renders a working `mailto:customer-service@sparkling-standard.com` link. The
-  retired gold-S floral monogram is archived outside `public/` with an authoritative brand inventory.
-  Centralized communications now covers staffing, complaints, cancellations, reschedules, refunds,
-  commercial/church inquiries and agreements, employee callouts/late arrivals and critical operational
-  failures, with optional per-branch recipient overrides that can never redirect critical alerts.
-  Contact-form complaints escalate to admin and owner; commercial/church inquiries route to their
-  dedicated recipients. Backup alerting reads `vars.OPS_ALERT_URL`, a controlled failure/recovery
-  notification test passed, the Worker dispatch ref is `main`, and a live scheduled backup succeeded
-  (`source=schedule`, run `45717896707`, archive `2026-11-25T23-01-23`, R2 + OneDrive verified,
-  isolated restore 63 migrations/106 tables). A post-migration complete backup (run `45711067126`)
-  captured 63 migrations/106 application tables, 227 files, 10,794,502 bytes, SHA-256
-  `7fb93022172eb44168d50b503937caa4e421565f8f0a70b9af1a426f55c3423e`. Verified: unit **1,140**
-  (1,139 pass, 1 pre-existing skip), browser **285/285**, `astro check` 0 errors, 41 pages, 2,636 links.
-  No live customer email, charge, refund, booking, hold or signed agreement was created. Owner action
-  remaining: rotate the backup Worker GitHub token to a fine-grained Actions-only token. Commercial
-  proposals/agreements, employee payroll/training and Tampa activation remain the next packages.
-  Evidence: `docs/verification/2026-11-25-P0-RESIDENTIAL-CHECKOUT-CORRECTIONS.md` and
+- **Current release (2026-11-26 commercial, employee, payroll, training and Tampa readiness):**
+  application code `bf03b36` on `main` and `production-safe` (identical), Cloudflare Pages production
+  deployment `2ef5eebb-f770-450b-9508-307996bb0e32`, verified live. Migrations `0064`-`0066` add
+  commercial proposals/contracts/facility contacts/walkthroughs, employee onboarding/training/quality/
+  performance/time-off/payroll and the failed-email retry queue (66 production migrations, 123 live
+  tables including `_cf_KV`, 0 foreign-key violations). Admin now has **Commercial Accounts** (custom
+  multi-location proposals, server-calculated totals/tax/discounts, revisions/expiration, approved
+  agreement packet + electronic signing, accepted-proposal contracts, Net 15 period invoices, facility
+  contacts and walkthroughs) and **Employees & Payroll** (profiles, emergency contacts, wage rates,
+  handbook, onboarding, shifts, time off, training, quality inspections, performance notes, payroll
+  calculation/overtime/approvals/CSV). The employee portal adds training self-completion, shifts,
+  approved earnings and time-off requests. Communications adds an owner retry/discard queue for failed
+  provider emails and manager/finance role scoping; Google review automation was re-verified with
+  requests disabled and no backlog flush. Tampa readiness now includes a server-derived checklist
+  (staffing, manager, calendar, timezone, services, review URL, origin, travel limit, GBP) that blocks
+  live activation until complete. Verified: unit **1,158** (1,157 pass, 1 pre-existing skip), browser
+  **287/287**, `astro check` 0 errors, 41 pages, 2,636 links; migrations applied before deployment;
+  unauthenticated new APIs return 401. No live customer email, charge, refund, booking, signature,
+  payroll disbursement or public Tampa activation occurred. Owner action remains: rotate the backup
+  Worker GitHub token to a fine-grained Actions-only token. Evidence:
+  `docs/verification/2026-11-25-OPERATIONS-EXPANSION.md`,
+  `docs/verification/2026-11-25-P0-RESIDENTIAL-CHECKOUT-CORRECTIONS.md` and
   `docs/verification/2026-11-25-COMMUNICATIONS-EXPANSION.md`.
 - **Prior release (2026-11-25 centralized backup control and branch consolidation):** application code
   3881a8f on production-safe and main (identical, zero divergence), Cloudflare Pages deployment

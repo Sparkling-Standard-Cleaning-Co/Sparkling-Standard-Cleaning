@@ -371,7 +371,7 @@ async function renderCommercialEditor(): Promise<void> {
   const status = String(proposal?.status ?? 'draft');
   const revisionAllowed = Boolean(proposal) && status !== 'accepted' && status !== 'archived';
   target.innerHTML = `<div class="admin-card">
-    <div class="admin-detail-head"><h3>${proposal ? `Proposal ${escUi(proposal.proposal_number)} (v${escUi(proposal.version)})` : 'New commercial proposal'}</h3><button class="btn btn--ghost btn--small" type="button" data-commercial-action="close-editor">Close</button></div>
+    <div class="admin-detail-head"><h3>${proposal ? `Proposal ${escUi(proposal.proposal_number)} (v${escUi(proposal.version)})` : 'New commercial proposal'}</h3><div class="admin-actions">${commercialState.editingId ? '<button class="btn btn--secondary btn--small" type="button" data-commercial-action="preview">Preview / print</button>' : ''}<button class="btn btn--ghost btn--small" type="button" data-commercial-action="close-editor">Close</button></div></div>
     <div class="admin-form admin-form--grid">
       <label>Customer <select data-commercial-field="customerId"${commercialState.editingId ? ' disabled' : ''}><option value="">Choose a customer</option>${customerOptions}</select></label>
       <label>Primary facility <select data-commercial-field="propertyId">${commercialPropOptions(String(proposal?.property_id ?? ''), String(proposal?.customer_id ?? ''))}</select></label>
@@ -606,6 +606,13 @@ document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventL
     void renderCommercialEditor();
   }
   if (action === 'edit') run(openCommercialProposal(id));
+  if (action === 'preview') {
+    window.open(
+      `/api/admin/commercial?view=proposal_preview&id=${encodeURIComponent(commercialState.editingId)}`,
+      '_blank',
+      'noopener',
+    );
+  }
   if (action === 'close-editor') {
     commercialState.editingId = '';
     commercialState.editingProposal = null;
@@ -757,3 +764,8 @@ document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventL
       .catch((error) => commercialSetStatus(friendlyUi(error), 'error'));
   }
 });
+
+export async function openCommercialProposalFromCustomer(id: string): Promise<void> {
+  await loadCommercial();
+  await openCommercialProposal(id);
+}

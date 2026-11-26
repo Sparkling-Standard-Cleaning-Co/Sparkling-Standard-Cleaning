@@ -407,6 +407,26 @@ export async function getCustomer(
         ).bind(customerId).all().catch(() => ({ success: true, results: [] }))
       : Promise.resolve({ success: true, results: [] }),
   ]);
+  const [commercialProposals, commercialContracts] = await Promise.all([
+    db
+      .prepare(
+        `SELECT id, proposal_number, title, status, recurring_total_cents, first_invoice_total_cents,
+                expiration_date, contract_id, created_at
+         FROM commercial_proposals WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+      )
+      .bind(customerId)
+      .all<Record<string, unknown>>()
+      .catch(() => ({ success: true, results: [] as Array<Record<string, unknown>> })),
+    db
+      .prepare(
+        `SELECT id, status, start_date, billing_frequency, payment_terms, recurring_total_cents,
+                next_invoice_date, created_at
+         FROM commercial_contracts WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`,
+      )
+      .bind(customerId)
+      .all<Record<string, unknown>>()
+      .catch(() => ({ success: true, results: [] as Array<Record<string, unknown>> })),
+  ]);
   const paymentRows = payments.results ?? [];
   const communicationRows = communications.results ?? [];
   const reviewRequestRows = reviewRequests.results ?? [];
@@ -435,6 +455,8 @@ export async function getCustomer(
     reviewRequests: reviewRequestRows,
     jobMedia: jobMediaRows,
     tipAllocations: tipAllocationRows,
+    commercialProposals: commercialProposals.results ?? [],
+    commercialContracts: commercialContracts.results ?? [],
     timeline: buildCustomerTimeline({
       leads: leads.results ?? [],
       estimates: estimates.results ?? [],

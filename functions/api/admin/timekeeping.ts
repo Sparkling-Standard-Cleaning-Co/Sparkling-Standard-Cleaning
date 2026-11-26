@@ -85,6 +85,16 @@ async function weekPayload(
     )
     .bind(bounds.startIso, bounds.endIso, ...scope.bind)
     .all<Record<string, unknown>>();
+  const appointments = await db
+    .prepare(
+      `SELECT a.id, a.start_at, a.status, ar.team_member_id
+       FROM appointments a
+       JOIN appointment_resources ar ON ar.appointment_id = a.id
+       WHERE a.start_at >= ? AND a.start_at < ?
+         AND a.status IN ('confirmed','in_progress','completed')`,
+    )
+    .bind(bounds.startIso, bounds.endIso)
+    .all<{ id: string; start_at: string; status: string; team_member_id: string }>();
   const corrections = await db
     .prepare(
       `SELECT tcr.id, tcr.interval_id, tcr.admin_user_id, tcr.requested_started_at, tcr.requested_ended_at,
@@ -113,6 +123,19 @@ async function weekPayload(
       },
       openInterval: rows.find((interval) => !interval.ended_at) ?? null,
       missingClockOut: rows.some((interval) => isMissingClockOut(interval as unknown as TimeIntervalLike, now)),
+      lateArrivals: (appointments.results ?? [])
+        .filter((appointment) => appointment.team_member_id === member.id)
+        .filter((appointment) => Date.parse(appointment.start_at) < now.getTime())
+        .map((appointment) => {
+          const first = rows
+            .filter((row) => row.appointment_id === appointment.id && row.kind === 'work')
+            .sort((a, b) => String(a.started_at).localeCompare(String(b.started_at)))[0];
+          const lateMinutes = first
+            ? Math.round((Date.parse(String(first.started_at)) - Date.parse(appointment.start_at)) / 60_000)
+            : null;
+          return { appointmentId: appointment.id, scheduledStart: appointment.start_at, firstClockIn: first?.started_at ?? null, lateMinutes };
+        })
+        .filter((entry) => entry.lateMinutes === null || entry.lateMinutes > 10),
     };
   });
   return {

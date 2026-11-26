@@ -59,18 +59,28 @@ export async function updateEmployeeProfile(
     .first<Record<string, unknown>>();
   if (!existing) throw new AdminAuthError(404, 'employee_not_found');
   const status = input.status === 'inactive' ? 'inactive' : input.status === 'active' ? 'active' : String(existing.status);
+  const branchId = ['branch_pensacola', 'branch_tampa'].includes(String(input.branchId))
+    ? String(input.branchId)
+    : String(existing.branch_id ?? '');
+  if (actor.role !== 'owner' && actor.branchId && branchId !== actor.branchId) {
+    throw new AdminAuthError(403, 'branch_scope_denied');
+  }
   const payRegular = cents(input.payRateRegular, Number(existing.pay_rate_regular_cents ?? 1800));
   const payLead = cents(input.payRateLead, Number(existing.pay_rate_lead_cents ?? 2200));
   const paySolo = cents(input.payRateSolo, Number(existing.pay_rate_solo_cents ?? 2500));
   const rateType = ['regular', 'lead', 'solo'].includes(String(input.defaultRateType))
     ? String(input.defaultRateType)
     : String(existing.default_rate_type ?? 'regular');
-  const qualifications = Array.isArray(input.dispatchServices)
-    ? input.dispatchServices.map((value) => text(value, 60)).filter(Boolean).slice(0, 20)
-    : null;
+  const qualificationSource = Array.isArray(input.dispatchServices)
+    ? input.dispatchServices
+    : String(input.dispatchServices ?? '').split(',');
+  const qualifications = input.dispatchServices === undefined
+    ? null
+    : qualificationSource.map((value) => text(value, 60)).filter(Boolean).slice(0, 20);
   await db
     .prepare(
       `UPDATE team_members SET
+         branch_id = ?,
          display_name = ?,
          email = ?,
          phone = ?,
@@ -91,6 +101,7 @@ export async function updateEmployeeProfile(
        WHERE id = ?`,
     )
     .bind(
+      branchId || null,
       text(input.displayName, 160) || String(existing.display_name),
       text(input.email, 200).toLowerCase() || String(existing.email),
       text(input.phone, 40),
