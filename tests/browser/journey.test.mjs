@@ -637,7 +637,7 @@ test('reservation summary carries every answer and the call/text actions work', 
     assert.equal(fields.quoted_price, String(expectedResidentialPrice({ addonIds: ['inside_oven'] })));
     assert.match(fields.quote_reference, /^SS-\d{8}-[0-9A-Z]{6}$/);
     assert.equal(fields.quote_config_version, pricing.instantQuote.configVersion.value);
-    assert.equal(fields.service_address, '100 S Baylen');
+    assert.equal(fields.service_address, '100 S Baylen St');
     assert.equal(fields.address_unit, '');
     assert.equal(fields.address_confirmed, 'yes');
     assert.equal(fields.pin_latitude, '30.411100');
