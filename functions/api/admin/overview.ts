@@ -7,7 +7,9 @@ import {
 } from '../../../src/lib/admin/operations.ts';
 import { bookingConfig } from '../../../src/config/booking.ts';
 import { zonedTimeToUtc } from '../../../src/lib/booking/time.ts';
+import { classifyCheckoutSession } from '../../../src/lib/payments/checkout-inspection.ts';
 import {
+  alertResolutionSuppresses,
   applyAlertAction,
   readAlertStates,
   type OperationalAlertAction,
@@ -61,31 +63,8 @@ function stringOrNull(value: unknown): string | null {
 }
 
 function classifyCheckout(row: Record<string, unknown>, now: number): { category: string; explanation: string } {
-  const status = String(row.status ?? '');
-  const expires = Date.parse(String(row.expires_at ?? ''));
-  const session = String(row.stripe_session_id ?? '');
-  if (status === 'open' && Number.isFinite(expires) && expires <= now) {
-    return {
-      category: 'Abandoned checkout',
-      explanation: 'The customer opened Stripe Checkout but did not complete payment before the session expired. This is ordinary abandonment, not a platform failure.',
-    };
-  }
-  if (status === 'failed' && !session) {
-    return {
-      category: 'Checkout setup failure',
-      explanation: 'Stripe Checkout was never created. The quote, hold, payment configuration or provider request failed before a payment page existed.',
-    };
-  }
-  if (status === 'failed') {
-    return {
-      category: 'Provider/session failure',
-      explanation: 'A Stripe Checkout session was created but the application recorded a failure. Review the request detail and provider status before retrying.',
-    };
-  }
-  return {
-    category: 'Stale open checkout',
-    explanation: 'The session is still marked open after its expected window. Recheck the provider status before treating it as a failure.',
-  };
+  const result = classifyCheckoutSession(row, now);
+  return { category: result.category, explanation: result.explanation };
 }
 
 function workerRootCause(detail: string): string {
@@ -261,7 +240,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       db
         .prepare(
           `SELECT run_key, status, started_at, finished_at, errors, detail_json
-           FROM recurring_worker_runs WHERE status = 'failed'
+           FROM recurring_worker_runs
+           WHERE status = 'failed'
+             AND started_at > COALESCE((SELECT MAX(started_at) FROM recurring_worker_runs WHERE status = 'completed'), '')
            ORDER BY started_at DESC LIMIT 50`,
         )
         .all<Record<string, unknown>>(),
@@ -351,6 +332,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const addAlert = (input: Omit<AlertRecord, 'status'>): void => {
       if (input.count <= 0) return;
       const state = alertStates.get(input.key);
+      if (alertResolutionSuppresses(state, input.lastSeen)) return;
       const previousClosed = state?.status === 'resolved' || state?.status === 'dismissed';
       alerts.push({
         ...input,
@@ -466,7 +448,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       count: failedCheckouts,
       firstSeen: stringOrNull((checkoutRows.results ?? []).at(-1)?.created_at),
       lastSeen: stringOrNull((checkoutRows.results ?? [])[0]?.created_at),
-      view: 'calendar',
+      view: 'finance',
       filter: 'checkout',
       records: checkoutRecords,
       canRecheck: true,

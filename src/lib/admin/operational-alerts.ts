@@ -1,6 +1,23 @@
 import type { D1Database } from './d1.ts';
 import { AdminAuthError, audit, type AdminActor } from './operations.ts';
 
+/**
+ * A resolved/dismissed alert stays closed while the underlying records are no
+ * newer than the resolution. A genuinely new record after the resolution
+ * reopens it, so suppression is persistent without hiding a new incident.
+ */
+export function alertResolutionSuppresses(
+  state: Pick<OperationalAlertState, 'status' | 'last_seen_at'> | undefined,
+  lastSeen: string | null,
+): boolean {
+  if (!state || (state.status !== 'resolved' && state.status !== 'dismissed')) return false;
+  if (!lastSeen || !state.last_seen_at) return true;
+  const current = Date.parse(lastSeen);
+  const resolved = Date.parse(state.last_seen_at);
+  if (!Number.isFinite(current) || !Number.isFinite(resolved)) return true;
+  return current <= resolved;
+}
+
 export type OperationalAlertAction =
   | 'acknowledge'
   | 'investigate'
@@ -16,6 +33,7 @@ export interface OperationalAlertState {
   resolution_note: string;
   dismissed_at: string | null;
   updated_at: string;
+  last_seen_at: string | null;
 }
 
 const STATUS_BY_ACTION: Record<OperationalAlertAction, OperationalAlertState['status']> = {
@@ -34,7 +52,7 @@ export async function readAlertStates(
   const placeholders = keys.map(() => '?').join(',');
   const rows = await db
     .prepare(
-      `SELECT alert_key, status, acknowledged_at, resolved_at, resolution_note, dismissed_at, updated_at
+      `SELECT alert_key, status, acknowledged_at, resolved_at, resolution_note, dismissed_at, updated_at, last_seen_at
        FROM operational_alerts WHERE alert_key IN (${placeholders})`,
     )
     .bind(...keys)
@@ -120,6 +138,7 @@ export async function applyAlertAction(
       resolution_note: note,
       dismissed_at: null,
       updated_at: now,
+      last_seen_at: now,
     }
   );
 }

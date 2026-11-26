@@ -15,10 +15,12 @@ import {
   recordRefund,
   updateInvoiceStatus,
 } from '../../../src/lib/admin/billing.ts';
+import { classifyCheckoutSession } from '../../../src/lib/payments/checkout-inspection.ts';
 import {
   createCustomerBillingPortalSession,
   createInvoicePaymentLink,
   createInvoicePaymentPageLink,
+  expireInvoiceCheckoutSession,
   refundStripePayment,
   tipLinkForInvoice,
   type StripeBillingEnv,
@@ -46,6 +48,25 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   try {
     const actor = await requireActor(db, context.request, 'finance.read');
     const url = new URL(context.request.url);
+    if (url.searchParams.get('view') === 'checkout_sessions') {
+      const rows = await db
+        .prepare(
+          `SELECT cs.id, cs.booking_hold_id, cs.quote_reference, cs.attempt, cs.stripe_session_id,
+                  cs.status, cs.amount_cents, cs.created_at, cs.updated_at, cs.expires_at,
+                  r.id AS request_id
+           FROM checkout_sessions cs
+           LEFT JOIN booking_requests r ON r.hold_id = cs.booking_hold_id
+           ORDER BY cs.updated_at DESC LIMIT 100`,
+        )
+        .all<Record<string, unknown>>();
+      return json({
+        ok: true,
+        sessions: (rows.results ?? []).map((row) => ({
+          ...row,
+          classification: classifyCheckoutSession(row),
+        })),
+      });
+    }
     const id = url.searchParams.get('id') ?? '';
     if (id) {
       const invoice = await getInvoice(db, actor, id);
@@ -110,7 +131,19 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'create_invoice') return json({ ok: true, ...(await createInvoice(db, actor, body)) });
     if (action === 'invoice_status') {
-      await updateInvoiceStatus(db, actor, String(body.invoiceId ?? ''), String(body.status ?? ''));
+      const invoiceId = String(body.invoiceId ?? '');
+      const nextStatus = String(body.status ?? '');
+      if (nextStatus === 'void') {
+        const result = await getInvoice(db, actor, invoiceId);
+        if (!result) return json({ ok: false, error: 'invoice_not_found' }, 404);
+        const invoice = result.invoice as Record<string, unknown>;
+        const sessionId = String(invoice.stripe_checkout_session_id ?? '').trim();
+        if (sessionId) {
+          const expired = await expireInvoiceCheckoutSession(context.env, sessionId);
+          if (!expired) return json({ ok: false, error: 'invoice_session_unverified' }, 502);
+        }
+      }
+      await updateInvoiceStatus(db, actor, invoiceId, nextStatus);
       return json({ ok: true });
     }
     if (action === 'record_payment') return json({ ok: true, ...(await recordPayment(db, actor, body)) });

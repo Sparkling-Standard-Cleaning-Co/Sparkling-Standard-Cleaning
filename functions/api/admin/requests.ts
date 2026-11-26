@@ -477,7 +477,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const [requests, appointments, reservationLeads] = await Promise.all([
       db.prepare(
         `SELECT r.id, r.customer_id, r.status, r.quote_reference, r.requested_date, r.start_at, r.end_at,
-                r.duration_minutes, r.payload_json, r.created_at, r.closed_at, r.closed_reason,
+                r.duration_minutes, r.payload_json, r.created_at, r.closed_at, r.closed_reason, r.decline_reason,
                 r.archived_at, r.duplicate_of_request_id, r.previous_status, ${isTestSelect},
                 r.payment_status, r.payment_reference, r.payment_amount_cents, r.paid_at,
                 c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
@@ -641,6 +641,10 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           return json({ ok: false, error: 'test_request_migration_required' }, 503);
         }
       }
+      const reason = text(body.reason, 500);
+      if (operation === 'deny' && !reason) {
+        return json({ ok: false, error: 'decline_reason_required' }, 400);
+      }
       const preview: Array<{ id: string; ok: boolean; error?: string }> = [];
       for (const requestId of ids) {
         const row = await bulkRow(db, actor, requestId);
@@ -748,13 +752,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
                    closed_reason = ?, previous_status = 'pending', updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?`,
               )
-              .bind('Declined by bulk action (no customer email sent)', requestId)
+              .bind(reason, requestId)
               .run();
             await audit(db, {
               actorUserId: actor.id,
               action: 'request.bulk_declined',
               entityType: 'booking_request',
               entityId: requestId,
+              detail: reason,
             });
             results.push({ id: requestId, ok: true });
             continue;

@@ -226,6 +226,7 @@ import {
               </form>
               <div class="admin-bulk-toolbar" data-admin-request-bulk hidden>
                 <strong data-admin-request-bulk-count>0 selected</strong>
+                <label class="admin-bulk-toolbar__reason">Decline reason <input class="input" data-admin-request-bulk-reason maxlength="500" placeholder="Required before denying a request" /></label>
                 <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-select-visible">Select all visible</button>
                 <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-select-filtered">Select all filtered results</button>
                 <button class="btn btn--ghost btn--small" type="button" data-admin-action="request-clear-selection">Clear selection</button>
@@ -1438,6 +1439,14 @@ import {
               <div data-admin-invoices-pagination style="margin-top:.75rem;"></div>
               <div data-admin-invoice-detail style="margin-top:1rem;"></div>
               <div data-admin-invoice-controls style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <h2 class="admin-section-title">Checkout sessions</h2>
+              <p class="admin-muted">Read-only inspection of Stripe Checkout attempts. Failed setup/provider sessions need review; abandoned sessions are ordinary customer behavior.</p>
+              <div class="admin-inline-form">
+                <label>View <select data-admin-checkout-filter><option value="actionable" selected>Needs review + abandoned</option><option value="failed">Failed only</option><option value="abandoned">Abandoned only</option><option value="all">All sessions</option></select></label>
+              </div>
+              <div data-admin-checkout-sessions style="margin-top:.75rem;"></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;">
               <h2 class="admin-section-title">Create an invoice</h2>

@@ -548,10 +548,16 @@ export async function refundStripePayment(
   return { refundId: stripeRefundId, status: 'succeeded' };
 }
 
-async function expireInvoiceCheckoutSession(env: StripeBillingEnv, sessionId: string): Promise<boolean> {
+export async function expireInvoiceCheckoutSession(env: StripeBillingEnv, sessionId: string): Promise<boolean> {
   const key = env.STRIPE_SECRET_KEY?.trim();
   if (!key || !sessionId) return false;
   try {
+    const current = await stripeGet(env, `checkout/sessions/${encodeURIComponent(sessionId)}`);
+    const status = String(current.status ?? '');
+    // Already expired is safe; complete/in-progress payment must never be
+    // hidden by voiding the invoice.
+    if (status === 'expired') return true;
+    if (status !== 'open') return false;
     const response = await fetch(
       `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}/expire`,
       {

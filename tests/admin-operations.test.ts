@@ -127,3 +127,14 @@ test('deleted customers are excluded from active lists and available through the
   assert.equal(deleted.some((row) => row.id === 'cust_deleted'), true);
   assert.equal(deleted.some((row) => row.id === 'cust_active'), false);
 });
+
+import { alertResolutionSuppresses } from '../src/lib/admin/operational-alerts.ts';
+
+test('resolved alerts stay suppressed for existing records and reopen only for newer records', () => {
+  const state = { status: 'resolved' as const, last_seen_at: '2026-11-26T12:00:00.000Z' };
+  assert.equal(alertResolutionSuppresses(state, '2026-11-26T11:59:59.000Z'), true);
+  assert.equal(alertResolutionSuppresses(state, '2026-11-26T12:00:00.000Z'), true);
+  assert.equal(alertResolutionSuppresses(state, '2026-11-26T12:00:01.000Z'), false);
+  assert.equal(alertResolutionSuppresses({ status: 'new', last_seen_at: null }, '2026-11-26T12:00:00.000Z'), false);
+  assert.equal(alertResolutionSuppresses({ status: 'dismissed', last_seen_at: null }, null), true);
+});

@@ -16,7 +16,7 @@ import { DOCUMENT_BRAND_CSS, renderBrandedDocumentHtml } from '../lib/documents/
 import { displayVersion } from '../lib/documents/version-labels.ts';
 import { formatLaborAndSite } from '../lib/format/duration.ts';
 import { bookingConfig } from '../config/booking';
-import { effectiveCapacityPerMinute } from '../lib/booking/crew';
+import { scheduledMinutesForCrew } from '../lib/booking/crew';
 
 interface AdminActor {
   id: string;
@@ -1536,6 +1536,43 @@ function requestStage(request: Record<string, unknown>): string {
   return titleCase(String(request.status ?? ''));
 }
 
+function requestReviewReason(request: Record<string, unknown>): string {
+  const status = String(request.status ?? '');
+  if (request.archived_at) return String(request.closed_reason || 'Archived request');
+  if (String(request.duplicate_of_request_id ?? '')) return 'Duplicate request';
+  if (String(request.closed_at ?? '')) {
+    return String(request.closed_reason || request.decline_reason || 'Closed by staff');
+  }
+  if (Number(request.staffing_pending ?? 0) === 1) {
+    return String(request.staffing_reason || 'Additional cleaner required before service');
+  }
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = JSON.parse(String(request.payload_json ?? '{}')) as Record<string, unknown>;
+  } catch {
+    payload = {};
+  }
+  if (status === 'pending') {
+    const checkoutFailure = String(payload.checkout_failure_reason ?? payload.checkout_error ?? '').trim();
+    if (checkoutFailure) return `Checkout failed: ${checkoutFailure}`;
+    if (String(request.payment_status ?? '') === 'paid_awaiting_confirmation') return 'Payment received; confirmation checks are pending';
+    if (String(request.payment_status ?? '') === 'paid_awaiting_photos') return 'Payment received; required photos are still outstanding';
+    if (!String(request.customer_id ?? '').trim()) return 'Customer identity is not linked';
+    if (!String(request.property_id ?? '').trim()) return 'Service property is not linked';
+    if (String(payload.initial_deep_clean_required ?? '') === 'yes' && String(payload.initial_deep_clean_acknowledged ?? '') !== 'yes') {
+      return 'Initial Deep Cleaning acknowledgment is missing';
+    }
+    if (String(payload.photos_outstanding ?? '') === 'yes') return 'Required photos are still outstanding';
+    if (String(payload.verification_status ?? '') === 'unverifiable') return 'Server could not verify the quote; owner review required';
+    if (String(payload.address_confirmed ?? '') !== 'yes' && String(payload.address_method ?? '') !== 'gps') {
+      return 'Service address is not confirmed';
+    }
+    return 'Awaiting owner review';
+  }
+  if (status === 'declined') return String(request.decline_reason || request.closed_reason || 'Declined');
+  return '';
+}
+
 function requestPayment(request: Record<string, unknown>): string {
   const status = String(request.payment_status ?? 'unpaid');
   const amount = Number(request.payment_amount_cents);
@@ -1603,7 +1640,7 @@ function renderRequestRows(): void {
   }
   target.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th><input type="checkbox" data-admin-request-select-all-visible aria-label="Select all visible requests" /></th><th>Start</th><th>Reference</th><th>Customer</th><th>Service</th><th>Property</th><th>Payment</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows.map((request) => {
     const id = String(request.id);
-    return `<tr><td><input type="checkbox" data-admin-request-select value="${esc(id)}" aria-label="Select request ${esc(request.quote_reference ?? id)}" /></td><td>${esc(dateTime(request.start_at))}</td><td>${esc(request.quote_reference)}${Number(request.is_test) === 1 ? ' <span class="admin-status">Test</span>' : ''}</td><td>${esc([request.first_name, request.last_name].filter(Boolean).join(' ') || 'Unlinked request')}</td><td>${esc(requestServiceLabel(request))}</td><td>${esc(requestLocation(request))}</td><td>${esc(requestPayment(request))}</td><td><span class="admin-status">${esc(requestStage(request))}</span></td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(id)}">Open</button></td></tr>`;
+    return `<tr><td><input type="checkbox" data-admin-request-select value="${esc(id)}" aria-label="Select request ${esc(request.quote_reference ?? id)}" /></td><td>${esc(dateTime(request.start_at))}</td><td>${esc(request.quote_reference)}${Number(request.is_test) === 1 ? ' <span class="admin-status">Test</span>' : ''}</td><td>${esc([request.first_name, request.last_name].filter(Boolean).join(' ') || 'Unlinked request')}</td><td>${esc(requestServiceLabel(request))}</td><td>${esc(requestLocation(request))}</td><td>${esc(requestPayment(request))}</td><td><span class="admin-status">${esc(requestStage(request))}</span>${requestReviewReason(request) ? `<p class="admin-muted">${esc(requestReviewReason(request))}</p>` : ''}</td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(id)}">Open</button></td></tr>`;
   }).join('')}</tbody></table></div>`;
   updateRequestBulkToolbar();
 }
@@ -1870,6 +1907,7 @@ async function openRequest(requestId: string): Promise<void> {
     <dl class="admin-definition">
       <dt>Requested</dt><dd>${esc(dateTime(request.start_at, request.branch_id))} – ${esc(dateTime(request.end_at, request.branch_id))}</dd>
       <dt>Status</dt><dd>${esc(titleCase(status))}</dd>
+      <dt>Review reason</dt><dd>${esc(requestReviewReason(request) || 'None')}</dd>
       <dt>Customer</dt><dd>${esc(customerName || 'Not linked')}</dd>
       <dt>Contact</dt><dd>${esc(email || '—')}</dd>
       <dt>Property</dt><dd>${esc([request.line1, request.city, request.state, request.postal_code].filter(Boolean).join(', ') || String(payload.locationText ?? '—'))}</dd>
@@ -1913,6 +1951,8 @@ const leadPage: PageState & { status: string; q: string } = { status: 'active', 
 const customerPage: PageState & { q: string; status: string } = { q: '', status: 'active', limit: 25, offset: 0, sort: 'created_at' };
 const careerPage: PageState & { status: string; branch: string; q: string } = { status: '', branch: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
 const financePage: PageState & { status: string; q: string } = { status: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
+let checkoutSessions: Array<Record<string, unknown>> = [];
+let checkoutSessionFilter = 'review';
 
 function renderPager(
   target: HTMLElement | null,
@@ -2622,10 +2662,18 @@ async function loadRecurring(): Promise<void> {
   const runsTarget = document.querySelector<HTMLElement>('[data-admin-recurring-runs]');
   if (runsTarget) {
     const runs = data.workerRuns ?? [];
-    renderTable(runsTarget, ['Date', 'Status', 'Plans', 'Synced', 'Errors', 'Cause'], runs.map((run) => {
+    renderTable(runsTarget, ['Date', 'Status', 'Plans', 'Synced', 'Errors', 'Cause', 'Plan detail'], runs.map((run) => {
       let details: Array<Record<string, unknown>> = [];
       try { details = JSON.parse(String(run.detail_json ?? '[]')) as Array<Record<string, unknown>>; } catch { details = []; }
       const reasons = new Map<string, string>();
+      const failedPlans = details
+        .filter((detail) => String(detail.planId ?? '').trim())
+        .filter((detail) => {
+          const errors = (detail.errors as string[]) ?? [];
+          const conflicts = (detail.conflictDetails as Array<Record<string, unknown>>) ?? [];
+          return errors.length > 0 || conflicts.length > 0 || String(detail.status ?? '') === 'failed' || String(detail.status ?? '') === 'exception';
+        })
+        .slice(0, 12);
       for (const detail of details) {
         for (const conflict of (detail.conflictDetails as Array<Record<string, unknown>>) ?? []) {
           const reason = String(conflict.reason ?? 'unknown');
@@ -2637,7 +2685,16 @@ async function loadRecurring(): Promise<void> {
         }
       }
       const cause = reasons.size ? [...reasons.values()].join('; ') : (String(run.status) === 'completed' ? 'No failure' : 'Unclassified');
-      return [esc(run.run_key), esc(titleCase(run.status)), esc(run.plans_scanned ?? 0), esc(run.plans_synced ?? 0), esc(run.errors ?? 0), esc(cause)];
+      const planDetail = failedPlans.length
+        ? `<details class="admin-detail-toggle"><summary>${failedPlans.length} failed plan(s)</summary><ul class="admin-result-list">${failedPlans.map((detail) => {
+            const planId = String(detail.planId);
+            const errors = ((detail.errors as string[]) ?? []).map((error) => recurringReasonLabel(String(error).split(':').pop() ?? String(error)));
+            const conflicts = ((detail.conflictDetails as Array<Record<string, unknown>>) ?? []).map((conflict) => recurringReasonLabel(String(conflict.reason ?? 'unknown')));
+            const labels = [...new Set([...errors, ...conflicts])];
+            return `<li><strong>${esc(planId)}</strong> ${esc(labels.join('; ') || 'failed')}${writable ? ` <button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(planId)}">Retry sync</button>` : ''}</li>`;
+          }).join('')}</ul></details>`
+        : '<span class="admin-muted">No plan-level failure recorded.</span>';
+      return [esc(run.run_key), esc(titleCase(run.status)), esc(run.plans_scanned ?? 0), esc(run.plans_synced ?? 0), esc(run.errors ?? 0), esc(cause), planDetail];
     }), 'No recurring worker runs recorded.');
   }
   await loadCustomerOptions();
@@ -4047,11 +4104,12 @@ function applyQuickProperty(): void {
 }
 
 function quickOnSiteMinutes(laborHours: number, crewSize: number): number {
-  const capacity = effectiveCapacityPerMinute(crewSize, bookingConfig.crewEfficiency);
-  return Math.min(
-    bookingConfig.maximumJobMinutes,
-    Math.max(bookingConfig.minimumJobMinutes, Math.ceil((laborHours * 60) / capacity / 15) * 15),
-  );
+  return scheduledMinutesForCrew(laborHours, crewSize, {
+    minimumJobMinutes: bookingConfig.minimumJobMinutes,
+    maximumJobMinutes: bookingConfig.maximumJobMinutes,
+    efficiency: bookingConfig.crewEfficiency,
+    slotMinutes: bookingConfig.slotMinutes,
+  });
 }
 
 function quickCrewPlanning(laborHours: number | null): string {
@@ -5035,6 +5093,42 @@ async function loadFinance(): Promise<void> {
     ]), 'No invoices are recorded yet.');
   }
   await loadCustomerOptions();
+  await loadCheckoutSessions().catch((error) => {
+    const target = document.querySelector<HTMLElement>('[data-admin-checkout-sessions]');
+    if (target) target.innerHTML = `<p class="admin-error">${esc(friendly(error))}</p>`;
+  });
+}
+
+function renderCheckoutSessions(): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-checkout-sessions]');
+  if (!target) return;
+  const filtered = checkoutSessions.filter((session) => {
+    const category = String((session.classification as Record<string, unknown> | undefined)?.category ?? '');
+    if (checkoutSessionFilter === 'failed') return category === 'Setup failure' || category === 'Provider/session failure';
+    if (checkoutSessionFilter === 'abandoned') return category === 'Abandoned checkout';
+    if (checkoutSessionFilter === 'review') return category !== 'Completed' && category !== 'Superseded' && category !== 'Expired';
+    return true;
+  });
+  renderTable(target, ['Updated', 'Reference', 'Status', 'Amount', 'Classification', 'Stripe session', 'Action'], filtered.map((session) => {
+    const classification = (session.classification ?? {}) as Record<string, unknown>;
+    return [
+      esc(dateTime(session.updated_at)),
+      esc(String(session.quote_reference ?? session.id ?? 'Checkout')),
+      `<span class="admin-status">${esc(titleCase(String(session.status ?? '')))}</span>`,
+      esc(money(session.amount_cents)),
+      `<strong>${esc(String(classification.category ?? 'Unknown'))}</strong><p class="admin-muted">${esc(String(classification.explanation ?? ''))}</p>`,
+      esc(String(session.stripe_session_id ?? 'Not created')),
+      session.request_id
+        ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(session.request_id)}">Open request</button>`
+        : '<span class="admin-muted">No linked request</span>',
+    ];
+  }), 'No checkout sessions match this view.');
+}
+
+async function loadCheckoutSessions(): Promise<void> {
+  const data = await api<{ sessions?: Array<Record<string, unknown>> }>('/api/admin/finance?view=checkout_sessions');
+  checkoutSessions = data.sessions ?? [];
+  renderCheckoutSessions();
 }
 
 const invoiceSendInFlight = new Set<string>();
@@ -5143,6 +5237,16 @@ async function openInvoice(invoiceId: string): Promise<void> {
   if (controls) {
     controls.innerHTML = `<a class="btn btn--secondary btn--small" href="/api/admin/invoice-document?id=${encodeURIComponent(invoiceId)}">Download invoice PDF</a>` +
       (can('finance.write') ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="customer-billing-portal" data-id="${esc(invoice.customer_id)}">Open secure billing portal</button>` : '');
+    if (
+      can('finance.write') &&
+      !['paid', 'void'].includes(String(invoice.status)) &&
+      Number(invoice.amount_paid_cents ?? 0) === 0
+    ) {
+      controls.insertAdjacentHTML(
+        'beforeend',
+        `<button class="btn btn--danger btn--small" type="button" data-admin-action="invoice-void" data-id="${esc(invoiceId)}">Void invoice</button>`,
+      );
+    }
     if (String(invoice.status) === 'paid' && can('finance.write')) {
       const latestReceipt = receipts[0];
       controls.insertAdjacentHTML(
@@ -8084,6 +8188,11 @@ document.querySelector<HTMLFormElement>('[data-admin-customer-search]')?.addEven
   void loadCustomers().catch((error) => setAppError(friendly(error)));
 });
 
+document.querySelector<HTMLSelectElement>('[data-admin-checkout-filter]')?.addEventListener('change', (event) => {
+  checkoutSessionFilter = (event.target as HTMLSelectElement).value;
+  renderCheckoutSessions();
+});
+
 document.querySelector<HTMLFormElement>('[data-admin-finance-filter]')?.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = new FormData(event.currentTarget as HTMLFormElement);
@@ -9451,6 +9560,27 @@ document.addEventListener('click', (event) => {
   if (actionName === 'job-checklist') void openChecklist(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'checklist-create') void action('/api/admin/operations', { action: 'create_checklist', appointmentId: id }).then(() => openChecklist(id));
   if (actionName === 'invoice-open') void openInvoice(id).catch((error) => setAppError(friendly(error)));
+  if (actionName === 'invoice-void') {
+    void (async () => {
+      const confirmed = await adminConfirm({
+        title: 'Void this invoice?',
+        body: '<p>This closes the invoice, clears its secure payment link and expires any open Stripe session. The record, lines and audit history are preserved. An invoice with any recorded payment cannot be voided.</p>',
+        confirmLabel: 'Void invoice',
+        danger: true,
+      });
+      if (!confirmed) return;
+      try {
+        await api('/api/admin/finance', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'invoice_status', invoiceId: id, status: 'void' }),
+        });
+        setSuccess('Invoice voided. Existing records and audit history were preserved.');
+        await openInvoice(id);
+      } catch (error) {
+        setAppError(friendly(error));
+      }
+    })();
+  }
   if (actionName === 'job-open') void openCalendarJob(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'job-invoice-open') void openCalendarJobInvoice(id).catch((error) => setAppError(friendly(error)));
   if (actionName === 'change-order-approve') {
@@ -9652,8 +9782,8 @@ document.addEventListener('click', (event) => {
           if (select) select.value = 'pending';
           return loadCalendar('pending');
         }
-        if (view === 'calendar' && filter === 'checkout') {
-          setAppError('Checkout sessions are classified in the alert. Abandoned checkouts are ordinary; inspect failed setup/provider sessions in Finance or the request detail.');
+        if (filter === 'checkout') {
+          document.querySelector<HTMLElement>('[data-admin-checkout-sessions]')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
         }
         return undefined;
       })
@@ -9711,6 +9841,11 @@ document.addEventListener('click', (event) => {
       delete_test: 'Delete',
     };
     const label = labels[operation] ?? titleCase(operation);
+    const declineReason = document.querySelector<HTMLInputElement>('[data-admin-request-bulk-reason]')?.value.trim() ?? '';
+    if (operation === 'deny' && !declineReason) {
+      setAppError('Enter the specific reason for declining these requests before continuing.');
+      return;
+    }
     void (async () => {
       try {
         const preview = await api<{
@@ -9720,7 +9855,7 @@ document.addEventListener('click', (event) => {
           results?: Array<{ id: string; ok: boolean; error?: string }>;
         }>('/api/admin/requests', {
           method: 'POST',
-          body: JSON.stringify({ action: 'bulk_preview', operation, requestIds: ids }),
+          body: JSON.stringify({ action: 'bulk_preview', operation, requestIds: ids, reason: declineReason }),
         });
         const eligible = Number(preview.eligible ?? 0);
         const ineligible = Number(preview.ineligible ?? 0);
@@ -9756,7 +9891,7 @@ document.addEventListener('click', (event) => {
           results?: Array<{ id: string; ok: boolean; error?: string }>;
         }>('/api/admin/requests', {
           method: 'POST',
-          body: JSON.stringify({ action: 'bulk', operation, requestIds: ids, confirm: true }),
+          body: JSON.stringify({ action: 'bulk', operation, requestIds: ids, confirm: true, reason: declineReason }),
         });
         const failed = (result.results ?? []).filter((entry) => !entry.ok);
         const resultNode = document.querySelector<HTMLElement>('[data-admin-request-bulk-result]');

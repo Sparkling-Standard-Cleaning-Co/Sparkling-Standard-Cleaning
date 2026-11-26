@@ -2041,13 +2041,15 @@ test('bulk reservation actions reach the real handler, preview eligibility and p
     operation: 'deny',
     confirm: true,
     requestIds: ['BR-BULK-ACTIVE'],
+    reason: 'Customer asked to withdraw the request before scheduling.',
   });
   assert.equal(denied.status, 200);
   const deniedRow = db.raw
-    .prepare('SELECT status, closed_at FROM booking_requests WHERE id = ?')
-    .get('BR-BULK-ACTIVE') as { status: string; closed_at: string | null };
+    .prepare('SELECT status, closed_at, closed_reason FROM booking_requests WHERE id = ?')
+    .get('BR-BULK-ACTIVE') as { status: string; closed_at: string | null; closed_reason: string };
   assert.equal(deniedRow.status, 'declined');
   assert.ok(deniedRow.closed_at);
+  assert.match(deniedRow.closed_reason, /withdraw the request/);
 
   const archivedAfterDeny = await post({ action: 'archive', requestId: 'BR-BULK-ACTIVE' });
   assert.equal(archivedAfterDeny.status, 200, 'a closed record can be archived individually');
