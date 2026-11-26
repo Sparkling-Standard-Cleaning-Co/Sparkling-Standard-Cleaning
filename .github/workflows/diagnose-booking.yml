@@ -54,6 +54,14 @@ jobs:
         run: |
           npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
             "SELECT alert_key,kind,status,title,first_seen_at,last_seen_at,resolution_note FROM operational_alerts WHERE kind LIKE '%booking%' OR alert_key LIKE '%booking%' ORDER BY updated_at DESC LIMIT 20;" || true
+      - name: Checkout failure diagnostics
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT id,status,quote_reference,json_extract(payload_json,'\$.checkout_failure_code') AS failure_code,json_extract(payload_json,'\$.checkout_failure_reason') AS failure_reason,json_extract(payload_json,'\$.checkout_failure_at') AS failure_at,created_at,updated_at FROM booking_requests WHERE json_extract(payload_json,'\$.checkout_failure_code') IS NOT NULL ORDER BY created_at DESC LIMIT 20;"
+      - name: Checkout failure counts
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT json_extract(payload_json,'\$.checkout_failure_code') AS failure_code,COUNT(*) AS count,MAX(created_at) AS latest FROM booking_requests WHERE json_extract(payload_json,'\$.checkout_failure_code') IS NOT NULL GROUP BY failure_code ORDER BY count DESC;"
       - name: Payment and booking tables present
         run: |
           npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
