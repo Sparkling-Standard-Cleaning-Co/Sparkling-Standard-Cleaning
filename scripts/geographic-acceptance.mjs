@@ -246,7 +246,7 @@ async function main() {
           fail(`${row.zip} ${row.address}: production geocode county ${row.productionGeocode.county} != ${row.expectedCounty}`);
         }
       }
-      await sleep(700);
+      await sleep(1100);
     }
   }
 
@@ -284,6 +284,19 @@ async function main() {
     }
   }
 
+  if (args.has('--merge') && fs.existsSync(OUTPUT)) {
+    try {
+      const previous = JSON.parse(fs.readFileSync(OUTPUT, 'utf8'));
+      const byKey = new Map((previous.results ?? []).map((row) => [row.zip + '|' + row.address, row]));
+      for (const row of results) {
+        const old = byKey.get(row.zip + '|' + row.address);
+        if (old?.travel) row.travel = old.travel;
+        if (old?.calendar) row.calendar = old.calendar;
+      }
+    } catch {
+      // A missing or unreadable previous run simply means no merge.
+    }
+  }
   const zipAudit = buildZipAudit();
   const summary = {
     generatedAt: new Date().toISOString(),
