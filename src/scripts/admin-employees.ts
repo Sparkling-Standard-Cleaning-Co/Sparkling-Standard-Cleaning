@@ -157,12 +157,15 @@ function renderEmployees(): void {
   const profileRows = employeeState.profiles
     .map((employee) => {
       const expiring = employee.license_expires_on || employee.work_authorization_expires_on;
+      const expiresSoon = [employee.license_expires_on, employee.work_authorization_expires_on]
+        .filter((value): value is string => typeof value === 'string' && Boolean(value))
+        .some((value) => Date.parse(value) <= Date.now() + 60 * 86_400_000);
       return `<tr>
         <td><button class="btn btn--ghost btn--small" type="button" data-employee-action="select" data-id="${escE(employee.id)}">${escE(employee.display_name)}</button><br /><span class="admin-muted">${escE(employee.email || '')}</span></td>
         <td>${escE(titleE(String(employee.status ?? '')))}${Number(employee.is_bookable) === 1 ? ' · bookable' : ' · not bookable'}</td>
         <td>${escE(titleE(String(employee.default_rate_type ?? 'regular')))} · ${escE(moneyE(employee.pay_rate_regular_cents))} / ${escE(moneyE(employee.pay_rate_lead_cents))} / ${escE(moneyE(employee.pay_rate_solo_cents))}</td>
         <td>${Number(employee.pending_onboarding ?? 0)} onboarding · ${Number(employee.pending_training ?? 0)} training</td>
-        <td>${expiring ? escE(expiring) : '—'}${employee.handbook_acknowledged_at ? '' : '<br /><span class="admin-warning">Handbook not acknowledged</span>'}</td>
+        <td>${expiring ? escE(expiring) : '—'}${expiresSoon ? '<br /><span class="admin-warning">Credential expires within 60 days</span>' : ''}${employee.handbook_acknowledged_at ? '' : '<br /><span class="admin-warning">Handbook not acknowledged</span>'}</td>
         <td><button class="btn btn--secondary btn--small" type="button" data-employee-action="select" data-id="${escE(employee.id)}">Open file</button></td>
       </tr>`;
     })
