@@ -1,0 +1,60 @@
+name: Diagnose booking readiness (read only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
+    steps:
+      - name: Resolve the production database id
+        run: |
+          set -o pipefail
+          DATABASE_ID=$(curl -fsS \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database?name=${D1_DATABASE_NAME}" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            | jq -r --arg name "$D1_DATABASE_NAME" '.result[] | select(.name == $name) | .uuid' | head -n1)
+          test -n "$DATABASE_ID" || (echo "D1 database id could not be resolved" && exit 1)
+          jq -n --arg name "$D1_DATABASE_NAME" --arg id "$DATABASE_ID" \
+            '{d1_databases:[{binding:"DB",database_name:$name,database_id:$id,migrations_dir:"migrations"}]}' \
+            > wrangler.diag.jsonc
+      - name: Branch and calendar configuration
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT id,name,status,lifecycle_status,timezone,calendar_id,calendar_name,origin_lat,origin_lng,travel_limit_miles,service_area_json,services_json,public_phone,public_email FROM branches ORDER BY id;"
+      - name: Bookable team resources
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT id,branch_id,display_name,email,status,is_bookable,is_lead,is_solo,booking_resource_id FROM team_members ORDER BY branch_id,display_name;"
+      - name: Booking and checkout state
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT (SELECT COUNT(*) FROM booking_requests) AS booking_requests, (SELECT COUNT(*) FROM booking_requests WHERE status='pending') AS pending_requests, (SELECT COUNT(*) FROM booking_requests WHERE status='confirmed') AS confirmed_requests, (SELECT COUNT(*) FROM checkout_sessions) AS checkout_sessions, (SELECT COUNT(*) FROM checkout_sessions WHERE status='open') AS open_checkouts, (SELECT COUNT(*) FROM checkout_sessions WHERE status='failed') AS failed_checkouts, (SELECT COUNT(*) FROM appointment_resources) AS appointment_resources, (SELECT COUNT(*) FROM appointments) AS appointments;"
+      - name: Recent booking requests
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT id,status,requested_date,start_at,end_at,quote_reference,created_at,updated_at FROM booking_requests ORDER BY created_at DESC LIMIT 15;"
+      - name: Recent checkout sessions
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT id,booking_hold_id,quote_reference,status,amount_cents,stripe_session_id,created_at,updated_at,expires_at FROM checkout_sessions ORDER BY created_at DESC LIMIT 15;"
+      - name: Recent failed checkout records
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT id,status,booking_hold_id,quote_reference,amount_cents,created_at,updated_at FROM checkout_sessions WHERE status='failed' ORDER BY created_at DESC LIMIT 15;"
+      - name: Recent communications failures related to booking
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT id,event_key,recipient,status,error_code,related_type,related_id,created_at FROM notification_deliveries WHERE status <> 'sent' ORDER BY created_at DESC LIMIT 20;" || true
+      - name: Payment and booking tables present
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('booking_requests','checkout_sessions','appointments','appointment_resources','team_members','invoices','payments') ORDER BY name;"
