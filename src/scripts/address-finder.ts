@@ -16,6 +16,7 @@
 
 import {
   buildGeocodeQuery,
+  confirmedStreetLine,
   formatLocationLine,
   houseNumberFromStreet,
   isPlausibleCoordinate,
@@ -1195,7 +1196,18 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
   }
 
   function buildManualConfirmed(candidate: ResolvedCandidate): ConfirmedLocation {
-    const streetText = streetField.value.trim();
+    // A selected exact provider result is authoritative for the street line.
+    // The customer may have typed an ambiguous abbreviation ("5134 hamilton");
+    // submitting that shortened text would make the server geocode a different
+    // road than the pin they selected. Street-level and approximate results
+    // keep the customer's typed street, never an invented house number.
+    const streetText = confirmedStreetLine(candidate.label, streetField.value, {
+      ...(candidate.city ? { city: candidate.city } : {}),
+      ...(candidate.state ? { state: candidate.state } : {}),
+      ...(candidate.zip ? { zip: candidate.zip } : {}),
+      ...(candidate.streetLevel ? { streetLevel: true } : {}),
+      ...(candidate.approximate ? { approximate: true } : {}),
+    });
     return {
       label: candidate.label,
       street: streetText || streetLineFromLabel(candidate.label),
@@ -1420,7 +1432,7 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       return {
         method,
         location: manualConfirmed,
-        street: streetField.value.trim(),
+        street: manualConfirmed?.street ?? streetField.value.trim(),
         unit: unitInput?.value.trim() ?? '',
         city: cityInput?.value.trim() ?? '',
         state: stateInput?.value ?? 'FL',

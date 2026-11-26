@@ -46,11 +46,12 @@ after(async () => {
   server?.kill();
 });
 
-async function openScenario({ staffingPending = false, checkoutFailure = null } = {}) {
+async function openScenario({ staffingPending = false, checkoutFailure = null, checkoutSequence = null } = {}) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   const page = await context.newPage();
   const holdRequests = [];
   const checkoutRequests = [];
+  let checkoutAttempt = 0;
   await page.addInitScript(() => {
     localStorage.setItem('pcc-consent-v1', JSON.stringify({ analytics: false, ads: false, v: 1 }));
     localStorage.setItem('pcc-promo-state', JSON.stringify({ state: 'dismissed', at: new Date().toISOString() }));
@@ -179,10 +180,14 @@ async function openScenario({ staffingPending = false, checkoutFailure = null } 
       return;
     }
     checkoutRequests.push(route.request().postDataJSON());
+    const scripted = checkoutSequence
+      ? checkoutSequence[Math.min(checkoutAttempt, checkoutSequence.length - 1)]
+      : null;
+    checkoutAttempt += 1;
     await route.fulfill({
-      status: checkoutFailure ? 409 : 503,
+      status: scripted?.status ?? (checkoutFailure ? 409 : 503),
       contentType: 'application/json',
-      body: JSON.stringify(checkoutFailure ?? { ok: false, error: 'payment_not_ready' }),
+      body: JSON.stringify(scripted?.body ?? checkoutFailure ?? { ok: false, error: 'payment_not_ready' }),
     });
   });
   await page.route('https://checkout.stripe.com/**', (route) => route.abort());
@@ -300,6 +305,27 @@ test('a verified-quote failure never permanently blocks Pay Now retry', async ()
     await retry.click();
     await page.waitForTimeout(300);
     assert.equal(checkoutRequests.length, 2, 'a second secure-payment attempt is allowed');
+  } finally {
+    await context.close();
+  }
+});
+
+test('an expired hold is refreshed and secure payment retries without a new lead', async () => {
+  const { context, page, holdRequests, checkoutRequests } = await openScenario({
+    checkoutSequence: [
+      { status: 409, body: { ok: false, error: 'booking_hold_expired' } },
+      { status: 200, body: { ok: true, url: 'https://checkout.stripe.com/test-session' } },
+    ],
+  });
+  try {
+    await chooseAddressAndDate(page);
+    await finishToPayment(page);
+    const stripeRequest = page.waitForRequest((request) => request.url().startsWith('https://checkout.stripe.com/'), { timeout: 15_000 });
+    await page.click('[data-pay-now]');
+    await stripeRequest;
+    assert.equal(holdRequests.length, 2, 'the client requests a fresh hold instead of replaying the expired one');
+    assert.equal(checkoutRequests.length, 2, 'the checkout is attempted again after the hold refresh');
+    assert.match(String(checkoutRequests[1]?.fields?.booking_hold_id ?? ''), /^\d{4}-\d{2}-\d{2}__/);
   } finally {
     await context.close();
   }

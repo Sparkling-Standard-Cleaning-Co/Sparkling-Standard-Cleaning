@@ -95,6 +95,24 @@ export function streetLineFromLabel(
   return line.replace(/[,\s]+$/, '') || label;
 }
 
+/**
+ * The street line that should be submitted for a confirmed manual candidate.
+ * An exact provider result wins over a shorter/ambiguous typed abbreviation
+ * (for example "5134 hamilton" vs "5134 Hamilton Bridge Rd"); street-level
+ * and approximate pins keep the customer's typed street and never invent a
+ * house number.
+ */
+export function confirmedStreetLine(
+  label: string,
+  typedStreet: string,
+  options: { city?: string; state?: string; zip?: string; streetLevel?: boolean; approximate?: boolean } = {},
+): string {
+  if (!options.streetLevel && !options.approximate) {
+    return streetLineFromLabel(label, options.city, options.state, options.zip) || typedStreet.trim();
+  }
+  return typedStreet.trim();
+}
+
 /** One-line display form used in the confirmation card and order summary. */
 export function formatLocationLine(location: ConfirmedLocation): string {
   const parts: string[] = [];

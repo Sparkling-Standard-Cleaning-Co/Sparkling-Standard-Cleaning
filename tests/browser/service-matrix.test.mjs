@@ -272,19 +272,12 @@ test('residential recurring: the rhythm matrix drives the two-price first-visit 
     assert.equal(await page.locator('[data-deep-cleaning]').isHidden(), true, 'the optional reset waits for a one-time choice');
     await page.selectOption('#est-frequency', 'weekly');
     assert.equal(await page.locator('[data-deep-cleaning]').isHidden(), true, 'recurring service never offers a second optional deep clean');
-    const pricing = page.locator('[data-recurring-deep-pricing]');
-    await pricing.waitFor({ state: 'visible' });
-    assert.match((await pricing.innerText()).replace(/\s+/g, ' '), /Following Visits: Weekly/);
+    assert.equal(await page.locator('[data-recurring-deep-pricing]').count(), 0, 'live condition-step pricing is not authorized');
+    assert.match(await page.locator('[data-recurring-deep]').innerText(), /Your First Cleaning/);
+    assert.match(await page.locator('[data-recurring-deep]').innerText(), /detailed Deep Cleaning/);
     await page.click('label.option:has(input[name="condition"][value="maintained"])');
     await page.selectOption('#est-last-clean', 'within_month');
     await page.selectOption('#est-pets', 'none');
-    await page.waitForFunction(() => {
-      const text = document.querySelector('[data-recurring-deep-pricing]')?.textContent ?? '';
-      return /First Visit: Deep Cleaning [—-] \$[\d,.]+/.test(text) && /per visit/.test(text);
-    });
-    const pricingText = (await pricing.innerText()).replace(/\s+/g, ' ');
-    assert.match(pricingText, /First Visit: Deep Cleaning [—-] \$[\d,.]+/);
-    assert.match(pricingText, /Following Visits: Weekly [—-] \$[\d,.]+ per visit/);
     const fields = await finishAndSubmit(page, captured, { deepAck: true });
     assert.equal(fields.service_type, 'standard');
     assert.equal(fields.frequency, 'weekly');

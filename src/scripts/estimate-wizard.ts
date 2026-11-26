@@ -584,52 +584,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
     return result.ongoing ? 'First Visit — Deep Cleaning' : 'Estimated Price';
   }
 
-  function updateRecurringDeepPricing(result: EstimateResult): void {
-    const block = form.querySelector<HTMLElement>('[data-recurring-deep-pricing]');
-    if (!block) return;
-    const firstEl = block.querySelector<HTMLElement>('[data-recurring-deep-first]');
-    const rhythmEl = block.querySelector<HTMLElement>('[data-recurring-deep-rhythm]');
-    const ongoingEl = block.querySelector<HTMLElement>('[data-recurring-deep-ongoing]');
-    const savingEl = block.querySelector<HTMLElement>('[data-recurring-deep-saving]');
-    if (!requiresInitialDeepClean()) {
-      block.hidden = true;
-      if (firstEl) firstEl.textContent = 'calculated after your home details';
-      if (rhythmEl) rhythmEl.textContent = 'maintenance';
-      if (ongoingEl) ongoingEl.textContent = 'calculated after your home details';
-      if (savingEl) savingEl.hidden = true;
-      return;
-    }
-    block.hidden = false;
-    if (!result.ongoing || result.status !== 'estimated') {
-      if (firstEl) firstEl.textContent = 'calculated after your home details';
-      if (rhythmEl) {
-        const current = textValue('frequency');
-        const rhythm = current && current in FREQUENCY_RHYTHMS
-          ? FREQUENCY_RHYTHMS[current as keyof typeof FREQUENCY_RHYTHMS]
-          : 'maintenance';
-        rhythmEl.textContent = `${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)}`;
-      }
-      if (ongoingEl) ongoingEl.textContent = 'calculated after your home details';
-      if (savingEl) savingEl.hidden = true;
-      return;
-    }
-    const first = latestQuote?.amount ?? result.expectedPrice ?? result.low;
-    if (firstEl) firstEl.textContent = typeof first === 'number' ? formatUsd(first) : 'calculated after your home details';
-    if (rhythmEl) {
-      const rhythm = FREQUENCY_RHYTHMS[result.ongoing.frequency] ?? result.ongoing.frequency;
-      rhythmEl.textContent = `${rhythm.charAt(0).toUpperCase()}${rhythm.slice(1)}`;
-    }
-    if (ongoingEl) ongoingEl.textContent = formatUsd(result.ongoing.perVisitPrice);
-    if (savingEl) {
-      const allocation = ongoingDiscount(result);
-      savingEl.hidden = !allocation;
-      const savings = Math.max(0, result.ongoing.regularPerVisitPrice - result.ongoing.perVisitPrice);
-      savingEl.textContent = allocation
-        ? `${allocation.label}: -${formatUsd(savings, { forceCents: true })} off the ${formatUsd(result.ongoing.regularPerVisitPrice, { forceCents: true })} regular recurring rate.`
-        : '';
-    }
-  }
-
   function recalc(): EstimateResult {
     const input = gatherInput();
     const result = calculateEstimate(input, buildContext());
@@ -644,7 +598,6 @@ function initEstimateWizard(form: HTMLFormElement): void {
             destinationConfirmed: location !== null,
           })
         : null;
-    updateRecurringDeepPricing(result);
     discountQuoteChanged();
     renderResult(result);
     renderAddonPrices(result);
@@ -2772,6 +2725,50 @@ function initEstimateWizard(form: HTMLFormElement): void {
     }
   }
 
+  async function refreshBookingHold(): Promise<boolean> {
+    if (!bookingCalendar || !latestQuote) return false;
+    const result = recalc();
+    if (result.status !== 'estimated') return false;
+    // Force a fresh hold instead of replaying the expired one. The old hold is
+    // no longer active, so the same selected slot can be reserved again.
+    bookingFinalizedKey = '';
+    const finalized = await finalizeBookingForSubmit(result);
+    if (finalized.status !== 'held') {
+      if (status) {
+        status.dataset.state = 'info';
+        status.textContent = finalized.note || 'That time is no longer available. Choose another time or reserve without paying.';
+      }
+      return false;
+    }
+    const holdId = textValue('booking_hold_id') ?? '';
+    const holdExpiry = textValue('booking_hold_expires_at') ?? '';
+    if (!holdId || !holdExpiry) return false;
+    if (pendingPaymentFields) {
+      pendingPaymentFields.booking_hold_id = holdId;
+      pendingPaymentFields.booking_hold_expires_at = holdExpiry;
+    }
+    return true;
+  }
+
+  async function startSecurePaymentWithHoldRecovery(
+    fields: Record<string, string>,
+    acceptedAmount: number | null = null,
+  ): Promise<StartPaymentResult> {
+    let started = await startSecurePayment(fields, acceptedAmount);
+    if (
+      !started.ok &&
+      (started.error === 'booking_hold_expired' || started.error === 'booking_hold_mismatch')
+    ) {
+      if (status) {
+        status.dataset.state = 'info';
+        status.textContent = 'Refreshing your temporary hold before retrying secure payment.';
+      }
+      if (!(await refreshBookingHold())) return started;
+      started = await startSecurePayment(fields, acceptedAmount);
+    }
+    return started;
+  }
+
   async function retryPendingPayment(): Promise<void> {
     if (!pendingPaymentFields || paymentBusy) return;
     setPayNowBusy(true);
@@ -2779,7 +2776,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       status.dataset.state = 'info';
       status.textContent = 'Opening secure checkout…';
     }
-    const started = await startSecurePayment(pendingPaymentFields, acceptedPaymentAmount);
+    const started = await startSecurePaymentWithHoldRecovery(pendingPaymentFields, acceptedPaymentAmount);
     if (!started.ok) handlePaymentFailure(started);
   }
 
@@ -3020,7 +3017,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
         status.dataset.state = 'info';
         status.textContent = 'Request received. Opening secure checkout…';
       }
-      const started = await startSecurePayment(pendingPaymentFields, acceptedPaymentAmount);
+      const started = await startSecurePaymentWithHoldRecovery(pendingPaymentFields, acceptedPaymentAmount);
       if (!started.ok) handlePaymentFailure(started);
       return;
     }

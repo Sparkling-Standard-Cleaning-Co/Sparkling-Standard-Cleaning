@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildGeocodeQuery,
+  confirmedStreetLine,
   formatLocationLine,
   houseNumberFromStreet,
   isPlausibleCoordinate,
@@ -123,4 +124,24 @@ test('regionFromLabel never treats the state or street as the city', () => {
     city: 'Pensacola',
     state: 'AL',
   });
+});
+
+test('an exact selected provider result replaces an ambiguous typed abbreviation', () => {
+  assert.equal(
+    confirmedStreetLine(
+      '5134 Hamilton Bridge Rd, Pace, FL 32571, USA',
+      '5134 hamilton',
+      { city: 'Pace', state: 'FL', zip: '32571' },
+    ),
+    '5134 Hamilton Bridge Rd',
+  );
+  assert.equal(
+    confirmedStreetLine('Hamilton Bridge Rd, Pace, FL 32571', '5134 hamilton', {
+      city: 'Pace',
+      state: 'FL',
+      zip: '32571',
+      streetLevel: true,
+    }),
+    '5134 hamilton',
+  );
 });
