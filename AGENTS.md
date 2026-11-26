@@ -85,8 +85,8 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
 - **Current release (2026-11-26 commercial, employee, payroll, training and Tampa readiness):**
-  application code `bf03b36` on `main` and `production-safe` (identical), Cloudflare Pages production
-  deployment `2ef5eebb-f770-450b-9508-307996bb0e32`, verified live. Migrations `0064`-`0066` add
+  application code `106696d` on `main` and `production-safe` (identical), Cloudflare Pages production
+  deployment `aa3da477-d130-426d-9dad-883bdcf6affb`, verified live. Migrations `0064`-`0066` add
   commercial proposals/contracts/facility contacts/walkthroughs, employee onboarding/training/quality/
   performance/time-off/payroll and the failed-email retry queue (66 production migrations, 123 live
   tables including `_cf_KV`, 0 foreign-key violations). Admin now has **Commercial Accounts** (custom
