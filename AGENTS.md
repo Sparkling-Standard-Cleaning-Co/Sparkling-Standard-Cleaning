@@ -84,7 +84,21 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-26 final development and operational acceptance):** application code
+- **Current release (2026-11-26 booking and Pay Now recovery):** application code `79929b4` on `main`
+  and `production-safe`; migration `0068_booking_service_area_repair.sql` applied before deployment
+  (68 production migrations, 124 live tables, 0 foreign-key violations). Restores ZIP `32534`
+  serviceability, uses the customer-selected Google geocoding authority for server verification so a
+  valid pin is not rejected as divergent, and keeps `quote_not_payable` recoverable with a visible
+  retry. Quick Estimates now separate the initial Deep Cleaning from ongoing maintenance and show
+  crew-derived labor/site time. Adds a source-integrity preflight that blocks encoding corruption,
+  mid-file BOMs, conflict markers and malformed JSON. Verified: unit **1,169** (1,168 pass, 1
+  pre-existing skip), browser **289/289**, `astro check` 0 errors, 41 pages, 2,636 links; live 32534
+  availability returns Pensacola slots; CI `45874423041` green; complete backup run `45875757206`
+  (249 files, SHA-256 `44212718a01de2e6705ad7e858ed4f695fdccd954dbdb464ddf00ced1aa5b038`, R2 and
+  OneDrive verified, isolated restore 123 tables / 68 migrations). No live charge, booking or customer
+  email was created; test-mode Stripe credentials remain unavailable. Evidence:
+  `docs/verification/2026-11-26-BOOKING-RECOVERY.md`.
+- **Prior release (2026-11-26 final development and operational acceptance):** application code
   `00b8376` on `main` and `production-safe`, migration `0067_financial_accuracy_and_commercial_scheduling.sql`
   applied before deployment (67 production migrations, 124 live tables including `_cf_KV`, 0
   foreign-key violations). Checkout now omits the three owner-requested explanatory paragraphs while
