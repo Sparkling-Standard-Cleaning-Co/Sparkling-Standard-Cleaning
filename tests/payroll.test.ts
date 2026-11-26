@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+﻿import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -174,4 +174,145 @@ test('only the owner can approve payroll', async () => {
     "INSERT INTO admin_users (id, role_id, email, password_hash, display_name, status) VALUES ('admin_other', 'manager', 'admin@example.test', 'x', 'Admin', 'active')",
   ).run();
   await assert.rejects(approvePayrollPeriod(db, admin, period.id), /owner_required/);
+});
+
+test('mixed rates use the weighted-average regular rate for overtime', () => {
+  const entries = calculatePayrollEntries(
+    [
+      interval('r1', '2026-12-07T14:00:00.000Z', '2026-12-07T22:00:00.000Z', 'regular', 1800),
+      interval('r2', '2026-12-08T14:00:00.000Z', '2026-12-08T22:00:00.000Z', 'regular', 1800),
+      interval('r3', '2026-12-09T14:00:00.000Z', '2026-12-09T22:00:00.000Z', 'regular', 1800),
+      interval('s1', '2026-12-10T14:00:00.000Z', '2026-12-10T22:00:00.000Z', 'solo', 2500),
+      interval('s2', '2026-12-11T14:00:00.000Z', '2026-12-11T22:00:00.000Z', 'solo', 2500),
+      interval('s3', '2026-12-12T14:00:00.000Z', '2026-12-12T19:00:00.000Z', 'solo', 2500),
+    ],
+    [],
+  );
+  const entry = entries.get('team_pay');
+  assert.ok(entry);
+  assert.equal(entry.regularMinutes, 2400);
+  assert.equal(entry.overtimeMinutes, 300);
+  assert.equal(entry.regularCents, 95700, 'all 45 hours at their actual straight-time rates');
+  assert.equal(entry.overtimeCents, 5317, 'half-time premium at the weighted regular rate');
+  assert.equal(entry.grossCents, 101017);
+});
+
+test('paid breaks and travel count as hours worked for overtime', () => {
+  const entries = calculatePayrollEntries(
+    [
+      interval('w1', '2026-12-07T13:00:00.000Z', '2026-12-08T05:00:00.000Z', 'regular', 1800),
+      { ...interval('b1', '2026-12-08T05:00:00.000Z', '2026-12-08T06:00:00.000Z', 'regular', 1800), kind: 'break', paid: 1 },
+      { ...interval('tr1', '2026-12-08T06:00:00.000Z', '2026-12-08T08:00:00.000Z', 'regular', 1800), is_travel: 1 },
+      interval('w2', '2026-12-08T13:00:00.000Z', '2026-12-09T05:00:00.000Z', 'regular', 1800),
+      interval('w3', '2026-12-09T13:00:00.000Z', '2026-12-10T01:00:00.000Z', 'regular', 1800),
+      { ...interval('m1', '2026-12-10T01:00:00.000Z', '2026-12-10T02:00:00.000Z', 'regular', 1800), kind: 'meal', paid: 0 },
+      interval('w4', '2026-12-10T02:00:00.000Z', '2026-12-10T06:00:00.000Z', 'regular', 1800),
+    ],
+    [],
+  );
+  const entry = entries.get('team_pay');
+  assert.ok(entry);
+  assert.equal(entry.regularMinutes, 2400);
+  assert.equal(entry.overtimeMinutes, 660, '16h+1h paid break+2h travel+16h+12h+4h = 51 paid hours');
+  assert.equal(entry.regularCents, 51 * 1800);
+});
+
+test('partial pay periods consider the complete workweek but pay only in-period hours', () => {
+  const entries = calculatePayrollEntries(
+    [
+      interval('p1', '2026-12-07T14:00:00.000Z', '2026-12-07T22:00:00.000Z', 'regular', 1800),
+      interval('p2', '2026-12-08T14:00:00.000Z', '2026-12-08T22:00:00.000Z', 'regular', 1800),
+      interval('p3', '2026-12-09T14:00:00.000Z', '2026-12-09T22:00:00.000Z', 'regular', 1800),
+      interval('p4', '2026-12-10T14:00:00.000Z', '2026-12-10T22:00:00.000Z', 'regular', 1800),
+      interval('p5', '2026-12-11T14:00:00.000Z', '2026-12-11T22:00:00.000Z', 'regular', 1800),
+      interval('p6', '2026-12-12T14:00:00.000Z', '2026-12-12T22:00:00.000Z', 'regular', 1800),
+    ],
+    [],
+    { periodStart: '2026-12-12', periodEnd: '2026-12-12' },
+  );
+  const entry = entries.get('team_pay');
+  assert.ok(entry);
+  assert.equal(entry.regularMinutes, 0);
+  assert.equal(entry.overtimeMinutes, 480, 'Saturday sits beyond the 40-hour threshold');
+  assert.equal(entry.regularCents, 8 * 1800);
+  assert.equal(entry.overtimeCents, 8 * 900);
+});
+
+test('an interval crossing the workweek boundary is split correctly', () => {
+  const entries = calculatePayrollEntries(
+    [
+      interval('c1', '2026-12-14T04:00:00.000Z', '2026-12-14T08:00:00.000Z', 'regular', 1800),
+    ],
+    [],
+  );
+  const entry = entries.get('team_pay');
+  assert.ok(entry);
+  assert.equal(entry.regularMinutes, 240);
+  assert.deepEqual(Object.keys(entry.weeks).sort(), ['2026-12-07', '2026-12-14']);
+  assert.equal(entry.weeks['2026-12-07']?.regularMinutes, 120);
+  assert.equal(entry.weeks['2026-12-14']?.regularMinutes, 120);
+});
+
+test('multiple adjustments are preserved for an employee without intervals', () => {
+  const entries = calculatePayrollEntries([], [
+    { id: 'a1', team_member_id: 'team_pay', kind: 'bonus', amount_cents: 1000 },
+    { id: 'a2', team_member_id: 'team_pay', kind: 'travel', amount_cents: 2500 },
+  ]);
+  const entry = entries.get('team_pay');
+  assert.ok(entry);
+  assert.equal(entry.adjustmentsCents, 3500);
+  assert.equal(entry.grossCents, 3500);
+});
+
+test('overlapping payroll periods are rejected and recalculation clears stale entries', async () => {
+  const db = database();
+  const period = await createPayrollPeriod(db, owner, {
+    periodStart: '2026-12-07',
+    periodEnd: '2026-12-13',
+  });
+  await assert.rejects(
+    createPayrollPeriod(db, owner, { periodStart: '2026-12-10', periodEnd: '2026-12-17' }),
+    /payroll_period_overlap/,
+  );
+  db.raw.prepare(
+    `INSERT INTO time_intervals
+     (id, admin_user_id, team_member_id, kind, rate_type, rate_cents, paid, started_at, ended_at, status)
+     VALUES ('t1', 'admin_owner', 'team_pay', 'work', 'regular', 1800, 1,
+             '2026-12-07T14:00:00.000Z', '2026-12-07T22:00:00.000Z', 'closed')`,
+  ).run();
+  await calculatePayrollPeriod(db, owner, period.id);
+  assert.equal(
+    (db.raw.prepare('SELECT COUNT(*) AS count FROM payroll_entries').get() as { count: number }).count,
+    1,
+  );
+  await addPayrollAdjustment(db, owner, {
+    periodId: period.id,
+    teamMemberId: 'team_pay',
+    kind: 'bonus',
+    label: 'Safety bonus',
+    amountCents: 1000,
+  });
+  const status = db.raw.prepare('SELECT status FROM payroll_periods WHERE id = ?').get(period.id) as {
+    status: string;
+  };
+  assert.equal(status.status, 'open');
+  assert.equal(
+    (db.raw.prepare('SELECT COUNT(*) AS count FROM payroll_entries').get() as { count: number }).count,
+    0,
+  );
+  await assert.rejects(approvePayrollPeriod(db, owner, period.id), /payroll_period_not_calculated/);
+  await calculatePayrollPeriod(db, owner, period.id);
+  db.raw
+    .prepare("UPDATE time_intervals SET ended_at = '2026-12-07T23:00:00.000Z' WHERE id = 't1'")
+    .run();
+  await assert.rejects(approvePayrollPeriod(db, owner, period.id), /payroll_recalculation_required/);
+});
+
+
+test('branch time zones control the workweek boundary', () => {
+  const base = interval('tz1', '2026-12-14T04:30:00.000Z', '2026-12-14T05:30:00.000Z', 'regular', 1800);
+  const tampa = calculatePayrollEntries([{ ...base, time_zone: 'America/New_York' }], []);
+  assert.deepEqual(Object.keys(tampa.get('team_pay')!.weeks).sort(), ['2026-12-07', '2026-12-14']);
+  const pensacola = calculatePayrollEntries([{ ...base, time_zone: 'America/Chicago' }], []);
+  assert.deepEqual(Object.keys(pensacola.get('team_pay')!.weeks), ['2026-12-07']);
 });

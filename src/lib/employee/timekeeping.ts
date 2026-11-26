@@ -5,8 +5,8 @@
  * - Timestamps are stored in UTC ISO format.
  * - The payroll workweek is Monday 00:00 through Sunday 23:59:59 in
  *   America/Chicago (the published operating timezone).
- * - Short rest breaks are compensated; a fully relieved meal period is
- *   unpaid unless a manager corrects the interval to paid.
+ * - Short rest breaks and compensable travel are paid; a fully relieved meal
+ *   period is unpaid unless a manager corrects the interval to paid.
  * - Overtime is calculated after 40 compensated hours in the workweek.
  * - Nothing here performs payroll disbursement.
  */
@@ -32,6 +32,7 @@ export const RATE_LABELS: Record<RateType, string> = {
 export interface TimeIntervalLike {
   id?: string;
   kind: TimeIntervalKind;
+  is_travel?: number | boolean | null;
   rate_type?: string;
   rate_cents?: number | null;
   paid?: number | boolean | null;
@@ -176,6 +177,7 @@ function rateCents(interval: TimeIntervalLike): number {
 }
 
 export function isPaid(interval: TimeIntervalLike): boolean {
+  if (Number(interval.is_travel) === 1) return true;
   if (interval.kind === 'work') return true;
   if (interval.kind === 'break') return interval.paid === undefined || interval.paid === null ? true : Boolean(interval.paid);
   return Boolean(interval.paid);
@@ -194,10 +196,15 @@ export function summarizeIntervals(intervals: TimeIntervalLike[], now = new Date
     if (interval.kind === 'work') workMinutes += minutes;
     if (interval.kind === 'break') breakMinutes += minutes;
     if (interval.kind === 'meal') mealMinutes += minutes;
-    if (isPaid(interval) || interval.kind === 'work') {
+    if (isPaid(interval)) {
       paidMinutes += minutes;
       grossCents += Math.round((minutes / 60) * rateCents(interval));
     }
+  }
+  const overtimeMinutes = Math.max(0, paidMinutes - OVERTIME_AFTER_MINUTES);
+  if (overtimeMinutes > 0 && paidMinutes > 0) {
+    // Half-time premium at the weighted average straight-time rate.
+    grossCents += Math.round((grossCents * overtimeMinutes) / (2 * paidMinutes));
   }
   return {
     workMinutes,
@@ -205,7 +212,7 @@ export function summarizeIntervals(intervals: TimeIntervalLike[], now = new Date
     mealMinutes,
     paidMinutes,
     grossCents,
-    overtimeMinutes: Math.max(0, workMinutes - OVERTIME_AFTER_MINUTES),
+    overtimeMinutes,
   };
 }
 

@@ -19,6 +19,12 @@ import {
   syncProposalSigningStatus,
   updateCommercialProposal,
 } from '../src/lib/commercial/service.ts';
+import {
+  approveCommercialSchedule,
+  previewCommercialSchedule,
+  setCommercialScheduleStatus,
+} from '../src/lib/commercial/scheduling.ts';
+import { zonedTimeToUtc } from '../src/lib/booking/time.ts';
 
 class SqlStatement implements D1PreparedStatement {
   private values: unknown[] = [];
@@ -232,18 +238,36 @@ test('accepted signing marks the proposal accepted and supports contract billing
   const invoice = await generateContractInvoice(database, actor, contract.id);
   assert.ok(invoice.invoiceId);
   const row = database.raw
-    .prepare('SELECT status, total_cents, commercial_contract_id, due_date FROM invoices WHERE id = ?')
-    .get(invoice.invoiceId) as { status: string; total_cents: number; commercial_contract_id: string; due_date: string };
+    .prepare('SELECT status, total_cents, commercial_contract_id, issue_date, due_date FROM invoices WHERE id = ?')
+    .get(invoice.invoiceId) as {
+    status: string;
+    total_cents: number;
+    commercial_contract_id: string;
+    issue_date: string;
+    due_date: string;
+  };
   assert.equal(row.status, 'open');
   assert.equal(row.commercial_contract_id, contract.id);
-  assert.ok(row.total_cents > 0);
-  assert.ok(row.due_date > '2026-12-01');
+  assert.equal(row.total_cents, 317125, 'first invoice must equal the signed first-invoice total');
+  assert.equal(
+    row.due_date,
+    new Date(Date.parse(`${row.issue_date}T12:00:00Z`) + 15 * 86_400_000).toISOString().slice(0, 10),
+    'Net 15 due date from the branch-local issue date',
+  );
+  const lines = database.raw
+    .prepare('SELECT kind, total_cents FROM invoice_lines WHERE invoice_id = ? ORDER BY sort_order')
+    .all(invoice.invoiceId) as Array<{ kind: string; total_cents: number }>;
+  assert.ok(lines.some((line) => line.kind === 'extra' && line.total_cents === 40000));
+  assert.ok(lines.some((line) => line.kind === 'discount' && line.total_cents === 5000));
+  assert.ok(lines.some((line) => line.kind === 'tax' && line.total_cents === 22125));
   const nextPeriod = database.raw
     .prepare('SELECT next_invoice_date FROM commercial_contracts WHERE id = ?')
     .get(contract.id) as { next_invoice_date: string };
-  assert.equal(nextPeriod.next_invoice_date, '2027-03-01');
+  assert.equal(nextPeriod.next_invoice_date, '2027-01-01');
+  const second = await generateContractInvoice(database, actor, contract.id);
+  assert.equal(second.totalCents, 279500, 'subsequent invoice is recurring service plus tax');
   database.raw
-    .prepare("UPDATE commercial_contracts SET next_invoice_date = '2027-01-01' WHERE id = ?")
+    .prepare("UPDATE commercial_contracts SET next_invoice_date = '2026-12-01' WHERE id = ?")
     .run(contract.id);
   await assert.rejects(generateContractInvoice(database, actor, contract.id), /contract_period_already_invoiced/);
 });
@@ -290,4 +314,134 @@ test('pure totals never trust client-submitted amounts and clamp discounts', () 
   const totals = calculateProposalTotals({ scope, taxRateBps: 1000, discountCents: 999999 });
   assert.equal(totals.discountCents, 15000);
   assert.equal(totals.firstInvoiceTotalCents, 0);
+});
+
+async function acceptedContract(database: TestD1, startDate: string, proposal: Record<string, unknown> = proposalInput()) {
+  const created = await createCommercialProposal(database, actor, proposal);
+  await publishCommercialProposal(database, actor, created.id);
+  database.raw.prepare(
+    "INSERT INTO document_templates (id, title, category, version, status, source_kind, content_text) VALUES ('doc_test', 'Commercial proposal', 'commercial-proposal', '1.0', 'approved', 'text', 'Agreement')",
+  ).run();
+  database.raw.prepare(
+    "INSERT INTO signing_requests (id, bundle_code, bundle_version, subject_type, customer_id, property_id, booking_reference, service_code, status, requirement_snapshot_json, signer_email) VALUES ('sr_commercial', 'commercial-proposal', 1, 'customer', 'cust_commercial', 'prop_a', 'CMP-TEST', 'commercial-cleaning', 'signed', '[]', 'billing@acme.test')",
+  ).run();
+  database.raw.prepare(
+    "INSERT INTO document_signatures (id, signing_request_id, template_id, template_version, document_sha256, signed_content_text, signer_party, signer_name, signer_email, signature_json, consent_version, signed_at) VALUES ('sig_commercial', 'sr_commercial', 'doc_test', '1.0', 'hash', 'content', 'customer', 'Alex Manager', 'billing@acme.test', '{}', 'v1', '2026-11-25T12:00:00.000Z')",
+  ).run();
+  database.raw
+    .prepare("UPDATE commercial_proposals SET signing_request_id = 'sr_commercial', status = 'sent' WHERE id = ?")
+    .run(created.id);
+  await syncProposalSigningStatus(database, created.id);
+  const contract = await createCommercialContract(database, actor, created.id, { startDate });
+  return { proposalId: created.id, contractId: contract.id };
+}
+
+test('month-end billing anchors and advances without skipping a period', async () => {
+  const database = db();
+  const { contractId } = await acceptedContract(database, '2026-01-31');
+  const first = await generateContractInvoice(database, actor, contractId);
+  const firstPeriod = database.raw
+    .prepare('SELECT period_start, period_end FROM commercial_contract_invoices WHERE contract_id = ?')
+    .get(contractId) as { period_start: string; period_end: string };
+  assert.equal(firstPeriod.period_start, '2026-01-31');
+  assert.equal(firstPeriod.period_end, '2026-02-28');
+  const second = await generateContractInvoice(database, actor, contractId);
+  const periods = database.raw
+    .prepare('SELECT period_start, period_end FROM commercial_contract_invoices WHERE contract_id = ? ORDER BY period_start')
+    .all(contractId) as Array<{ period_start: string; period_end: string }>;
+  assert.deepEqual(periods.map((period) => period.period_start), ['2026-01-31', '2026-02-28']);
+  assert.equal(periods[1]?.period_end, '2026-03-31');
+  assert.ok(second.totalCents > 0);
+  assert.ok(first.invoiceId !== second.invoiceId);
+});
+
+test('a commercial contract can preview and generate a recurring service schedule', async () => {
+  const database = db();
+  database.raw.prepare("UPDATE properties SET latitude = 30.4, longitude = -87.2 WHERE id = 'prop_a'").run();
+  const { contractId } = await acceptedContract(database, '2026-12-01');
+  const availability = (async (_env: unknown, input: { date: string; startTime?: string; durationMinutes: number }) => {
+    const start = zonedTimeToUtc(input.date, '08:00', 'America/Chicago').toISOString();
+    return {
+      ok: true,
+      availability: {
+        slots: [
+          {
+            start,
+            end: new Date(Date.parse(start) + input.durationMinutes * 60_000).toISOString(),
+            resourceIds: ['res_1'],
+          },
+        ],
+      },
+    };
+  }) as never;
+  const deps = {
+    availability,
+    geocode: (async () => ({ lat: 30.4, lng: -87.2 })) as never,
+    findEvent: (async () => null) as never,
+    createEvent: (async () => ({ ok: true, eventId: `evt_${crypto.randomUUID()}` })) as never,
+    updateEvent: (async () => ({ ok: true })) as never,
+    deleteEvent: (async () => ({ ok: true })) as never,
+  };
+  const input = {
+    contractId,
+    propertyId: 'prop_a',
+    frequency: 'monthly',
+    startDate: '2026-12-01',
+    window: 'morning',
+    startTime: '08:00',
+    durationMinutes: 120,
+    firstDurationMinutes: 120,
+    crewSize: 2,
+    scopeNotes: 'Lobby, restrooms, break room',
+    accessInstructions: 'Front desk key; alarm code held by facility',
+    requiredQualifications: 'Lead cleaner, floor scrubber',
+  };
+  const preview = await previewCommercialSchedule({ DB: database } as never, database, actor, input, deps);
+  assert.equal(preview.ok, true);
+  assert.ok(preview.dates.length >= 1);
+  const approved = await approveCommercialSchedule({ DB: database } as never, database, actor, input, deps);
+  assert.ok(approved.planId);
+  assert.equal(approved.sync.created + approved.sync.skipped, preview.dates.length);
+  const schedule = database.raw
+    .prepare('SELECT id, status, recurring_plan_id, scope_notes, access_instructions, required_qualifications FROM commercial_contract_schedules WHERE contract_id = ?')
+    .get(contractId) as {
+    id: string;
+    status: string;
+    recurring_plan_id: string;
+    scope_notes: string;
+    access_instructions: string;
+    required_qualifications: string;
+  };
+  assert.equal(schedule.status, 'active');
+  assert.equal(schedule.recurring_plan_id, approved.planId);
+  assert.equal(schedule.scope_notes, 'Lobby, restrooms, break room');
+  assert.equal(schedule.access_instructions, 'Front desk key; alarm code held by facility');
+  assert.match(schedule.required_qualifications, /floor scrubber/i);
+  const plan = database.raw
+    .prepare('SELECT status, branch_id, commercial_schedule_id, frequency FROM recurring_plans WHERE id = ?')
+    .get(approved.planId) as { status: string; branch_id: string; commercial_schedule_id: string; frequency: string };
+  assert.equal(plan.status, 'active');
+  assert.equal(plan.branch_id, 'branch_pensacola');
+  assert.equal(plan.frequency, 'monthly');
+  const appointments = database.raw
+    .prepare("SELECT notes, timezone, crew_size FROM appointments WHERE recurring_plan_id = ? ORDER BY start_at")
+    .all(approved.planId) as Array<{ notes: string; timezone: string; crew_size: number }>;
+  assert.equal(appointments.length, preview.dates.length);
+  assert.match(appointments[0]!.notes, /Lobby, restrooms/);
+  assert.match(appointments[0]!.notes, /Front desk key/);
+  assert.equal(appointments[0]!.timezone, 'America/Chicago');
+  assert.equal(appointments[0]!.crew_size, 2);
+  await assert.rejects(
+    approveCommercialSchedule({ DB: database } as never, database, actor, input, deps),
+    /commercial_schedule_exists/,
+  );
+  const paused = await setCommercialScheduleStatus(
+    { DB: database } as never,
+    database,
+    actor,
+    schedule.id,
+    'paused',
+    deps,
+  );
+  assert.equal(paused.status, 'paused');
 });

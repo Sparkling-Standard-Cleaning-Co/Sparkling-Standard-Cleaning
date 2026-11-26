@@ -7672,6 +7672,13 @@ document.querySelector<HTMLElement>('[data-admin-promotions]')?.addEventListener
 document.querySelector<HTMLElement>('[data-promotion-reset]')?.addEventListener('click', () => {
   document.querySelector<HTMLFormElement>('[data-promotion-form]')?.reset();
 });
+window.addEventListener('ss-admin-navigate', (event) => {
+  const detail = (event as CustomEvent<{ view?: string }>).detail;
+  const view = detail?.view ?? '';
+  if (!view) return;
+  void loadView(view).catch((error) => setAppError(friendly(error)));
+});
+
 async function loadView(view: string): Promise<void> {
   const permission = navPermission[view];
   if (permission && !can(permission)) {
@@ -8570,7 +8577,8 @@ document.addEventListener('submit', (event) => {
     } else {
       void action('/api/admin/timekeeping', {
         action: 'correct_interval', intervalId: value('intervalId'), startedAt: start, endedAt: end,
-        kind: value('kind'), rateType: value('rateType'), paid: checked('paid'), reason: value('reason'),
+        kind: value('kind'), rateType: value('rateType'), paid: checked('paid'),
+        travel: checked('travel'), reason: value('reason'),
       });
     }
   }
@@ -9036,11 +9044,13 @@ document.addEventListener('click', (event) => {
       const kind = field('kind') as HTMLSelectElement | null;
       const rate = field('rateType') as HTMLSelectElement | null;
       const paid = correctionForm.querySelector<HTMLInputElement>('input[name="paid"]');
+      const travel = correctionForm.querySelector<HTMLInputElement>('input[name="travel"]');
       if (start) start.value = centralInputValue(interval.started_at);
       if (end) end.value = centralInputValue(interval.ended_at);
       if (kind) kind.value = String(interval.kind ?? 'work');
       if (rate) rate.value = String(interval.rate_type ?? 'regular');
       if (paid) paid.checked = Boolean(Number(interval.paid));
+      if (travel) travel.checked = Number(interval.is_travel) === 1;
       correctionForm.closest('details')?.setAttribute('open', '');
       correctionForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }

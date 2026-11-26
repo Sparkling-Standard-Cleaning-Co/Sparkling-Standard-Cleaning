@@ -879,3 +879,51 @@ test('small Android viewport also anchors address confirmation to availability',
     await context.close();
   }
 });
+
+test('checkout omits the three redundant paragraphs on desktop and mobile', async () => {
+  const { context, page } = await setupPage({ reducedMotion: 'reduce', paymentReady: true });
+  try {
+    await completeToFinalStep(page);
+    await page.locator('[data-reservation-summary]').waitFor({ state: 'visible' });
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      await delay(80);
+      const removed = await page.evaluate(() => {
+        const text = document.body.innerText;
+        return {
+          versionNote: text.includes('The version you accept is recorded with your request'),
+          floridaNote: text.includes('Florida law gives you three business days to cancel without penalty'),
+          giftNote: text.includes("We will apply the certificate's available balance"),
+          photosNote: text.includes('If required photos are still outstanding, we will mark the booking pending photos'),
+          terms: Boolean(document.querySelector('#est-terms')),
+          termsLink: Boolean(document.querySelector('a[href="/terms/"]')),
+          privacyLink: Boolean(document.querySelector('a[href="/privacy/"]')),
+          promo: Boolean(document.querySelector('[data-promo-code]')),
+          gift: Boolean(document.querySelector('[data-gift-code]')),
+          pay: Boolean(document.querySelector('[data-pay-now]')),
+          later: Boolean(document.querySelector('[data-submit]')),
+        };
+      });
+      assert.equal(removed.versionNote || removed.floridaNote, false, `${width}px: terms paragraph removed`);
+      assert.equal(removed.giftNote, false, `${width}px: gift paragraph removed`);
+      assert.equal(removed.photosNote, false, `${width}px: pay-now paragraph removed`);
+      assert.equal(removed.terms, true, `${width}px: terms checkbox preserved`);
+      assert.equal(removed.termsLink, true, `${width}px: terms link preserved`);
+      assert.equal(removed.privacyLink, true, `${width}px: privacy link preserved`);
+      assert.equal(removed.promo, true, `${width}px: promotion code preserved`);
+      assert.equal(removed.gift, true, `${width}px: gift certificate preserved`);
+      assert.equal(removed.pay, true, `${width}px: Pay Now preserved`);
+      assert.equal(removed.later, true, `${width}px: Pay Later preserved`);
+      assert.equal(
+        await page.locator('[data-payment-note]').evaluate((element) => {
+          if (!element.textContent?.trim()) return getComputedStyle(element).display === 'none';
+          return true;
+        }),
+        true,
+        `${width}px: an empty note leaves no spacing`,
+      );
+    }
+  } finally {
+    await context.close();
+  }
+});

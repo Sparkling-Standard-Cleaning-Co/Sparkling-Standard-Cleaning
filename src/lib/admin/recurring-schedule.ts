@@ -42,6 +42,10 @@ interface PlanRow extends Record<string, unknown> {
   duration_minutes: number | null;
   first_duration_minutes: number | null;
   crew_size: number | null;
+  commercial_schedule_id?: string | null;
+  scope_notes?: string | null;
+  access_instructions?: string | null;
+  required_qualifications?: string | null;
   next_visit_date?: string | null;
   sync_status?: string;
   sync_error?: string;
@@ -71,6 +75,16 @@ function todayForTimeZone(timeZone: string): string {
     timeZone,
     year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
+}
+
+function appointmentNotes(plan: Pick<PlanRow, 'scope_notes' | 'access_instructions' | 'required_qualifications'>): string {
+  const parts = ['Recurring cleaning'];
+  if (plan.scope_notes?.trim()) parts.push(`Scope: ${plan.scope_notes.trim()}`);
+  if (plan.access_instructions?.trim()) parts.push(`Access: ${plan.access_instructions.trim()}`);
+  if (plan.required_qualifications?.trim()) {
+    parts.push(`Required qualifications: ${plan.required_qualifications.trim()}`);
+  }
+  return parts.join('\n').slice(0, 2000);
 }
 
 export function monthAnchored(startDate: string, months: number): string {
@@ -291,7 +305,8 @@ export async function prepareRecurringScheduleChange(
 ): Promise<PreparedRecurringSchedule> {
   const plan = await loadPlan(db, actor, planId);
   const schedule = effectiveRecurringSchedule(plan, proposed);
-  const today = localToday();
+  const planTimeZone = timeZoneForPlan(plan);
+  const today = todayForTimeZone(planTimeZone);
   const horizon = addDays(today, bookingConfig.maxAdvanceDays);
   const dates = occurrenceDatesWithin(schedule.startDate, schedule.frequency, today, horizon);
   const conflicts: PreparedRecurringSchedule['conflicts'] = [];
@@ -304,12 +319,13 @@ export async function prepareRecurringScheduleChange(
   const excludeEventIds = await occurrenceEventIds(db, planId);
   for (const date of dates) {
     const duration = date === schedule.startDate ? schedule.firstDurationMinutes : schedule.durationMinutes;
-    const start = zonedTimeToUtc(date, schedule.startTime, bookingConfig.timeZone);
+    const start = zonedTimeToUtc(date, schedule.startTime, planTimeZone);
     const result = await availability(env, {
       date,
       durationMinutes: duration,
       destination,
       crewSize: schedule.crewSize,
+      ...(plan.branch_id ? { branchId: plan.branch_id as 'branch_pensacola' | 'branch_tampa' } : {}),
       excludeEventIds,
     });
     if (!result.ok) {
@@ -474,6 +490,7 @@ export async function syncRecurringPlan(
     ...options.deps,
   };
   const plan = await loadPlan(db, actor, planId);
+  const planTimeZone = timeZoneForPlan(plan);
   const result: RecurringSyncResult = {
     ok: false,
     status: 'sync_failed',
@@ -506,7 +523,7 @@ export async function syncRecurringPlan(
   if (!destination) {
     throw new AdminAuthError(400, 'recurring_property_location_missing');
   }
-  const today = localToday();
+  const today = todayForTimeZone(planTimeZone);
   const horizon = addDays(today, bookingConfig.maxAdvanceDays);
   const location = [plan.line1, plan.city, plan.state, plan.postal_code].filter(Boolean).join(', ');
   const desiredDates = occurrenceDatesWithin(schedule.startDate, schedule.frequency, today, horizon);
@@ -515,7 +532,7 @@ export async function syncRecurringPlan(
 
   for (const date of desiredDates) {
     const duration = date === schedule.startDate ? schedule.firstDurationMinutes : schedule.durationMinutes;
-    const start = zonedTimeToUtc(date, schedule.startTime, bookingConfig.timeZone);
+    const start = zonedTimeToUtc(date, schedule.startTime, planTimeZone);
     const occurrenceReference = reference(planId, date);
     const existing = await db
       .prepare(
@@ -551,6 +568,7 @@ export async function syncRecurringPlan(
       durationMinutes: duration,
       destination,
       crewSize: schedule.crewSize,
+      ...(plan.branch_id ? { branchId: plan.branch_id as 'branch_pensacola' | 'branch_tampa' } : {}),
       excludeEventIds: ownEventIds,
     });
     if (!availability.ok) {
@@ -592,7 +610,7 @@ export async function syncRecurringPlan(
           const patched = await deps.updateEvent(env, eventId, {
             start: start.toISOString(),
             end: endIso,
-            timeZone: bookingConfig.timeZone,
+            timeZone: planTimeZone,
             resourceIds,
           });
           if (!patched.ok) {
@@ -608,11 +626,21 @@ export async function syncRecurringPlan(
     if (!eventId) {
       const created = await deps.createEvent(env, {
         summary: `Sparkling Standard Recurring Cleaning - ${[plan.first_name, plan.last_name].filter(Boolean).join(' ') || planId}`,
-        description: `Recurring plan ${planId}. ${schedule.frequency} service. ${schedule.crewSize} cleaner(s).`,
+        description: [
+          `Recurring plan ${planId}. ${schedule.frequency} service. ${schedule.crewSize} cleaner(s).`,
+          plan.scope_notes?.trim() ? `Scope: ${plan.scope_notes.trim()}` : '',
+          plan.access_instructions?.trim() ? `Access: ${plan.access_instructions.trim()}` : '',
+          plan.required_qualifications?.trim()
+            ? `Required qualifications: ${plan.required_qualifications.trim()}`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+          .slice(0, 2000),
         location,
         start: start.toISOString(),
         end: endIso,
-        timeZone: bookingConfig.timeZone,
+        timeZone: planTimeZone,
         reference: occurrenceReference,
         resourceIds,
       });
@@ -639,11 +667,20 @@ export async function syncRecurringPlan(
         await db
           .prepare(
             `UPDATE appointments
-             SET status = 'confirmed', start_at = ?, end_at = ?, duration_minutes = ?, crew_size = ?,
-                 cancelled_at = NULL, updated_at = ?
+             SET status = 'confirmed', start_at = ?, end_at = ?, timezone = ?, duration_minutes = ?,
+                 crew_size = ?, notes = ?, cancelled_at = NULL, updated_at = ?
              WHERE id = ?`,
           )
-          .bind(start.toISOString(), endIso, duration, schedule.crewSize, new Date().toISOString(), appointmentId)
+          .bind(
+            start.toISOString(),
+            endIso,
+            planTimeZone,
+            duration,
+            schedule.crewSize,
+            appointmentNotes(plan),
+            new Date().toISOString(),
+            appointmentId,
+          )
           .run();
       } else {
         await db
@@ -651,7 +688,7 @@ export async function syncRecurringPlan(
             `INSERT INTO appointments
              (id, branch_id, customer_id, property_id, recurring_plan_id, status, start_at, end_at,
               timezone, duration_minutes, crew_size, source, reference, notes)
-             VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, 'recurring', ?, 'Recurring cleaning')`,
+             VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, 'recurring', ?, ?)`,
           )
           .bind(
             appointmentId,
@@ -661,10 +698,11 @@ export async function syncRecurringPlan(
             planId,
             start.toISOString(),
             endIso,
-            bookingConfig.timeZone,
+            planTimeZone,
             duration,
             schedule.crewSize,
             occurrenceReference,
+            appointmentNotes(plan),
           )
           .run();
       }
@@ -879,7 +917,7 @@ async function restoreRecurringSnapshot(
       const patched = await deps.updateEvent!(env, row.calendar_event_id, {
         start: row.start_at,
         end: row.end_at,
-        timeZone: bookingConfig.timeZone,
+        timeZone: timeZoneForPlan(planBefore),
         resourceIds,
       });
       if (!patched.ok) errors.push(`${row.id}:rollback_calendar_failed`);

@@ -1,6 +1,6 @@
 import type { AdminActor } from './operations.ts';
 import { AdminAuthError, audit } from './operations.ts';
-import type { D1Database } from './d1.ts';
+import type { D1Database, D1PreparedStatement } from './d1.ts';
 import { beginRefund, recomputeInvoiceFinancials } from './refunds.ts';
 import { listInvoiceTips } from '../tips/service.ts';
 
@@ -252,46 +252,63 @@ export async function createInvoice(
   const totalCents = Math.max(0, subtotal - discount + tax);
   const invoiceId = id('invoice');
   const number = invoiceNumber();
-  await db
-    .prepare(
-      `INSERT INTO invoices
-       (id, branch_id, customer_id, property_id, appointment_id, number, status, issue_date, due_date,
-        service_code, service_label, service_date, subtotal_cents, discount_cents, tax_cents, total_cents, amount_paid_cents, balance_cents,
-        booking_request_id, invoice_role, related_invoice_id, created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      invoiceId,
-      customer.primary_branch_id,
-      customerId,
-      propertyId,
-      appointmentId,
-      number,
-      issueDate,
-      dueDate,
-      serviceCode,
-      serviceLabel || null,
-      serviceDate || null,
-      subtotal,
-      discount,
-      tax,
-      totalCents,
-      totalCents,
-      bookingRequestId,
-      invoiceRole,
-      relatedInvoiceId,
-      actor.id,
-    )
-    .run();
-  for (const [index, line] of normalized.entries()) {
-    await db
+  const statements = [
+    db
       .prepare(
-        `INSERT INTO invoice_lines (id, invoice_id, kind, description, quantity, unit_amount_cents, total_cents, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO invoices
+         (id, branch_id, customer_id, property_id, appointment_id, number, status, issue_date, due_date,
+          service_code, service_label, service_date, subtotal_cents, discount_cents, tax_cents, total_cents, amount_paid_cents, balance_cents,
+          booking_request_id, invoice_role, related_invoice_id, created_by_admin_user_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
       )
-      .bind(id('line'), invoiceId, line.kind, line.description, line.quantity, line.unit, line.total, index)
-      .run();
+      .bind(
+        invoiceId,
+        customer.primary_branch_id,
+        customerId,
+        propertyId,
+        appointmentId,
+        number,
+        issueDate,
+        dueDate,
+        serviceCode,
+        serviceLabel || null,
+        serviceDate || null,
+        subtotal,
+        discount,
+        tax,
+        totalCents,
+        totalCents,
+        bookingRequestId,
+        invoiceRole,
+        relatedInvoiceId,
+        actor.id,
+      ),
+  ];
+  for (const [index, line] of normalized.entries()) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO invoice_lines (id, invoice_id, kind, description, quantity, unit_amount_cents, total_cents, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(id('line'), invoiceId, line.kind, line.description, line.quantity, line.unit, line.total, index),
+    );
   }
+  const additional = input.additionalStatements;
+  if (typeof additional === 'function') {
+    const extra = (
+      additional as (invoice: {
+        id: string;
+        number: string;
+        totalCents: number;
+      }) => D1PreparedStatement[]
+    )({ id: invoiceId, number, totalCents });
+    if (Array.isArray(extra)) statements.push(...extra);
+  }
+  // One transaction keeps the invoice, its lines and any caller-owned linkage
+  // (for example a commercial contract period) from partially committing.
+  if (db.batch) await db.batch(statements);
+  else for (const statement of statements) await statement.run();
   await audit(db, { actorUserId: actor.id, action: 'invoice.created', entityType: 'invoice', entityId: invoiceId });
   return { id: invoiceId, number, totalCents };
 }

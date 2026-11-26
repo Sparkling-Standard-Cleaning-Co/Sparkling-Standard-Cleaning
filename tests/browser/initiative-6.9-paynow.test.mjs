@@ -171,7 +171,8 @@ for (const [label, width, height] of [
       assert.equal(await page.locator('[data-gift-code]').isVisible(), true, 'gift code is available with online payment');
       assert.equal(await page.locator('[data-verify-address]').isVisible(), false, 'no separate address verification control');
       const note = (await page.locator('[data-payment-note]').innerText()).replace(/\s+/g, ' ');
-      assert.match(note, /Pay now to reserve this cleaning/i);
+      assert.equal(note, '', 'the removed pay-now explanation does not render');
+      assert.doesNotMatch(note, /pending photos/i);
       assert.match(
         (await page.locator('[data-submit]').innerText()).replace(/\s+/g, ' '),
         /Reserve This Cleaning/,

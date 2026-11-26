@@ -77,6 +77,16 @@ function emptyCommercialScope(): CommercialScope {
   };
 }
 
+interface CommercialScheduleContext {
+  contractId: string;
+  contract: Record<string, unknown>;
+  properties: Array<Record<string, unknown>>;
+  defaults: Record<string, { scopeNotes: string; accessInstructions: string }>;
+  schedules: Array<Record<string, unknown>>;
+}
+
+let commercialScheduleState: CommercialScheduleContext | null = null;
+
 let commercialState: CommercialState = {
   customers: [],
   properties: [],
@@ -228,7 +238,10 @@ function renderCommercial(): void {
         <td>${escUi(titleUi(String(contract.billing_frequency ?? '')))} · ${escUi(contract.payment_terms)}</td>
         <td>${escUi(moneyUi(contract.recurring_total_cents))}</td>
         <td>${escUi(contract.next_invoice_date || '—')} <span class="admin-muted">(${escUi(contract.invoice_count ?? 0)} billed)</span></td>
-        <td><div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-commercial-action="invoice" data-id="${escUi(contract.id)}">Generate invoice</button></div></td>
+        <td><div class="admin-actions">
+          <button class="btn btn--secondary btn--small" type="button" data-commercial-action="schedule" data-id="${escUi(contract.id)}">Service schedule</button>
+          <button class="btn btn--primary btn--small" type="button" data-commercial-action="invoice" data-id="${escUi(contract.id)}">Generate invoice</button>
+        </div></td>
       </tr>`;
     })
     .join('');
@@ -275,6 +288,7 @@ function renderCommercial(): void {
       <div class="admin-history" style="margin-top:.75rem;">${propertyCards || '<p class="admin-muted">No active facilities.</p>'}</div>
       <div data-commercial-property-panel style="margin-top:1rem;"></div>
     </div>
+    <div data-commercial-schedule-panel style="margin-top:1rem;"></div>
     <div data-commercial-editor style="margin-top:1rem;"></div>`;
   if (commercialState.editingId) void renderCommercialEditor();
 }
@@ -574,6 +588,181 @@ async function openCommercialProperty(propertyId: string): Promise<void> {
   </div>`;
 }
 
+async function openCommercialSchedule(contractId: string): Promise<void> {
+  const panel = document.querySelector<HTMLElement>('[data-commercial-schedule-panel]');
+  if (!panel) return;
+  panel.innerHTML = '<p class="admin-muted">Loading contract schedule...</p>';
+  const data = await commercialApi<Omit<CommercialScheduleContext, 'contractId'>>(
+    `/api/admin/commercial?view=contract_schedule&contractId=${encodeURIComponent(contractId)}`,
+  );
+  commercialScheduleState = { contractId, ...data };
+  renderCommercialSchedule();
+}
+
+function scheduleTimeOptions(selected: string): string {
+  const values: string[] = [];
+  for (let minute = 7 * 60; minute <= 8 * 60 + 30; minute += 15) {
+    values.push(`${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`);
+  }
+  for (let minute = 12 * 60 + 30; minute <= 14 * 60 + 30; minute += 15) {
+    values.push(`${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`);
+  }
+  return values
+    .map((value) => `<option value="${value}"${value === selected ? ' selected' : ''}>${value}</option>`)
+    .join('');
+}
+
+function renderCommercialSchedule(): void {
+  const panel = document.querySelector<HTMLElement>('[data-commercial-schedule-panel]');
+  const context = commercialScheduleState;
+  if (!panel || !context) return;
+  const contractStart = String(context.contract.start_date ?? '');
+  const defaultStart =
+    /^\d{4}-\d{2}-\d{2}$/.test(contractStart) && contractStart >= localTodayUi(0)
+      ? contractStart
+      : localTodayUi(1);
+  const propertyOptions = context.properties
+    .map(
+      (property) =>
+        `<option value="${escUi(property.id)}">${escUi(commercialPropertyLabel(property))}</option>`,
+    )
+    .join('');
+  const defaultProperty = String(
+    context.contract.property_id ?? context.properties[0]?.id ?? '',
+  );
+  const scheduleRows = context.schedules
+    .map((schedule) => {
+      const status = String(schedule.status ?? '');
+      const actions = [
+        status === 'active' || status === 'approved'
+          ? `<button class="btn btn--ghost btn--small" type="button" data-commercial-schedule-action="pause" data-id="${escUi(schedule.id)}">Pause</button>`
+          : '',
+        status === 'paused'
+          ? `<button class="btn btn--secondary btn--small" type="button" data-commercial-schedule-action="resume" data-id="${escUi(schedule.id)}">Resume</button>`
+          : '',
+        status !== 'cancelled'
+          ? `<button class="btn btn--ghost btn--small" type="button" data-commercial-schedule-action="cancel" data-id="${escUi(schedule.id)}">Cancel</button>`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('');
+      return `<div class="admin-record">
+        <p><strong>${escUi(schedule.property_label || schedule.line1 || 'Facility')}</strong> ${escUi(titleUi(status))}</p>
+        <p class="admin-muted">${escUi(titleUi(String(schedule.frequency ?? '')))} - ${escUi(String(schedule.start_time ?? ''))} - ${escUi(String(schedule.crew_size ?? ''))} cleaner(s) - next ${escUi(schedule.next_visit_date || 'pending')} - ${escUi(schedule.scheduled_count ?? 0)} scheduled</p>
+        <p class="admin-muted">Scope: ${escUi(schedule.scope_notes || 'not recorded')}</p>
+        <p class="admin-muted">Access: ${escUi(schedule.access_instructions || 'not recorded')}</p>
+        ${schedule.sync_error ? `<p class="admin-muted">Sync: ${escUi(schedule.sync_error)}</p>` : ''}
+        <div class="admin-actions">
+          ${actions}
+          <button class="btn btn--ghost btn--small" type="button" data-commercial-schedule-nav="jobs">Open Job Files</button>
+          <button class="btn btn--ghost btn--small" type="button" data-commercial-schedule-nav="recurring">Open Recurring Plans</button>
+        </div>
+      </div>`;
+    })
+    .join('');
+  panel.innerHTML = `<div class="admin-card">
+    <div class="admin-detail-head"><h3>Commercial service schedule</h3><button class="btn btn--ghost btn--small" type="button" data-commercial-schedule-action="close">Close</button></div>
+    <p class="admin-muted">Schedules are created only from structured, administrator-confirmed fields. Preview availability before approving; approving creates the recurring plan, Job Files and calendar events.</p>
+    ${scheduleRows || '<p class="admin-muted">No service schedule exists for this contract.</p>'}
+    <h4>Create or preview a service schedule</h4>
+    <div class="admin-form admin-form--grid" data-commercial-schedule-form>
+      <input type="hidden" data-schedule-field="contractId" value="${escUi(context.contractId)}" />
+      <label>Facility <select data-schedule-field="propertyId">${propertyOptions}</select></label>
+      <label>Frequency <select data-schedule-field="frequency"><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="monthly" selected>Monthly</option></select></label>
+      <label>First service date <input type="date" data-schedule-field="startDate" value="${defaultStart}" /></label>
+      <label>Time window <select data-schedule-field="window"><option value="morning">Morning</option><option value="afternoon">Afternoon</option></select></label>
+      <label>Start time <select data-schedule-field="startTime">${scheduleTimeOptions('08:00')}</select></label>
+      <label>Visit minutes <input type="number" min="30" max="600" step="15" data-schedule-field="durationMinutes" value="120" /></label>
+      <label>First visit minutes <input type="number" min="30" max="600" step="15" data-schedule-field="firstDurationMinutes" value="120" /></label>
+      <label>Crew size <input type="number" min="1" max="6" data-schedule-field="crewSize" value="1" /></label>
+      <label class="admin-field--wide">Facility scope <textarea rows="3" data-schedule-field="scopeNotes">${escUi(context.defaults[defaultProperty]?.scopeNotes ?? '')}</textarea></label>
+      <label class="admin-field--wide">Customer access instructions <textarea rows="2" data-schedule-field="accessInstructions">${escUi(context.defaults[defaultProperty]?.accessInstructions ?? '')}</textarea></label>
+      <label class="admin-field--wide">Required crew qualifications <input data-schedule-field="requiredQualifications" placeholder="e.g. floor scrubber certified, lead cleaner" /></label>
+    </div>
+    <div class="admin-actions">
+      <button class="btn btn--secondary btn--small" type="button" data-commercial-schedule-action="preview">Preview availability</button>
+      <button class="btn btn--primary btn--small" type="button" data-commercial-schedule-action="approve">Approve and generate schedule</button>
+    </div>
+    <div data-commercial-schedule-preview style="margin-top:.75rem;"></div>
+  </div>`;
+  const select = panel.querySelector<HTMLSelectElement>('[data-schedule-field="propertyId"]');
+  if (select && defaultProperty) select.value = defaultProperty;
+}
+
+function scheduleField(name: string): string {
+  return (
+    document.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      `[data-commercial-schedule-form] [data-schedule-field="${name}"]`,
+    )?.value.trim() ?? ''
+  );
+}
+
+function schedulePayload(): Record<string, unknown> {
+  return {
+    contractId: scheduleField('contractId'),
+    propertyId: scheduleField('propertyId'),
+    frequency: scheduleField('frequency'),
+    startDate: scheduleField('startDate'),
+    window: scheduleField('window'),
+    startTime: scheduleField('startTime'),
+    durationMinutes: Number(scheduleField('durationMinutes')),
+    firstDurationMinutes: Number(scheduleField('firstDurationMinutes')),
+    crewSize: Number(scheduleField('crewSize')),
+    scopeNotes: scheduleField('scopeNotes'),
+    accessInstructions: scheduleField('accessInstructions'),
+    requiredQualifications: scheduleField('requiredQualifications'),
+  };
+}
+
+function renderSchedulePreview(preview: Record<string, unknown>): void {
+  const target = document.querySelector<HTMLElement>('[data-commercial-schedule-preview]');
+  if (!target) return;
+  const conflicts = (preview.conflicts as Array<Record<string, unknown>>) ?? [];
+  const dates = (preview.dates as Array<Record<string, unknown>>) ?? [];
+  target.innerHTML = `<div class="admin-record">
+    <p><strong>${preview.ok ? 'Preview ready' : 'Conflicts found'}</strong></p>
+    ${
+      conflicts.length
+        ? `<p class="admin-muted">${conflicts
+            .slice(0, 12)
+            .map((conflict) => `${escUi(conflict.date)}: ${escUi(titleUi(String(conflict.reason ?? '')))}`)
+            .join('<br />')}</p>`
+        : `<p class="admin-muted">${dates.length} visit(s) can be scheduled in the current booking window. First: ${escUi(dates[0]?.date ?? '')}.</p>`
+    }
+  </div>`;
+}
+
+async function previewCommercialScheduleUi(): Promise<void> {
+  const result = await commercialPost({ action: 'preview_schedule', ...schedulePayload() });
+  renderSchedulePreview((result.preview ?? {}) as Record<string, unknown>);
+}
+
+async function approveCommercialScheduleUi(): Promise<void> {
+  if (!window.confirm('Approve this service schedule and create the recurring plan, Job Files and calendar events?')) {
+    return;
+  }
+  const result = await commercialPost({ action: 'approve_schedule', ...schedulePayload() });
+  commercialSetStatus(
+    `Service schedule approved. ${String((result.sync as Record<string, unknown> | undefined)?.created ?? 0)} visit(s) created.`,
+    'success',
+  );
+  const contractId = commercialScheduleState?.contractId ?? '';
+  await loadCommercial();
+  if (contractId) await openCommercialSchedule(contractId);
+}
+
+async function setCommercialScheduleStatusUi(
+  scheduleId: string,
+  status: 'active' | 'paused' | 'cancelled',
+): Promise<void> {
+  if (status === 'cancelled' && !window.confirm('Cancel this service schedule and its future visits?')) {
+    return;
+  }
+  await commercialPost({ action: 'schedule_status', scheduleId, status });
+  commercialSetStatus(`Service schedule ${status}.`, 'success');
+  if (commercialScheduleState) await openCommercialSchedule(commercialScheduleState.contractId);
+}
+
 function commercialIndexFrom(target: HTMLElement | null, container: Element | null): number {
   if (!target || !container) return 0;
   const siblings = [...container.querySelectorAll(':scope > [data-commercial-location], :scope > [data-commercial-area], :scope > [data-commercial-task]')];
@@ -714,6 +903,49 @@ document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventL
     );
   }
   if (action === 'property') run(openCommercialProperty(id));
+  if (action === 'schedule' || action === 'open-contract') run(openCommercialSchedule(id));
+});
+
+document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventListener('click', (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>(
+    '[data-commercial-schedule-action], [data-commercial-schedule-nav]',
+  );
+  if (!target) return;
+  const nav = target.dataset.commercialScheduleNav;
+  if (nav) {
+    window.dispatchEvent(new CustomEvent('ss-admin-navigate', { detail: { view: nav } }));
+    return;
+  }
+  const action = target.dataset.commercialScheduleAction ?? '';
+  const id = target.dataset.id ?? '';
+  const run = (work: Promise<unknown>): void => {
+    work.catch((error) => commercialSetStatus(friendlyUi(error), 'error'));
+  };
+  if (action === 'close') {
+    commercialScheduleState = null;
+    const panel = document.querySelector<HTMLElement>('[data-commercial-schedule-panel]');
+    if (panel) panel.innerHTML = '';
+  }
+  if (action === 'preview') run(previewCommercialScheduleUi());
+  if (action === 'approve') run(approveCommercialScheduleUi());
+  if (action === 'pause') run(setCommercialScheduleStatusUi(id, 'paused'));
+  if (action === 'resume') run(setCommercialScheduleStatusUi(id, 'active'));
+  if (action === 'cancel') run(setCommercialScheduleStatusUi(id, 'cancelled'));
+});
+
+document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventListener('change', (event) => {
+  const select = (event.target as HTMLElement).closest<HTMLSelectElement>(
+    '[data-schedule-field="propertyId"]',
+  );
+  if (!select || !commercialScheduleState) return;
+  const defaults = commercialScheduleState.defaults[select.value];
+  if (!defaults) return;
+  const scope = document.querySelector<HTMLTextAreaElement>('[data-schedule-field="scopeNotes"]');
+  const access = document.querySelector<HTMLTextAreaElement>(
+    '[data-schedule-field="accessInstructions"]',
+  );
+  if (scope) scope.value = defaults.scopeNotes;
+  if (access) access.value = defaults.accessInstructions;
 });
 
 document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventListener('change', (event) => {

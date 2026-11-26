@@ -103,12 +103,6 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function addMonths(date: string, months: number): string {
-  const [year, month, day] = date.split('-').map(Number);
-  const next = new Date(Date.UTC(year!, (month ?? 1) - 1 + months, day ?? 1, 12));
-  return next.toISOString().slice(0, 10);
-}
-
 export function billingIntervalMonths(frequency: BillingFrequency): number {
   switch (frequency) {
     case 'quarterly':
@@ -122,8 +116,48 @@ export function billingIntervalMonths(frequency: BillingFrequency): number {
   }
 }
 
+function addMonthsAnchored(date: string, months: number, anchorDay: number): string {
+  const [year, month] = date.split('-').map(Number);
+  const targetMonth = (month ?? 1) - 1 + months;
+  const targetYear = (year ?? 1970) + Math.floor(targetMonth / 12);
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0, 12)).getUTCDate();
+  const day = Math.min(Math.max(1, anchorDay), lastDay);
+  return `${targetYear}-${String(normalizedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 export function nextInvoiceDate(start: string, frequency: BillingFrequency): string {
-  return addMonths(start, billingIntervalMonths(frequency));
+  const anchor = Number(start.slice(8, 10)) || 1;
+  return addMonthsAnchored(start, billingIntervalMonths(frequency), anchor);
+}
+
+function branchTimeZone(branchId: string | null | undefined): string {
+  return branchId === 'branch_tampa' ? 'America/New_York' : 'America/Chicago';
+}
+
+function branchToday(branchId: string | null | undefined): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: branchTimeZone(branchId),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function addCalendarDays(date: string, days: number): string {
+  const value = Date.parse(`${date}T12:00:00Z`);
+  return new Date(value + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+export function paymentTermsDueDate(issueDate: string, paymentTerms: string): string {
+  const terms = String(paymentTerms ?? '').trim();
+  const net = /net\s*(\d+)/i.exec(terms);
+  if (net) return addCalendarDays(issueDate, Math.max(0, Number(net[1])));
+  if (/(due\s*(up)?on\s*receipt|upon\s*receipt|due\s*immediately|immediate)/i.test(terms)) {
+    return issueDate;
+  }
+  // Commercial agreements historically default to Net 15.
+  return addCalendarDays(issueDate, 15);
 }
 
 function normalizeScope(raw: unknown): ProposalScope {
@@ -915,6 +949,38 @@ export async function syncProposalSigningStatus(
   return 'accepted';
 }
 
+function acceptedContractTerms(row: Record<string, unknown>): {
+  scope: ProposalScope;
+  totals: ProposalTotals;
+  snapshotJson: string;
+} {
+  let snapshot: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(String(row.snapshot_json ?? '{}')) as unknown;
+    if (parsed && typeof parsed === 'object') snapshot = parsed as Record<string, unknown>;
+  } catch {
+    snapshot = {};
+  }
+  let storedScope: unknown = {};
+  try {
+    storedScope = JSON.parse(String(row.scope_json ?? '{}'));
+  } catch {
+    storedScope = {};
+  }
+  const scope = normalizeScope(snapshot.scope ?? storedScope);
+  const totals = calculateProposalTotals({
+    scope,
+    taxRateBps: Number(row.tax_rate_bps) || 0,
+    discountCents: Number(row.discount_cents) || 0,
+  });
+  return {
+    scope,
+    totals,
+    snapshotJson:
+      Object.keys(snapshot).length > 0 ? canonical(snapshot) : canonical({ scope, totals }),
+  };
+}
+
 export async function createCommercialContract(
   db: D1Database,
   actor: AdminActor,
@@ -934,13 +1000,15 @@ export async function createCommercialContract(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new AdminAuthError(400, 'contract_start_invalid');
   const id = `contract_${crypto.randomUUID()}`;
   const frequency = String(row.billing_frequency) as BillingFrequency;
+  const accepted = acceptedContractTerms(row);
   await db
     .prepare(
       `INSERT INTO commercial_contracts
        (id, proposal_id, branch_id, customer_id, property_id, status, start_date,
-        billing_frequency, payment_terms, recurring_total_cents, tax_rate_bps,
-        next_invoice_date, scope_json, notes, created_by_admin_user_id)
-       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        billing_frequency, payment_terms, recurring_total_cents, one_time_total_cents,
+        discount_cents, first_invoice_total_cents, tax_rate_bps,
+        next_invoice_date, scope_json, snapshot_json, notes, created_by_admin_user_id)
+       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -951,10 +1019,14 @@ export async function createCommercialContract(
       startDate,
       frequency,
       String(row.payment_terms),
-      Number(row.recurring_total_cents) || 0,
+      accepted.totals.recurringTotalCents,
+      accepted.totals.oneTimeTotalCents,
+      accepted.totals.discountCents,
+      accepted.totals.firstInvoiceTotalCents,
       Number(row.tax_rate_bps) || 0,
-      nextInvoiceDate(startDate, frequency),
-      String(row.scope_json ?? '{}'),
+      startDate,
+      JSON.stringify(accepted.scope),
+      accepted.snapshotJson,
       text(input.notes, 1000),
       actor.id,
     )
@@ -1008,24 +1080,71 @@ export async function generateContractInvoice(
   if (actor.role !== 'owner' && actor.branchId && String(contract.branch_id) !== actor.branchId) {
     throw new AdminAuthError(403, 'branch_scope_denied');
   }
-  const periodStart = String(contract.next_invoice_date || today());
+  if (contract.property_id) {
+    const property = await db
+      .prepare('SELECT branch_id FROM properties WHERE id = ? AND customer_id = ? LIMIT 1')
+      .bind(contract.property_id, contract.customer_id)
+      .first<{ branch_id: string | null }>();
+    if (!property) throw new AdminAuthError(409, 'contract_property_invalid');
+    if (contract.branch_id && property.branch_id && property.branch_id !== contract.branch_id) {
+      throw new AdminAuthError(409, 'contract_property_branch_mismatch');
+    }
+  }
   const frequency = String(contract.billing_frequency) as BillingFrequency;
-  const periodEnd = addMonths(periodStart, billingIntervalMonths(frequency));
-  const duplicate = await db
+  const invoiceCount = await db
+    .prepare('SELECT COUNT(*) AS count FROM commercial_contract_invoices WHERE contract_id = ?')
+    .bind(contractId)
+    .first<{ count: number }>();
+  const firstInvoice = Number(invoiceCount?.count ?? 0) === 0;
+  const startDate = String(contract.start_date ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    throw new AdminAuthError(409, 'contract_billing_date_invalid');
+  }
+  const periodStart = firstInvoice
+    ? startDate
+    : String(contract.next_invoice_date ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(periodStart) || periodStart < startDate) {
+    throw new AdminAuthError(409, 'contract_billing_date_invalid');
+  }
+  const anchorDay = Number(startDate.slice(8, 10)) || 1;
+  const periodEnd = addMonthsAnchored(
+    periodStart,
+    billingIntervalMonths(frequency),
+    anchorDay,
+  );
+  if (periodEnd <= periodStart) throw new AdminAuthError(409, 'contract_billing_period_invalid');
+  const overlap = await db
     .prepare(
-      'SELECT invoice_id FROM commercial_contract_invoices WHERE contract_id = ? AND period_start = ? LIMIT 1',
+      `SELECT invoice_id FROM commercial_contract_invoices
+       WHERE contract_id = ? AND period_start < ? AND period_end > ? LIMIT 1`,
     )
-    .bind(contractId, periodStart)
+    .bind(contractId, periodEnd, periodStart)
     .first<{ invoice_id: string }>();
-  if (duplicate) throw new AdminAuthError(409, 'contract_period_already_invoiced');
-  const scope = JSON.parse(String(contract.scope_json ?? '{}')) as ProposalScope;
+  if (overlap) throw new AdminAuthError(409, 'contract_period_already_invoiced');
+
+  let snapshot: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(String(contract.snapshot_json ?? '{}')) as unknown;
+    if (parsed && typeof parsed === 'object') snapshot = parsed as Record<string, unknown>;
+  } catch {
+    snapshot = {};
+  }
+  let storedScope: unknown = {};
+  try {
+    storedScope = JSON.parse(String(contract.scope_json ?? '{}'));
+  } catch {
+    storedScope = {};
+  }
+  const scope = normalizeScope(snapshot.scope ?? storedScope);
   const lines: Array<Record<string, unknown>> = [];
+  let recurringSubtotal = 0;
   for (const location of scope.locations) {
     for (const area of location.areas) {
       for (const task of area.tasks) {
         if (task.monthlyCents <= 0) continue;
+        recurringSubtotal += task.monthlyCents;
         lines.push({
-          description: `${location.name || 'Facility'} — ${area.name} — ${task.name} (${task.frequency})`,
+          description: `${location.name || location.address || 'Facility'} - ${area.name} - ${task.name} (${task.frequency})`,
           quantity: 1,
           unitAmountCents: task.monthlyCents,
           kind: 'service',
@@ -1035,57 +1154,116 @@ export async function generateContractInvoice(
   }
   for (const addOn of scope.addOns) {
     if (!addOn.recurring || addOn.amountCents <= 0) continue;
-    lines.push({ description: addOn.label, quantity: 1, unitAmountCents: addOn.amountCents, kind: 'service' });
+    recurringSubtotal += addOn.amountCents;
+    lines.push({
+      description: addOn.label,
+      quantity: 1,
+      unitAmountCents: addOn.amountCents,
+      kind: 'service',
+    });
   }
-  if (lines.length === 0) throw new AdminAuthError(409, 'contract_has_no_recurring_lines');
-  const taxRateBps = Number(contract.tax_rate_bps) || 0;
-  if (taxRateBps > 0) {
-    const subtotal = lines.reduce((sum, line) => sum + Number(line.unitAmountCents), 0);
+  let oneTimeSubtotal = 0;
+  if (firstInvoice) {
+    for (const charge of scope.oneTimeCharges) {
+      if (charge.amountCents <= 0) continue;
+      oneTimeSubtotal += charge.amountCents;
+      lines.push({
+        description: charge.label,
+        quantity: 1,
+        unitAmountCents: charge.amountCents,
+        kind: 'extra',
+      });
+    }
+    for (const addOn of scope.addOns) {
+      if (addOn.recurring || addOn.amountCents <= 0) continue;
+      oneTimeSubtotal += addOn.amountCents;
+      lines.push({
+        description: addOn.label,
+        quantity: 1,
+        unitAmountCents: addOn.amountCents,
+        kind: 'extra',
+      });
+    }
+  }
+  if (!firstInvoice && recurringSubtotal === 0) {
+    throw new AdminAuthError(409, 'contract_has_no_recurring_lines');
+  }
+  if (lines.length === 0) throw new AdminAuthError(409, 'contract_has_no_invoice_lines');
+  const subtotal = recurringSubtotal + oneTimeSubtotal;
+  const discount = firstInvoice
+    ? Math.min(subtotal, Math.max(0, Math.round(Number(contract.discount_cents) || 0)))
+    : 0;
+  if (discount > 0) {
+    lines.push({
+      description: 'Approved proposal discount',
+      quantity: 1,
+      unitAmountCents: discount,
+      kind: 'discount',
+    });
+  }
+  const taxRateBps = Math.min(10000, Math.max(0, Math.round(Number(contract.tax_rate_bps) || 0)));
+  const taxable = Math.max(0, subtotal - discount);
+  const tax = Math.round((taxable * taxRateBps) / 10000);
+  if (tax > 0) {
     lines.push({
       description: `Sales tax (${(taxRateBps / 100).toFixed(2)}%)`,
       quantity: 1,
-      unitAmountCents: Math.round((subtotal * taxRateBps) / 10000),
+      unitAmountCents: tax,
       kind: 'tax',
     });
   }
-  const invoice = await createInvoice(db, actor, {
-    customerId: contract.customer_id,
-    ...(contract.property_id ? { propertyId: contract.property_id } : {}),
-    serviceCode: 'commercial-cleaning',
-    serviceLabel: 'Commercial cleaning — contract billing',
-    issueDate: today(),
-    dueDate: text(contract.payment_terms, 120).match(/net\s*(\d+)/i)
-      ? addMonths(today(), 0)
-      : today(),
-    lines,
-    bookingRequestId: null,
-  });
-  // Net terms: replace the same-day default with the approved term date.
-  const termDays = Number((String(contract.payment_terms).match(/net\s*(\d+)/i) ?? [])[1] ?? 15);
-  const due = new Date(Date.now() + Math.max(0, termDays) * 86_400_000).toISOString().slice(0, 10);
-  await db
-    .prepare('UPDATE invoices SET due_date = ?, commercial_contract_id = ?, updated_at = ? WHERE id = ?')
-    .bind(due, contractId, new Date().toISOString(), invoice.id)
-    .run();
-  await db
-    .prepare(
-      `INSERT INTO commercial_contract_invoices (id, contract_id, invoice_id, period_start, period_end)
-       VALUES (?, ?, ?, ?, ?)`,
-    )
-    .bind(`ci_${crypto.randomUUID()}`, contractId, invoice.id, periodStart, periodEnd)
-    .run();
-  await db
-    .prepare(
-      'UPDATE commercial_contracts SET last_invoice_at = ?, next_invoice_date = ?, updated_at = ? WHERE id = ?',
-    )
-    .bind(new Date().toISOString(), nextInvoiceDate(periodEnd, frequency), new Date().toISOString(), contractId)
-    .run();
+  const expectedTotalCents = taxable + tax;
+  if (
+    firstInvoice &&
+    Number(contract.first_invoice_total_cents) > 0 &&
+    expectedTotalCents !== Number(contract.first_invoice_total_cents)
+  ) {
+    throw new AdminAuthError(409, 'contract_snapshot_mismatch');
+  }
+  const issueDate = branchToday(contract.branch_id ? String(contract.branch_id) : null);
+  const dueDate = paymentTermsDueDate(issueDate, String(contract.payment_terms ?? 'Net 15'));
+  const timestamp = new Date().toISOString();
+  let invoice: { id: string; number: string; totalCents: number };
+  try {
+    invoice = await createInvoice(db, actor, {
+      customerId: contract.customer_id,
+      ...(contract.property_id ? { propertyId: contract.property_id } : {}),
+      serviceCode: 'commercial-cleaning',
+      serviceLabel: 'Commercial cleaning - contract billing',
+      issueDate,
+      dueDate,
+      lines,
+      bookingRequestId: null,
+      additionalStatements: (created: { id: string; number: string; totalCents: number }) => [
+        db
+          .prepare('UPDATE invoices SET commercial_contract_id = ?, updated_at = ? WHERE id = ?')
+          .bind(contractId, timestamp, created.id),
+        db
+          .prepare(
+            `INSERT INTO commercial_contract_invoices (id, contract_id, invoice_id, period_start, period_end)
+             VALUES (?, ?, ?, ?, ?)`,
+          )
+          .bind(`ci_${crypto.randomUUID()}`, contractId, created.id, periodStart, periodEnd),
+        db
+          .prepare(
+            `UPDATE commercial_contracts SET last_invoice_at = ?, next_invoice_date = ?, updated_at = ?
+             WHERE id = ?`,
+          )
+          .bind(timestamp, periodEnd, timestamp, contractId),
+      ],
+    });
+  } catch (error) {
+    if (/unique|constraint/i.test((error as Error).message ?? '')) {
+      throw new AdminAuthError(409, 'contract_period_already_invoiced');
+    }
+    throw error;
+  }
   await audit(db, {
     actorUserId: actor.id,
     action: 'commercial.contract_invoice_created',
     entityType: 'commercial_contract',
     entityId: contractId,
-    detail: invoice.id,
+    detail: `${invoice.id}:${periodStart}..${periodEnd}`,
   });
   return { invoiceId: invoice.id, number: invoice.number, totalCents: invoice.totalCents };
 }

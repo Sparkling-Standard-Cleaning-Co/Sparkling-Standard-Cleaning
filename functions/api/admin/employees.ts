@@ -98,11 +98,11 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (view === 'payroll') {
       const periodId = text(url.searchParams.get('id'), 100);
       if (!periodId) return json({ ok: false, error: 'payroll_period_required' }, 400);
-      return json({ ok: true, ...(await getPayrollPeriod(db, periodId)) });
+      return json({ ok: true, ...(await getPayrollPeriod(db, periodId, actor)) });
     }
     if (view === 'payroll_csv') {
       const periodId = text(url.searchParams.get('id'), 100);
-      const detail = await getPayrollPeriod(db, periodId);
+      const detail = await getPayrollPeriod(db, periodId, actor);
       const csv = payrollCsv(detail.period, detail.entries);
       return new Response(csv, {
         headers: {
@@ -117,7 +117,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       listTrainingModules(db),
       listTrainingAssignments(db),
       listQualityInspections(db, actor),
-      listPayrollPeriods(db),
+      listPayrollPeriods(db, actor),
       listTimeOffRequests(db, actor),
     ]);
     return json({

@@ -206,7 +206,15 @@ async function loadMe(): Promise<void> {
     if (stateEl) {
       stateEl.dataset.state = state;
       stateEl.textContent =
-        state === 'work' ? 'Clocked in' : state === 'break' ? 'On break' : state === 'meal' ? 'On meal' : 'Clocked out';
+        state === 'work'
+          ? 'Clocked in'
+          : state === 'break'
+            ? 'On break'
+            : state === 'meal'
+              ? 'On meal'
+              : state === 'travel'
+                ? 'Traveling'
+                : 'Clocked out';
     }
     const since = document.querySelector<HTMLElement>('[data-employee-clock-time]');
     if (since) since.textContent = clock.since ? `Since ${shortTime(clock.since)}` : 'Ready when you are';
@@ -219,7 +227,9 @@ async function loadMe(): Promise<void> {
             ? 'Short rest breaks are paid. End the break when you return to work.'
             : state === 'meal'
               ? 'Meal periods are unpaid unless you work through them; a manager can correct the timecard.'
-              : 'Your paid work time is running.';
+              : state === 'travel'
+                ? 'Compensable travel is running. End travel when you arrive.'
+                : 'Your paid work time is running.';
     }
     document.querySelector<HTMLElement>('[data-employee-today]')!.textContent = String(today.workLabel ?? '0h 00m');
     document.querySelector<HTMLElement>('[data-employee-week]')!.textContent = String(week.workLabel ?? '0h 00m');
@@ -233,13 +243,15 @@ async function loadMe(): Promise<void> {
           ? action !== 'clock_in'
           : action === 'clock_in'
             ? true
-            : action === 'start_break' || action === 'start_meal'
+            : action === 'start_break' || action === 'start_meal' || action === 'start_travel'
               ? state !== 'work'
               : action === 'end_break'
                 ? state !== 'break'
                 : action === 'end_meal'
                   ? state !== 'meal'
-                  : false;
+                  : action === 'end_travel'
+                    ? state !== 'travel'
+                    : false;
     }
     const rate = String(profile.defaultRateType ?? 'regular');
     const rateSelect = document.querySelector<HTMLSelectElement>('[data-employee-rate]');

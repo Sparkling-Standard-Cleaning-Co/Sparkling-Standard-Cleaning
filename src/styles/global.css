@@ -3593,13 +3593,6 @@ fieldset.input--invalid {
   text-underline-offset: 0.14em;
 }
 
-.terms-acceptance__note {
-  margin: 0;
-  padding-left: calc(1.1rem + var(--space-2));
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
 body:has(.legal-policy-dialog[open]) {
   overflow: hidden;
 }
@@ -4783,6 +4776,10 @@ body:has(.legal-policy-dialog[open]) {
 .reservation-actions__note {
   margin: 0;
   font-size: var(--text-sm);
+}
+
+.reservation-actions__note:empty {
+  display: none;
 }
 
 .reservation-actions__links {

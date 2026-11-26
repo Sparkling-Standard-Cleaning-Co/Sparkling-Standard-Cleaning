@@ -1239,8 +1239,7 @@ function initEstimateWizard(form: HTMLFormElement): void {
       return;
     }
     if (eligible) {
-      paymentNote.textContent =
-        'Pay now to reserve this cleaning. If required photos are still outstanding, we will mark the booking pending photos.';
+      paymentNote.textContent = '';
       return;
     }
     if (canOfferVerification) {

@@ -32,8 +32,25 @@ interface Env extends AdminDbEnv {
   PUBLIC_SITE_URL?: string;
 }
 
-type ClockAction = 'clock_in' | 'start_break' | 'end_break' | 'start_meal' | 'end_meal' | 'clock_out';
-const ACTIONS: ClockAction[] = ['clock_in', 'start_break', 'end_break', 'start_meal', 'end_meal', 'clock_out'];
+type ClockAction =
+  | 'clock_in'
+  | 'start_break'
+  | 'end_break'
+  | 'start_meal'
+  | 'end_meal'
+  | 'start_travel'
+  | 'end_travel'
+  | 'clock_out';
+const ACTIONS: ClockAction[] = [
+  'clock_in',
+  'start_break',
+  'end_break',
+  'start_meal',
+  'end_meal',
+  'start_travel',
+  'end_travel',
+  'clock_out',
+];
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -106,19 +123,22 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       appointmentId: string | null;
       rateType: RateType;
       rateCents: number;
+      travel?: boolean;
     }): Promise<void> => {
+      const travel = input.travel === true ? 1 : 0;
       await db
         .prepare(
           `INSERT INTO time_intervals
-           (id, admin_user_id, team_member_id, appointment_id, kind, rate_type, rate_cents, paid,
+           (id, admin_user_id, team_member_id, appointment_id, kind, is_travel, rate_type, rate_cents, paid,
             started_at, status, start_event_id)
-           VALUES (?, ?, ?, ?, 'work', ?, ?, 1, ?, 'open', ?)`,
+           VALUES (?, ?, ?, ?, 'work', ?, ?, ?, 1, ?, 'open', ?)`,
         )
         .bind(
           `tint_${crypto.randomUUID()}`,
           actor.id,
           profile.teamMemberId,
           input.appointmentId,
+          travel,
           input.rateType,
           input.rateCents,
           now.toISOString(),
@@ -203,10 +223,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     } else {
       if (!open) return json({ ok: false, error: 'not_clocked_in' }, 409);
       const kind = String(open.kind ?? 'work');
-      if (action === 'start_break' && kind !== 'work') return json({ ok: false, error: 'invalid_state' }, 409);
+      const travelling = Number(open.is_travel) === 1;
+      if (action === 'start_break' && (kind !== 'work' || travelling)) return json({ ok: false, error: 'invalid_state' }, 409);
       if (action === 'end_break' && kind !== 'break') return json({ ok: false, error: 'invalid_state' }, 409);
-      if (action === 'start_meal' && kind !== 'work') return json({ ok: false, error: 'invalid_state' }, 409);
+      if (action === 'start_meal' && (kind !== 'work' || travelling)) return json({ ok: false, error: 'invalid_state' }, 409);
       if (action === 'end_meal' && kind !== 'meal') return json({ ok: false, error: 'invalid_state' }, 409);
+      if (action === 'start_travel' && (kind !== 'work' || travelling)) return json({ ok: false, error: 'invalid_state' }, 409);
+      if (action === 'end_travel' && (kind !== 'work' || !travelling)) return json({ ok: false, error: 'invalid_state' }, 409);
 
       const appointmentId = open.appointment_id ? String(open.appointment_id) : null;
       const rateType = (normaliseRateType(open.rate_type) ?? profile.defaultRateType) as RateType;
@@ -260,7 +283,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             event.id,
           )
           .run();
-      } else if (action === 'end_break' || action === 'end_meal') {
+      } else if (action === 'start_travel') {
+        await openWork({ eventId: event.id, appointmentId, rateType, rateCents, travel: true });
+      } else if (action === 'end_break' || action === 'end_meal' || action === 'end_travel') {
         await openWork({ eventId: event.id, appointmentId, rateType, rateCents });
       }
       await audit(db, {
@@ -291,7 +316,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     return json({
       ok: true,
       clock: next
-        ? { state: String(next.kind ?? 'work'), since: String(next.started_at ?? ''), appointmentId: next.appointment_id ?? null }
+        ? {
+            state:
+              Number(next.is_travel) === 1 ? 'travel' : String(next.kind ?? 'work'),
+            since: String(next.started_at ?? ''),
+            appointmentId: next.appointment_id ?? null,
+          }
         : { state: 'out', since: null, appointmentId: null },
       today: { ...todayTotals, workLabel: formatMinutes(todayTotals.workMinutes), grossLabel: formatMoney(todayTotals.grossCents) },
       week: { ...weekTotals, workLabel: formatMinutes(weekTotals.workMinutes), overtimeLabel: formatMinutes(weekTotals.overtimeMinutes) },

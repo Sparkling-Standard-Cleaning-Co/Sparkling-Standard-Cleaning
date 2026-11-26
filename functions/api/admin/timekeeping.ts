@@ -235,6 +235,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       if (!['work', 'break', 'meal'].includes(kind)) return json({ ok: false, error: 'invalid_kind' }, 400);
       if (!reason) return json({ ok: false, error: 'correction_reason_required' }, 400);
       const paid = body.paid === undefined ? Number(row.paid) : body.paid === true ? 1 : 0;
+      const travel =
+        body.travel === undefined
+          ? Number(row.is_travel) === 1
+            ? 1
+            : 0
+          : body.travel === true
+            ? 1
+            : 0;
+      const effectivePaid = travel === 1 ? 1 : paid;
       const rateCents =
         Number(body.rateCents) > 0
           ? Math.round(Number(body.rateCents))
@@ -245,11 +254,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
               : Number(row.rate_cents) || DEFAULT_RATES_CENTS.regular;
       await db
         .prepare(
-          `UPDATE time_intervals SET started_at = ?, ended_at = ?, kind = ?, rate_type = ?, rate_cents = ?,
-             paid = ?, status = 'corrected', corrected_by_admin_user_id = ?, correction_reason = ?,
+          `UPDATE time_intervals SET started_at = ?, ended_at = ?, kind = ?, is_travel = ?,
+             rate_type = ?, rate_cents = ?, paid = ?, status = 'corrected',
+             corrected_by_admin_user_id = ?, correction_reason = ?,
              updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         )
-        .bind(started, ended, kind, rateType, rateCents, paid, actor.id, reason, intervalId)
+        .bind(started, ended, kind, travel, rateType, rateCents, effectivePaid, actor.id, reason, intervalId)
         .run();
       await db
         .prepare(
@@ -263,10 +273,18 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
             started_at: row.started_at,
             ended_at: row.ended_at,
             kind: row.kind,
+            is_travel: Number(row.is_travel) === 1 ? 1 : 0,
             rate_type: row.rate_type,
             paid: row.paid,
           }),
-          JSON.stringify({ started_at: started, ended_at: ended, kind, rate_type: rateType, paid }),
+          JSON.stringify({
+            started_at: started,
+            ended_at: ended,
+            kind,
+            is_travel: travel,
+            rate_type: rateType,
+            paid: effectivePaid,
+          }),
           reason,
           actor.id,
         )

@@ -20,6 +20,14 @@ import {
   syncProposalSigningStatus,
   updateCommercialProposal,
 } from '../../../src/lib/commercial/service.ts';
+import {
+  approveCommercialSchedule,
+  contractSchedulingContext,
+  previewCommercialSchedule,
+  setCommercialScheduleStatus,
+  type CommercialScheduleEnv,
+  type CommercialScheduleInput,
+} from '../../../src/lib/commercial/scheduling.ts';
 
 interface Env extends AdminDbEnv {
   RESEND_API_KEY?: string;
@@ -36,6 +44,23 @@ function json(body: unknown, status = 200): Response {
 
 function text(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function scheduleInput(body: Record<string, unknown>): CommercialScheduleInput {
+  return {
+    contractId: text(body.contractId, 100),
+    propertyId: text(body.propertyId, 100),
+    frequency: text(body.frequency, 20),
+    startDate: text(body.startDate, 10),
+    window: text(body.window, 20),
+    startTime: text(body.startTime, 10),
+    durationMinutes: Math.round(Number(body.durationMinutes) || 0),
+    firstDurationMinutes: Math.round(Number(body.firstDurationMinutes) || 0),
+    crewSize: Math.round(Number(body.crewSize) || 0),
+    scopeNotes: text(body.scopeNotes, 2000),
+    accessInstructions: text(body.accessInstructions, 2000),
+    requiredQualifications: text(body.requiredQualifications, 1000),
+  };
 }
 
 async function branchCustomers(
@@ -132,6 +157,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         : null;
       return json({ ok: true, proposal, revisions: revisions.results ?? [], signing });
     }
+    if (view === 'contract_schedule') {
+      const contractId = text(url.searchParams.get('contractId'), 100);
+      if (!contractId) return json({ ok: false, error: 'contract_required' }, 400);
+      const context = await contractSchedulingContext(db, actor, contractId);
+      return json({ ok: true, ...context });
+    }
     if (view === 'property') {
       const propertyId = text(url.searchParams.get('propertyId'), 100);
       if (!propertyId) return json({ ok: false, error: 'property_required' }, 400);
@@ -219,6 +250,38 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         detail: text(body.contractId, 100),
       });
       return json({ ok: true, invoice });
+    }
+    if (action === 'preview_schedule') {
+      const preview = await previewCommercialSchedule(
+        context.env as unknown as CommercialScheduleEnv,
+        db,
+        actor,
+        scheduleInput(body),
+      );
+      return json({ ok: true, preview });
+    }
+    if (action === 'approve_schedule') {
+      const approved = await approveCommercialSchedule(
+        context.env as unknown as CommercialScheduleEnv,
+        db,
+        actor,
+        scheduleInput(body),
+      );
+      return json({ ok: true, ...approved });
+    }
+    if (action === 'schedule_status') {
+      const status = text(body.status, 20);
+      if (!['active', 'paused', 'cancelled'].includes(status)) {
+        return json({ ok: false, error: 'schedule_status_invalid' }, 400);
+      }
+      const result = await setCommercialScheduleStatus(
+        context.env as unknown as CommercialScheduleEnv,
+        db,
+        actor,
+        text(body.scheduleId, 100),
+        status as 'active' | 'paused' | 'cancelled',
+      );
+      return json({ ok: true, ...result });
     }
     if (action === 'add_contact' || action === 'add_walkthrough') {
       const propertyId = text(body.propertyId, 100);
