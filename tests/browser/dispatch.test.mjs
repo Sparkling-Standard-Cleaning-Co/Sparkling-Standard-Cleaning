@@ -160,8 +160,9 @@ test('the owner can save dispatch controls and run automatic assignment', async 
     await page.click('[data-dispatch-settings] button[type="submit"]');
     await page.waitForFunction(() => document.querySelector('[data-dispatch-result]')?.textContent === 'Dispatch updated.');
     assert.ok(posts.some((entry) => entry.action === 'update_settings' && entry.autoAssignEnabled === true && entry.paused === false));
-    page.once('dialog', (dialog) => void dialog.accept());
     await page.click('[data-admin-action="dispatch-run-auto"]');
+    await page.locator('[data-admin-dialog][open]').waitFor({ state: 'visible' });
+    await page.locator('[data-admin-dialog-confirm]').click();
     await page.waitForFunction(() => /assigned 1/.test(document.querySelector('[data-dispatch-result]')?.textContent ?? ''));
     assert.ok(posts.some((entry) => entry.action === 'run_automatic'));
   } finally {
@@ -176,8 +177,9 @@ test('dispatch assignment can send a full multi-cleaner crew set', async () => {
     assert.equal(await boxes.count(), 2, 'both dispatch-ready employees are offered');
     await boxes.nth(0).check();
     await boxes.nth(1).check();
-    page.once('dialog', (dialog) => void dialog.accept());
     await page.click('[data-admin-action="dispatch-assign"]');
+    await page.locator('[data-admin-dialog][open]').waitFor({ state: 'visible' });
+    await page.locator('[data-admin-dialog-confirm]').click();
     await page.waitForFunction(() => /Dispatch updated/.test(document.querySelector('[data-dispatch-result]')?.textContent ?? ''));
     const post = posts.find((entry) => entry.action === 'assign_job');
     assert.ok(post);

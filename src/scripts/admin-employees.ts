@@ -1,4 +1,5 @@
 // Employee administration, onboarding, training, quality and payroll UI.
+import { adminConfirm, adminPrompt } from './admin-dialog';
 
 interface EmployeeState {
   profiles: Array<Record<string, unknown>>;
@@ -483,14 +484,16 @@ document.querySelector<HTMLElement>('[data-admin-view="employees"]')?.addEventLi
     run(employeePost({ action: 'onboarding_status', taskId: id, status: 'completed' }).then(() => loadEmployeeMember(employeeState.selectedMember)));
   }
   if (action === 'training-complete') {
-    const score = window.prompt('Assessment score (0–100, optional)', '');
-    run(
-      employeePost({
-        action: 'complete_training',
-        assignmentId: id,
-        ...(score && Number.isFinite(Number(score)) ? { score: Number(score) } : {}),
-      }).then(() => loadEmployeeMember(employeeState.selectedMember)),
-    );
+    void adminPrompt({ title: 'Complete training', body: '<p>Optionally record the assessment score.</p>', label: 'Assessment score (0-100)', type: 'number', inputMode: 'numeric', confirmLabel: 'Record completion' }).then((score) => {
+      if (score === null) return;
+      run(
+        employeePost({
+          action: 'complete_training',
+          assignmentId: id,
+          ...(score && Number.isFinite(Number(score)) ? { score: Number(score) } : {}),
+        }).then(() => loadEmployeeMember(employeeState.selectedMember)),
+      );
+    });
   }
   if (action === 'timeoff-approve' || action === 'timeoff-decline') {
     run(
@@ -506,8 +509,10 @@ document.querySelector<HTMLElement>('[data-admin-view="employees"]')?.addEventLi
     run(employeePost({ action: 'payroll_calculate', periodId: id }).then(() => loadEmployees()));
   }
   if (action === 'payroll-approve') {
-    if (!window.confirm('Approve this payroll calculation? Approved entries are locked.')) return;
-    run(employeePost({ action: 'payroll_approve', periodId: id }).then(() => loadEmployees()));
+    void adminConfirm({ title: 'Approve this payroll calculation?', body: '<p>Approved entries are locked against further changes.</p>', confirmLabel: 'Approve payroll' }).then((ok) => {
+      if (!ok) return;
+      run(employeePost({ action: 'payroll_approve', periodId: id }).then(() => loadEmployees()));
+    });
   }
   if (action === 'payroll-close') {
     employeeState.payrollDetail = null;

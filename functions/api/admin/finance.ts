@@ -125,7 +125,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const action = String(body.action ?? '');
     if (
       action !== 'preview_invoice_email' &&
-      ['create_invoice', 'invoice_status', 'record_payment', 'record_refund', 'create_credit', 'apply_credit', 'payment_link', 'billing_portal', 'resend_invoice_receipt', 'stripe_refund'].includes(action)
+      ['create_invoice', 'record_payment', 'record_refund', 'create_credit', 'apply_credit', 'payment_link', 'billing_portal', 'resend_invoice_receipt', 'stripe_refund'].includes(action)
     ) {
       requireStepUp(actor);
     }

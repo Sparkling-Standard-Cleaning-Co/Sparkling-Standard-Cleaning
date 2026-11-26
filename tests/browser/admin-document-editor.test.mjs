@@ -197,6 +197,8 @@ test('the owner can revise an approved document in the visual editor and publish
     assert.match(saved.contentText, /A new explanatory paragraph/);
 
     await page.locator('[data-document-editor-publish]').click();
+    await page.locator('[data-admin-dialog][open]').waitFor({ state: 'visible' });
+    await page.locator('[data-admin-dialog-confirm]').click();
     await page.waitForFunction(() => document.querySelector('[data-document-editor-status]')?.textContent?.includes('Approved and published'));
     const published = posts.find((entry) => entry.action === 'publish_revision');
     assert.deepEqual(published, { action: 'publish_revision', templateId: 'doc_rev_1' });

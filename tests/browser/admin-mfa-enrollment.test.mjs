@@ -138,8 +138,11 @@ test('the owner sees email-first MFA enrollment in the security section', async 
     assert.equal(await authenticatorButton.count(), 1);
     assert.match(await emailButton.getAttribute('class') ?? '', /btn--primary/);
 
-    page.once('dialog', (dialog) => dialog.accept('SyntheticOwner!2026'));
     await emailButton.click();
+    const passwordDialog = page.locator('[data-admin-dialog]');
+    await passwordDialog.waitFor({ state: 'visible' });
+    await passwordDialog.locator('[data-admin-dialog-body] input').fill('SyntheticOwner!2026');
+    await passwordDialog.locator('[data-admin-dialog-confirm]').click();
     await page.waitForSelector('[data-admin-view="settings"] [data-form="mfa-email-enable"]');
     assert.match(
       (await page.locator('[data-admin-view="settings"] [data-admin-mfa-setup]').textContent()) ?? '',

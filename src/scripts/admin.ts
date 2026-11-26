@@ -8,6 +8,7 @@ import { loadPricingView } from './pricing-admin';
 import { loadBranchView } from './admin-branches';
 import { loadCommercial, openCommercialProposalFromCustomer } from './admin-commercial';
 import { loadEmployees } from './admin-employees';
+import { adminConfirm, adminPrompt } from './admin-dialog';
 import './admin-address-autocomplete';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
 import { pricing } from '../config/pricing';
@@ -210,45 +211,6 @@ function setAppError(message = ''): void {
   if (appError) appError.textContent = message;
 }
 
-interface AdminConfirmInput {
-  title: string;
-  body: string;
-  confirmLabel?: string;
-  danger?: boolean;
-}
-
-function adminConfirm(input: AdminConfirmInput): Promise<boolean> {
-  const dialog = document.querySelector<HTMLDialogElement>('[data-admin-dialog]');
-  if (!dialog || typeof dialog.showModal !== 'function') {
-    const plain = input.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    return Promise.resolve(window.confirm(`${input.title}\n\n${plain}`));
-  }
-  const title = dialog.querySelector<HTMLElement>('[data-admin-dialog-title]');
-  const body = dialog.querySelector<HTMLElement>('[data-admin-dialog-body]');
-  const confirmButton = dialog.querySelector<HTMLButtonElement>('[data-admin-dialog-confirm]');
-  const cancelButton = dialog.querySelector<HTMLButtonElement>('[data-admin-dialog-cancel]');
-  if (!title || !body || !confirmButton || !cancelButton) {
-    return Promise.resolve(window.confirm(input.title));
-  }
-  title.textContent = input.title;
-  body.innerHTML = input.body;
-  confirmButton.textContent = input.confirmLabel ?? 'Confirm';
-  confirmButton.classList.toggle('btn--danger', input.danger === true);
-  confirmButton.classList.toggle('btn--primary', input.danger !== true);
-  dialog.returnValue = 'cancel';
-  const previousFocus = document.activeElement as HTMLElement | null;
-  return new Promise((resolve) => {
-    const onClose = (): void => {
-      dialog.removeEventListener('close', onClose);
-      previousFocus?.focus?.();
-      resolve(dialog.returnValue === 'confirm');
-    };
-    dialog.addEventListener('close', onClose);
-    dialog.showModal();
-    cancelButton.focus();
-  });
-}
-
 function friendly(error: unknown): string {
   const code = error instanceof Error ? error.message : 'request_failed';
   const messages: Record<string, string> = {
@@ -367,11 +329,18 @@ async function confirmStepUp(): Promise<boolean> {
         body: JSON.stringify({ action: 'step_up_start' }),
       });
       if (!started.challengeToken) throw new Error('mfa_challenge_invalid');
-      const code = window.prompt(
-        started.mfaMethod === 'email'
-          ? 'Enter the six-digit code sent to your account email.'
-          : 'Enter the current authenticator code.',
-      );
+      const code = await adminPrompt({
+        title: 'Confirm your identity',
+        body:
+          started.mfaMethod === 'email'
+            ? '<p>A six-digit verification code was sent to your administrator email.</p><p class="admin-muted">This extra check is only used for sensitive security actions.</p>'
+            : '<p>Enter the current code from your authenticator app.</p><p class="admin-muted">This extra check is only used for sensitive security actions.</p>',
+        label: started.mfaMethod === 'email' ? 'Email verification code' : 'Authenticator code',
+        inputMode: 'numeric',
+        maxLength: 6,
+        placeholder: '6-digit code',
+        confirmLabel: 'Confirm identity',
+      });
       if (!code) {
         setAppError('A fresh verification code is required for this sensitive action.');
         return false;
@@ -2500,7 +2469,7 @@ async function applyCustomerBenefit(customerId: string, code: string): Promise<v
 }
 
 async function removeCustomerBenefit(customerId: string, entitlementId: string): Promise<void> {
-  if (!window.confirm('Remove this persistent benefit? Active recurring plans will return to their normal price. Issued invoices are not rewritten.')) return;
+  if (!(await adminConfirm({ title: 'Remove this persistent benefit?', body: '<p>Active recurring plans will return to their normal price. Issued invoices are not rewritten.</p>', confirmLabel: 'Remove benefit', danger: true }))) return;
   setAppError();
   setSuccess();
   try {
@@ -4279,7 +4248,7 @@ async function openQuickEstimate(id: string): Promise<void> {
 
 async function quickDiscard(): Promise<void> {
   if (!quickEstimateId) throw new Error('Save the estimate before discarding it.');
-  if (!window.confirm('Discard this Quick Estimate? It stays in the audit record and is never hard-deleted.')) return;
+  if (!(await adminConfirm({ title: 'Discard this Quick Estimate?', body: '<p>The estimate stays in the audit record and is never hard-deleted.</p>', confirmLabel: 'Discard estimate', danger: true }))) return;
   await api('/api/admin/quick-estimates', { method: 'POST', body: JSON.stringify({ action: 'discard', id: quickEstimateId }) });
   await loadQuickList();
   quickEstimateId = '';
@@ -8714,9 +8683,19 @@ document.addEventListener('submit', (event) => {
   }
   if (kind === 'customer-erase') {
     const customerId = value('customerId');
-    const confirmation = window.prompt('Type DELETE to permanently erase this customer. Retained financial and signed history will be anonymized. This cannot be undone.');
-    if (confirmation === 'DELETE') {
-      void api<Record<string, unknown>>('/api/admin/customers', {
+    void adminPrompt({
+      title: 'Permanently erase this customer?',
+      body: '<p>Retained financial and signed history will be anonymized. This cannot be undone.</p>',
+      label: 'Type DELETE to confirm',
+      placeholder: 'DELETE',
+      confirmLabel: 'Erase customer',
+      danger: true,
+    }).then((confirmation) => {
+      if (confirmation !== 'DELETE') {
+        if (confirmation !== null) setAppError('Type DELETE exactly to permanently erase this customer.');
+        return;
+      }
+      return api<Record<string, unknown>>('/api/admin/customers', {
         method: 'POST',
         body: JSON.stringify({ action: 'delete', customerId, confirmation: 'DELETE' }),
       }).then((result) => {
@@ -8726,7 +8705,7 @@ document.addEventListener('submit', (event) => {
         window.alert(mode === 'anonymized' ? 'Customer identifiers removed. Retained financial and audit history was anonymized.' : 'Customer permanently deleted.');
         return loadCustomers();
       }).catch((error) => setAppError(friendly(error)));
-    }
+    });
   }
   if (kind === 'property-add') {
     const customerId = value('customerId');
@@ -9291,9 +9270,9 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'dispatch-run-analysis') { void dispatchAction({ action: 'run_analysis' }); return; }
   if (actionName === 'dispatch-run-auto') {
-    if (window.confirm('Automatically staff eligible unassigned jobs? Existing assignments and customer times will not change.')) {
-      void dispatchAction({ action: 'run_automatic' });
-    }
+    void adminConfirm({ title: 'Automatically staff eligible jobs?', body: '<p>Existing assignments and customer times will not change.</p>', confirmLabel: 'Run automatic staffing' }).then((ok) => {
+      if (ok) void dispatchAction({ action: 'run_automatic' });
+    });
     return;
   }
   if (actionName === 'dispatch-add-timeoff') {
@@ -9325,8 +9304,9 @@ document.addEventListener('click', (event) => {
       return;
     }
     const names = memberIds.map((memberId) => dispatchMemberName(memberId)).join(', ');
-    if (!window.confirm(`Assign ${names} as the crew for this unassigned job? The server will validate the exact crew set, travel, branch and calendar. Customer appointment times will not change.`)) return;
-    void dispatchAction({ action: 'assign_job', appointmentId: id, teamMemberIds: memberIds });
+    void adminConfirm({ title: 'Assign this crew?', body: `<p>Assign <strong>${esc(names)}</strong> as the crew for this unassigned job? The server validates the exact crew set, travel, branch and calendar. Customer appointment times will not change.</p>`, confirmLabel: 'Assign crew' }).then((ok) => {
+      if (ok) void dispatchAction({ action: 'assign_job', appointmentId: id, teamMemberIds: memberIds });
+    });
     return;
   }
   if (actionName === 'dispatch-retry-calendar') { void dispatchAction({ action: 'retry_calendar', decisionId: id }); return; }
@@ -9357,8 +9337,9 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (actionName === 'career-convert') {
-    if (!window.confirm('Create an employee profile from this application? This transfers the applicant information and creates onboarding tasks. No employee portal access is granted automatically.')) return;
-    void api<{ ok?: boolean; teamMemberId?: string }>('/api/admin/careers', { method: 'POST', body: JSON.stringify({ action: 'convert_to_employee', applicationId: id }) })
+    void adminConfirm({ title: 'Create an employee profile?', body: '<p>This transfers the applicant information and creates onboarding tasks. No employee portal access is granted automatically.</p>', confirmLabel: 'Create employee' }).then((ok) => {
+      if (!ok) return;
+      return api<{ ok?: boolean; teamMemberId?: string }>('/api/admin/careers', { method: 'POST', body: JSON.stringify({ action: 'convert_to_employee', applicationId: id }) })
       .then((result) => {
         setSuccess('Employee profile created. Complete onboarding, agreements and training in Employees & Payroll.');
         return openCareer(id).then(() => {
@@ -9368,6 +9349,7 @@ document.addEventListener('click', (event) => {
         });
       })
       .catch((error) => setAppError(friendly(error)));
+    });
     return;
   }
   if (actionName === 'career-open-employee') {
@@ -9933,12 +9915,12 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'mfa-email-start') {
     setAppError();
-    const password = window.prompt('Confirm your account password before enabling email verification.');
-    if (!password) return;
-    void api<{ challengeToken?: string; expiresAt?: string; resendAfterSeconds?: number }>('/api/admin/accounts', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'mfa_email_start', password }),
-    })
+    void adminPrompt({ title: 'Confirm your password', body: '<p>Email verification will be enabled for this administrator account.</p>', label: 'Account password', type: 'password', confirmLabel: 'Continue', danger: false }).then((password) => {
+      if (!password) return;
+      return api<{ challengeToken?: string; expiresAt?: string; resendAfterSeconds?: number }>('/api/admin/accounts', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'mfa_email_start', password }),
+      })
       .then((result) => {
         emailMfaChallenge = result.challengeToken ?? '';
         const target = document.querySelector<HTMLElement>('[data-admin-mfa-setup]');
@@ -9947,6 +9929,7 @@ document.addEventListener('click', (event) => {
         }
       })
       .catch((error) => setAppError(friendly(error)));
+    });
   }
   if (actionName === 'admin-reset') {
     setAppError();
@@ -10220,11 +10203,13 @@ document.querySelector<HTMLElement>('[data-admin-view="quick-estimate"]')?.addEv
   }
   const discardButton = target.closest<HTMLElement>('[data-quick-discard]');
   if (discardButton?.dataset.quickDiscard) {
-    if (!window.confirm('Discard this Quick Estimate? It remains in the audit record and is never hard-deleted.')) return;
-    void api('/api/admin/quick-estimates', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'discard', id: discardButton.dataset.quickDiscard }),
-    }).then(() => loadQuickList()).catch((error) => setAppError(friendly(error)));
+    void adminConfirm({ title: 'Discard this Quick Estimate?', body: '<p>It remains in the audit record and is never hard-deleted.</p>', confirmLabel: 'Discard estimate', danger: true }).then((ok) => {
+      if (!ok) return;
+      return api('/api/admin/quick-estimates', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'discard', id: discardButton.dataset.quickDiscard }),
+      }).then(() => loadQuickList()).catch((error) => setAppError(friendly(error)));
+    });
   }
 });
 
@@ -10514,7 +10499,7 @@ async function compareDocumentEditor(): Promise<void> {
 
 async function publishDocumentEditor(): Promise<void> {
   if (!documentEditorId) return;
-  if (!window.confirm('Approve and publish this revision? Every packet using the previous version will move to this version. Prior signers will be flagged for review. Executed agreements are not changed.')) return;
+  if (!(await adminConfirm({ title: 'Approve and publish this revision?', body: '<p>Every packet using the previous version will move to this version. Prior signers will be flagged for review. Executed agreements are not changed.</p>', confirmLabel: 'Publish revision' }))) return;
   const status = document.querySelector<HTMLElement>('[data-document-editor-status]');
   if (status) status.textContent = 'Publishing revision…';
   try {

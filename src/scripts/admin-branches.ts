@@ -3,6 +3,7 @@
 // The server is authoritative: lifecycle, service availability and pricing
 // publication gates are enforced by the API. This module only renders the
 // owner's setup form and reports the actual saved state.
+import { adminConfirm } from './admin-dialog';
 
 interface BranchSettings {
   id: string;
@@ -272,7 +273,7 @@ async function save(): Promise<void> {
   };
   const previous = selected()?.lifecycle;
   if (body.lifecycle === 'live' && previous !== 'live') {
-    if (!window.confirm('Advance this branch to LIVE? Public pages, pricing and booking gates will follow the saved settings. Verify staffing, licensing, insurance, tax, capacity and local contact first.')) {
+    if (!(await adminConfirm({ title: 'Advance this branch to LIVE?', body: '<p>Public pages, pricing and booking gates will follow the saved settings. Verify staffing, licensing, insurance, tax, capacity and local contact first.</p>', confirmLabel: 'Advance to live' }))) {
       return;
     }
   }

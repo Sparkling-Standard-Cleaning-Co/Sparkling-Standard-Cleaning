@@ -1,6 +1,7 @@
 // Commercial accounts, custom proposal builder, agreement sending and billing.
 // Shared admin authentication is server-enforced; this module uses the CSRF
 // token exposed by the main admin controller.
+import { adminConfirm } from './admin-dialog';
 
 interface CommercialScope {
   locations: Array<{
@@ -738,7 +739,7 @@ async function previewCommercialScheduleUi(): Promise<void> {
 }
 
 async function approveCommercialScheduleUi(): Promise<void> {
-  if (!window.confirm('Approve this service schedule and create the recurring plan, Job Files and calendar events?')) {
+  if (!(await adminConfirm({ title: 'Approve this service schedule?', body: '<p>This creates the recurring plan, Job Files and calendar events.</p>', confirmLabel: 'Approve schedule' }))) {
     return;
   }
   const result = await commercialPost({ action: 'approve_schedule', ...schedulePayload() });
@@ -755,7 +756,7 @@ async function setCommercialScheduleStatusUi(
   scheduleId: string,
   status: 'active' | 'paused' | 'cancelled',
 ): Promise<void> {
-  if (status === 'cancelled' && !window.confirm('Cancel this service schedule and its future visits?')) {
+  if (status === 'cancelled' && !(await adminConfirm({ title: 'Cancel this service schedule?', body: '<p>Future visits for this schedule will be cancelled. Existing history is preserved.</p>', confirmLabel: 'Cancel schedule', danger: true }))) {
     return;
   }
   await commercialPost({ action: 'schedule_status', scheduleId, status });
@@ -853,16 +854,18 @@ document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventL
     );
   }
   if (action === 'send') {
-    if (!window.confirm('Send this proposal to the customer for electronic signature?')) return;
-    run(
-      commercialPost({ action: 'send_proposal', id }).then((result) => {
-        commercialSetStatus(
-          `Proposal sent for signature. Email: ${String(result.emailStatus ?? 'sent')}.`,
-          'success',
-        );
-        return loadCommercial();
-      }),
-    );
+    void adminConfirm({ title: 'Send this proposal?', body: '<p>The customer will receive this proposal for electronic signature.</p>', confirmLabel: 'Send proposal' }).then((ok) => {
+      if (!ok) return;
+      run(
+        commercialPost({ action: 'send_proposal', id }).then((result) => {
+          commercialSetStatus(
+            `Proposal sent for signature. Email: ${String(result.emailStatus ?? 'sent')}.`,
+            'success',
+          );
+          return loadCommercial();
+        }),
+      );
+    });
   }
   if (action === 'revision') {
     run(
@@ -881,26 +884,30 @@ document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventL
     );
   }
   if (action === 'invoice') {
-    if (!window.confirm('Generate the next contract invoice for this billing period?')) return;
-    run(
-      commercialPost({ action: 'generate_invoice', contractId: id }).then((result) => {
-        const invoice = (result.invoice ?? {}) as Record<string, unknown>;
-        commercialSetStatus(
-          `Invoice ${String(invoice.number)} created for ${moneyUi(invoice.totalCents)}.`,
-          'success',
-        );
-        return loadCommercial();
-      }),
-    );
+    void adminConfirm({ title: 'Generate the next contract invoice?', body: '<p>This creates the invoice for the current billing period.</p>', confirmLabel: 'Generate invoice' }).then((ok) => {
+      if (!ok) return;
+      run(
+        commercialPost({ action: 'generate_invoice', contractId: id }).then((result) => {
+          const invoice = (result.invoice ?? {}) as Record<string, unknown>;
+          commercialSetStatus(
+            `Invoice ${String(invoice.number)} created for ${moneyUi(invoice.totalCents)}.`,
+            'success',
+          );
+          return loadCommercial();
+        }),
+      );
+    });
   }
   if (action === 'archive') {
-    if (!window.confirm('Archive this proposal? It stays in history and cannot be edited.')) return;
-    run(
-      commercialPost({ action: 'archive_proposal', id }).then(() => {
-        commercialSetStatus('Proposal archived.', 'success');
-        return loadCommercial();
-      }),
-    );
+    void adminConfirm({ title: 'Archive this proposal?', body: '<p>It stays in history and cannot be edited.</p>', confirmLabel: 'Archive proposal', danger: true }).then((ok) => {
+      if (!ok) return;
+      run(
+        commercialPost({ action: 'archive_proposal', id }).then(() => {
+          commercialSetStatus('Proposal archived.', 'success');
+          return loadCommercial();
+        }),
+      );
+    });
   }
   if (action === 'property') run(openCommercialProperty(id));
   if (action === 'schedule' || action === 'open-contract') run(openCommercialSchedule(id));
