@@ -74,6 +74,7 @@ overtime, approval locks, CSV and manager/owner restrictions.
   `notification_retry_queue`. Owners can retry or discard from the Communications
   center; retries record attempts/provider acceptance and audit. Duplicate pending
   failures for the same event/recipient/related record are suppressed.
+- Branch scope is enforced on employee member views/actions and facility contact/walkthrough records; cross-branch IDs fail closed.
 - Manager/branch-manager access is enforced server-side: employee administration
   requires owner/manager, payroll requires owner/finance and approval requires
   owner. Commercial reads require booking read with branch scoping.
@@ -95,7 +96,7 @@ staffing is configured and public activation stays owner-controlled.
 ## Deployment
 
 - Production migrations 064-066 applied before code deployment; 66 migrations, 123 live tables (122 application tables plus _cf_KV), 0 foreign-key violations.
-- Cloudflare Pages production deployment 372e67c4-96a4-4dee-b2d3-b6eda3e24cc8 from application code 90b7ab5; main and production-safe identical.
+- Cloudflare Pages production deployment a3da477-d130-426d-9dad-883bdcf6affb from application code 106696d; main and production-safe identical.
 - Fresh complete backup after migration (run 45729049782): archive sparkling-standard-backup-2026-11-26T00-29-54-complete.ssbk, 10,813,677 bytes, 227 files, SHA-256 49b688bc035ba83fe3bad67cb01f19b603378a42951f93b7b13d86fbe28e1d14, R2 + OneDrive verified, isolated restore 122 application tables / 66 migrations, 0 FK violations, 0 missing R2 references.
 - Unauthenticated /api/admin/commercial, /api/admin/employees and /api/employee/requests return 401.
 
