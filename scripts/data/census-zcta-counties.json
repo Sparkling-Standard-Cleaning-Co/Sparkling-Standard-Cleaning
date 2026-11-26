@@ -1,0 +1,2063 @@
+{
+  "source": "U.S. Census 2020 ZCTA-to-county relationship file",
+  "sourceUrl": "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt",
+  "fetchedAt": "2026-11-26",
+  "entries": {
+    "32501": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 9550036
+      }
+    },
+    "32502": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 6944058
+      }
+    },
+    "32503": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 32661185
+      }
+    },
+    "32504": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 27167739
+      }
+    },
+    "32505": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 33553269
+      }
+    },
+    "32506": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 79247429
+      }
+    },
+    "32507": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 72190105
+      }
+    },
+    "32508": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 18684288
+      }
+    },
+    "32511": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 739620
+      }
+    },
+    "32514": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 51328342
+      }
+    },
+    "32526": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 151284811
+      }
+    },
+    "32530": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Santa Rosa"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Santa Rosa": 2060664
+      }
+    },
+    "32533": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 199866499
+      }
+    },
+    "32534": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 25607000
+      }
+    },
+    "32561": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia",
+        "Santa Rosa"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 19054887,
+        "Santa Rosa": 12122982
+      }
+    },
+    "32563": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Santa Rosa"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Santa Rosa": 43086275
+      }
+    },
+    "32565": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Santa Rosa"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Santa Rosa": 596655238
+      }
+    },
+    "32566": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Santa Rosa"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Santa Rosa": 101447890
+      }
+    },
+    "32570": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Santa Rosa"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Santa Rosa": 779756373
+      }
+    },
+    "32571": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Santa Rosa"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Santa Rosa": 291666388
+      }
+    },
+    "32577": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Escambia": 178598892
+      }
+    },
+    "32583": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Santa Rosa"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Santa Rosa": 323912243
+      }
+    },
+    "33503": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 1577942
+      }
+    },
+    "33510": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 19626804
+      }
+    },
+    "33511": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 41557316
+      }
+    },
+    "33523": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco",
+        "Hernando"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 252170572,
+        "Hernando": 20807738
+      }
+    },
+    "33525": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 248735026
+      }
+    },
+    "33527": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 81421219
+      }
+    },
+    "33530": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 171788
+      }
+    },
+    "33534": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 34131954
+      }
+    },
+    "33540": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco",
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 85620481,
+        "Hillsborough": 7808863
+      }
+    },
+    "33541": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 61553162
+      }
+    },
+    "33542": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 27019601
+      }
+    },
+    "33543": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 67989319
+      }
+    },
+    "33544": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 74476699
+      }
+    },
+    "33545": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 68866009
+      }
+    },
+    "33547": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough",
+        "Polk"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 406513812,
+        "Polk": 9384255
+      }
+    },
+    "33548": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough",
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 18927357,
+        "Pasco": 797100
+      }
+    },
+    "33549": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough",
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 25590196,
+        "Pasco": 5995202
+      }
+    },
+    "33550": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 30729
+      }
+    },
+    "33556": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough",
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 83331562,
+        "Pasco": 72857872
+      }
+    },
+    "33558": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough",
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 30077096,
+        "Pasco": 16876214
+      }
+    },
+    "33559": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough",
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 18084945,
+        "Pasco": 12858515
+      }
+    },
+    "33563": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 39079054
+      }
+    },
+    "33565": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 202878638
+      }
+    },
+    "33566": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 61316346
+      }
+    },
+    "33567": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 107715370
+      }
+    },
+    "33569": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 36065996
+      }
+    },
+    "33570": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 108311093
+      }
+    },
+    "33572": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 33864244
+      }
+    },
+    "33573": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 43514701
+      }
+    },
+    "33574": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 695801
+      }
+    },
+    "33576": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 53676060
+      }
+    },
+    "33578": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 52769414
+      }
+    },
+    "33579": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 55938966
+      }
+    },
+    "33584": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 49705031
+      }
+    },
+    "33592": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 137526433
+      }
+    },
+    "33594": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 26499357
+      }
+    },
+    "33596": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 29432525
+      }
+    },
+    "33597": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Sumter",
+        "Hernando",
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Sumter": 222476793,
+        "Hernando": 89114734,
+        "Pasco": 88238902
+      }
+    },
+    "33598": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough",
+        "Manatee"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 201664644,
+        "Manatee": 16417147
+      }
+    },
+    "33602": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 6712507
+      }
+    },
+    "33603": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 10700971
+      }
+    },
+    "33604": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 19340552
+      }
+    },
+    "33605": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 20298741
+      }
+    },
+    "33606": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 8485914
+      }
+    },
+    "33607": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 24029172
+      }
+    },
+    "33609": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 10351818
+      }
+    },
+    "33610": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 46618625
+      }
+    },
+    "33611": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 16273684
+      }
+    },
+    "33612": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 25755990
+      }
+    },
+    "33613": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 19293787
+      }
+    },
+    "33614": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 25225927
+      }
+    },
+    "33615": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 22175521
+      }
+    },
+    "33616": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 10171597
+      }
+    },
+    "33617": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 22885393
+      }
+    },
+    "33618": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 21857697
+      }
+    },
+    "33619": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 71145858
+      }
+    },
+    "33620": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 2261767
+      }
+    },
+    "33621": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 21497168
+      }
+    },
+    "33624": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 23537775
+      }
+    },
+    "33625": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 23417865
+      }
+    },
+    "33626": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 31779023
+      }
+    },
+    "33629": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 12459065
+      }
+    },
+    "33634": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 21856150
+      }
+    },
+    "33635": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 16509441
+      }
+    },
+    "33637": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 20290728
+      }
+    },
+    "33647": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hillsborough": 83880768
+      }
+    },
+    "33701": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 6903672
+      }
+    },
+    "33702": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 26869663
+      }
+    },
+    "33703": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 12993389
+      }
+    },
+    "33704": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 8862588
+      }
+    },
+    "33705": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 14457845
+      }
+    },
+    "33706": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 9470971
+      }
+    },
+    "33707": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 13677392
+      }
+    },
+    "33708": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 8821999
+      }
+    },
+    "33709": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 13260944
+      }
+    },
+    "33710": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 20648972
+      }
+    },
+    "33711": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 12181775
+      }
+    },
+    "33712": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 16569610
+      }
+    },
+    "33713": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 16928214
+      }
+    },
+    "33714": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 9457791
+      }
+    },
+    "33715": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 9837426
+      }
+    },
+    "33716": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 18551048
+      }
+    },
+    "33744": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 1512876
+      }
+    },
+    "33755": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 14164706
+      }
+    },
+    "33756": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 18677899
+      }
+    },
+    "33759": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 13665760
+      }
+    },
+    "33760": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 14591797
+      }
+    },
+    "33761": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 13103175
+      }
+    },
+    "33762": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 18368584
+      }
+    },
+    "33763": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 8685667
+      }
+    },
+    "33764": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 16352705
+      }
+    },
+    "33765": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 10817765
+      }
+    },
+    "33767": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 5199086
+      }
+    },
+    "33770": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 13466889
+      }
+    },
+    "33771": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 15510076
+      }
+    },
+    "33772": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 13667925
+      }
+    },
+    "33773": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 13096583
+      }
+    },
+    "33774": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 11876979
+      }
+    },
+    "33776": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 8771184
+      }
+    },
+    "33777": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 14249988
+      }
+    },
+    "33778": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 9745016
+      }
+    },
+    "33781": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 17022739
+      }
+    },
+    "33782": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 13951184
+      }
+    },
+    "33785": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 3052462
+      }
+    },
+    "33786": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 1388657
+      }
+    },
+    "33809": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Polk",
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Polk": 170303909,
+        "Pasco": 273062
+      }
+    },
+    "33810": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Polk",
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Polk": 122909235,
+        "Hillsborough": 44482672
+      }
+    },
+    "33849": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Polk",
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Polk": 57196490,
+        "Pasco": 945086
+      }
+    },
+    "33860": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Polk",
+        "Hillsborough"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Polk": 251502936,
+        "Hillsborough": 3373197
+      }
+    },
+    "34609": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Hernando"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Hernando": 57464654
+      }
+    },
+    "34610": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 176227868
+      }
+    },
+    "34637": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 38285287
+      }
+    },
+    "34638": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 119876980
+      }
+    },
+    "34639": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 70088601
+      }
+    },
+    "34652": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 22243864
+      }
+    },
+    "34653": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 28332906
+      }
+    },
+    "34654": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 65574396
+      }
+    },
+    "34655": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 69868851
+      }
+    },
+    "34667": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 79088556
+      }
+    },
+    "34668": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 40185637
+      }
+    },
+    "34669": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 48529429
+      }
+    },
+    "34677": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 32769943
+      }
+    },
+    "34679": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 5378857
+      }
+    },
+    "34681": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 1876881
+      }
+    },
+    "34683": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 26648381
+      }
+    },
+    "34684": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 17445073
+      }
+    },
+    "34685": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 25994013
+      }
+    },
+    "34688": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 41020360
+      }
+    },
+    "34689": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 27326141
+      }
+    },
+    "34690": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 8877893
+      }
+    },
+    "34691": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pasco"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pasco": 20162006
+      }
+    },
+    "34695": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 14458681
+      }
+    },
+    "34698": {
+      "branch": "branch_tampa",
+      "counties": [
+        "Pinellas"
+      ],
+      "states": [
+        "FL"
+      ],
+      "landByCounty": {
+        "Pinellas": 28957858
+      }
+    },
+    "36426": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia",
+        "Conecuh"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Escambia": 1241317865,
+        "Conecuh": 48408651
+      }
+    },
+    "36502": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Escambia",
+        "Baldwin",
+        "Monroe",
+        "Conecuh"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Escambia": 679105781,
+        "Baldwin": 86650802,
+        "Monroe": 66423702,
+        "Conecuh": 24606308
+      }
+    },
+    "36507": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 888720414
+      }
+    },
+    "36526": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 97637249
+      }
+    },
+    "36527": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 109657775
+      }
+    },
+    "36530": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 247637339
+      }
+    },
+    "36532": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 189521072
+      }
+    },
+    "36535": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 239677138
+      }
+    },
+    "36542": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 134655021
+      }
+    },
+    "36551": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 177863216
+      }
+    },
+    "36561": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 43252271
+      }
+    },
+    "36567": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 592332927
+      }
+    },
+    "36580": {
+      "branch": "branch_pensacola",
+      "counties": [
+        "Baldwin"
+      ],
+      "states": [
+        "AL"
+      ],
+      "landByCounty": {
+        "Baldwin": 136259943
+      }
+    }
+  }
+}

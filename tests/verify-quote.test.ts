@@ -780,3 +780,22 @@ test('server verification uses the same Google address authority the customer se
   assert.equal(verification.pinCheck, 'ok');
   assert.equal(verification.status, 'verified');
 });
+
+test('server verification exposes the ongoing maintenance labor-hours separately from the first Deep Cleaning', async () => {
+  const quoted = browserPrice({ frequency: 'weekly' });
+  const verification = await withFetch(providerStub(), () =>
+    verifyReservationQuote(
+      fields({
+        frequency: 'weekly',
+        initial_deep_clean_acknowledged: 'yes',
+        quoted_price: String(quoted),
+      }),
+      routedEnv,
+      Date.UTC(2026, 9, 1, 12, 0, 0),
+    ),
+  );
+  assert.ok(verification.ongoing, 'a new recurring arrangement must expose its ongoing calculation');
+  assert.ok(verification.ongoing!.laborHours > 0);
+  assert.ok(verification.breakdown);
+  assert.notEqual(verification.ongoing!.laborHours, verification.breakdown!.totalLaborHours);
+});

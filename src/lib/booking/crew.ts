@@ -45,6 +45,33 @@ export function effectiveCapacityPerMinute(crewSize: number, efficiency: number)
   return 1 + Math.max(0, crewSize - 1) * safeEfficiency;
 }
 
+/**
+ * Converts person-hours into an on-site duration for a fixed crew. Used by
+ * recurring maintenance, where the assigned crew is preserved across visits.
+ */
+export function scheduledMinutesForCrew(
+  laborHours: number,
+  crewSize: number,
+  input: {
+    minimumJobMinutes: number;
+    maximumJobMinutes: number;
+    efficiency: number;
+    slotMinutes?: number;
+  },
+): number {
+  const slotMinutes =
+    Number.isFinite(input.slotMinutes) && (input.slotMinutes ?? 0) > 0
+      ? Math.round(input.slotMinutes as number)
+      : 15;
+  const minimum = Math.max(1, Math.round(input.minimumJobMinutes));
+  const maximum = Math.max(minimum, Math.round(input.maximumJobMinutes));
+  const hours = finitePositive(laborHours);
+  if (hours === null) return minimum;
+  const capacity = effectiveCapacityPerMinute(crewSize, input.efficiency);
+  const raw = (hours * 60) / capacity;
+  return Math.min(maximum, Math.max(minimum, Math.ceil(raw / slotMinutes) * slotMinutes));
+}
+
 export function planCrew(input: CrewPlanInput): CrewPlan {
   const slotMinutes =
     Number.isFinite(input.slotMinutes) && (input.slotMinutes ?? 0) > 0

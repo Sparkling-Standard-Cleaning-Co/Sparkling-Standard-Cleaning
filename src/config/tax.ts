@@ -46,9 +46,12 @@ export type TaxServiceCategory = 'residential' | 'str' | 'commercial' | 'church'
 
 export interface ZipTaxJurisdiction {
   state: 'FL' | 'AL';
-  county: string;
-  /** Internal stable key, e.g. FL-Escambia. */
-  key: string;
+  /** Known county, or null when one ZIP spans more than one county. */
+  county: string | null;
+  /** Internal stable key, e.g. FL-Escambia; null when the county is unresolved. */
+  key: string | null;
+  /** True when the ZIP crosses a county line and the address must decide. */
+  ambiguous?: boolean;
 }
 
 export interface CountyTaxRate {
@@ -129,15 +132,18 @@ export const zipTaxJurisdictions: Record<string, ZipTaxJurisdiction> = {
   '32514': { state: 'FL', county: 'Escambia', key: 'FL-Escambia' },
   '32526': { state: 'FL', county: 'Escambia', key: 'FL-Escambia' },
   '32533': { state: 'FL', county: 'Escambia', key: 'FL-Escambia' },
+  '32534': { state: 'FL', county: 'Escambia', key: 'FL-Escambia' },
   // Santa Rosa County, Florida
   '32530': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
-  '32561': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
+  // 32561 spans Pensacola Beach (Escambia) and Gulf Breeze (Santa Rosa); the
+  // confirmed address county decides the surtax instead of guessing from ZIP.
+  '32561': { state: 'FL', county: null, key: null, ambiguous: true },
   '32563': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
   '32565': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
   '32566': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
   '32570': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
   '32571': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
-  '32577': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
+  '32577': { state: 'FL', county: 'Escambia', key: 'FL-Escambia' },
   '32583': { state: 'FL', county: 'Santa Rosa', key: 'FL-Santa Rosa' },
   // Baldwin County, Alabama
   '36507': { state: 'AL', county: 'Baldwin', key: 'AL-Baldwin' },

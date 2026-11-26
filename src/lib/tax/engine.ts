@@ -32,6 +32,8 @@ export interface ServiceTaxInput {
   state?: string | null;
   /** Confirmed service-address ZIP. */
   zip?: string | null;
+  /** Confirmed service-address county when the provider supplied it. */
+  county?: string | null;
   /** The amount the tax applies to, before tax. */
   taxableBase: number;
   /** True only when an owner has verified a current exemption certificate. */
@@ -108,6 +110,11 @@ function normalizeState(value: string | null | undefined): 'FL' | 'AL' | null {
 function normalizeZip(value: string | null | undefined): string | null {
   const match = (value ?? '').trim().match(/^(\d{5})(?:-\d{4})?$/);
   return match ? match[1]! : null;
+}
+
+function normalizeCounty(value: string | null | undefined): string | null {
+  const normalized = (value ?? '').trim().replace(/\s+County$/i, '').replace(/\s+/g, ' ');
+  return normalized || null;
 }
 
 function localDateKey(at: Date): string {
@@ -201,6 +208,16 @@ export function calculateServiceTax(input: ServiceTaxInput): ServiceTaxResult {
   const zip = normalizeZip(input.zip);
   const zipInfo = zip ? zipTaxJurisdictions[zip] ?? null : null;
   const statedState = normalizeState(input.state);
+  const statedCounty = normalizeCounty(input.county);
+  if (zipInfo?.county && statedCounty && zipInfo.county.toLowerCase() !== statedCounty.toLowerCase()) {
+    return review(
+      input,
+      category,
+      'jurisdiction_conflict',
+      'The confirmed address county and ZIP do not agree, so tax cannot be calculated safely. Sparkling Standard will confirm the service jurisdiction.',
+      { jurisdictionKey: zipInfo.key, state: zipInfo.state, county: zipInfo.county },
+    );
+  }
   if (zipInfo && statedState && zipInfo.state !== statedState) {
     return review(
       input,
@@ -211,6 +228,7 @@ export function calculateServiceTax(input: ServiceTaxInput): ServiceTaxResult {
     );
   }
   const state = zipInfo?.state ?? statedState;
+  const confirmedCounty = statedCounty ?? zipInfo?.county ?? null;
   if (!state) {
     return review(
       input,
@@ -262,14 +280,16 @@ export function calculateServiceTax(input: ServiceTaxInput): ServiceTaxResult {
   }
 
   // Florida nonresidential cleaning (commercial, and church unless exempt).
-  const jurisdictionKey = zipInfo?.key ?? null;
+  const jurisdictionKey = confirmedCounty
+    ? `FL-${confirmedCounty}`
+    : zipInfo?.key ?? null;
   if (!jurisdictionKey) {
     return review(
       input,
       category,
       'county_unknown',
-      'The service county could not be established from the confirmed ZIP. Sparkling Standard will confirm the tax personally before charging.',
-      { state, jurisdictionKey: null, jurisdictionLabel: null },
+      'The service county could not be established from the confirmed address. Sparkling Standard will confirm the tax personally before charging.',
+      { state, jurisdictionKey: null, jurisdictionLabel: null, county: confirmedCounty },
     );
   }
   const rate = floridaCountyTaxRates[jurisdictionKey];

@@ -17,6 +17,7 @@
 
 import { pricing, type PricingConfig } from '../../config/pricing.ts';
 import { zipReference } from '../../config/geography.ts';
+import { zipTaxJurisdictions } from '../../config/tax.ts';
 import { calculateEstimate, type EstimateContext } from './calculate.ts';
 import { parseDirtLevel } from './dirt-levels.ts';
 import { requiresInitialDeepClean } from './frequency.ts';
@@ -76,6 +77,7 @@ export interface QuoteVerificationTravel {
   /** Server-derived jurisdiction facts for the verified destination. */
   destinationZip: string | null;
   destinationState: string | null;
+  destinationCounty: string | null;
 }
 
 export interface QuoteVerification {
@@ -112,6 +114,8 @@ export interface QuoteVerification {
     frequency: string;
     regularPerVisitPrice: number;
     perVisitPrice: number;
+    /** Person-hours behind the ongoing maintenance visit. */
+    laborHours: number;
     discounts: DiscountAllocation[];
   } | null;
   travel: QuoteVerificationTravel;
@@ -255,6 +259,7 @@ interface ServerDestination {
   source: QuoteVerificationTravel['destinationSource'];
   zip?: string;
   state?: string;
+  county?: string;
 }
 
 /**
@@ -286,6 +291,7 @@ export async function resolveServerDestination(
         source: 'customer_pin',
         ...(located?.zip ? { zip: located.zip } : {}),
         ...(located?.state ? { state: located.state } : {}),
+        ...(located?.county ? { county: located.county } : {}),
       };
     }
   }
@@ -308,6 +314,7 @@ export async function resolveServerDestination(
           source: 'address_geocode',
           ...(google.zip ? { zip: google.zip } : {}),
           ...(google.state ? { state: google.state } : {}),
+          ...(google.county ? { county: google.county } : {}),
         };
       }
     }
@@ -319,6 +326,7 @@ export async function resolveServerDestination(
         source: 'address_geocode',
         ...(resolved.zip ? { zip: resolved.zip } : {}),
         ...(resolved.state ? { state: resolved.state } : {}),
+        ...(resolved.county ? { county: resolved.county } : {}),
       };
     }
   }
@@ -335,6 +343,7 @@ export async function resolveServerDestination(
         source: 'customer_pin',
         ...(located?.zip ? { zip: located.zip } : {}),
         ...(located?.state ? { state: located.state } : {}),
+        ...(located?.county ? { county: located.county } : {}),
       };
     }
   }
@@ -350,6 +359,7 @@ export async function resolveServerDestination(
         source: 'zip_centroid',
         zip: zipCode,
         state: reference.state,
+        ...(zipTaxJurisdictions[zipCode]?.county ? { county: zipTaxJurisdictions[zipCode]!.county! } : {}),
       };
     }
   }
@@ -390,6 +400,7 @@ export async function verifyReservationQuote(
     destinationSource: 'none',
     destinationZip: null,
     destinationState: null,
+    destinationCounty: null,
   };
   let pinCheck: PinCheck = 'unknown';
   let pinDistanceMeters: number | null = null;
@@ -442,6 +453,7 @@ export async function verifyReservationQuote(
     travel.destinationSource = destination.source;
     travel.destinationZip = destination.zip ?? null;
     travel.destinationState = destination.state ?? null;
+    travel.destinationCounty = destination.county ?? null;
     const route = await resolveRoute(env, origin, destination).catch(() => null);
     if (route) {
       const gas = await gulfCoastGasPrice(
@@ -501,6 +513,7 @@ export async function verifyReservationQuote(
         frequency: estimate.ongoing.frequency,
         regularPerVisitPrice: estimate.ongoing.regularPerVisitPrice,
         perVisitPrice: estimate.ongoing.perVisitPrice,
+        laborHours: estimate.ongoing.laborHours,
         discounts: estimate.ongoing.pricing.discounts,
       }
     : null;

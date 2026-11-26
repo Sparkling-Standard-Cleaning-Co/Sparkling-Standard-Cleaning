@@ -21,6 +21,7 @@ import {
   updateCalendarEvent,
 } from './google-calendar.ts';
 import { availabilityForDate, type BookingEnv } from './service.ts';
+import { scheduledMinutesForCrew } from './crew.ts';
 import { recurringSchedulingEnabled } from './recurring-gate.ts';
 import {
   bookingStore,
@@ -83,6 +84,7 @@ export interface CommitmentInput {
   ongoingPriceCents?: number;
   baseOngoingPriceCents?: number;
   ongoingDurationMinutes?: number;
+  ongoingLaborHours?: number;
   termsVersion?: string;
   notes?: string;
   source?: string;
@@ -544,6 +546,22 @@ export async function commitConfirmedBooking(
         duration,
         ongoingDuration:
           Number(input.ongoingDurationMinutes) ||
+          (Number(input.ongoingLaborHours) > 0
+            ? scheduledMinutesForCrew(Number(input.ongoingLaborHours), Math.max(1, resourceIds.length), {
+                minimumJobMinutes: bookingConfig.minimumJobMinutes,
+                maximumJobMinutes: bookingConfig.maximumJobMinutes,
+                efficiency: bookingConfig.crewEfficiency,
+                slotMinutes: bookingConfig.slotMinutes,
+              })
+            : 0) ||
+          (Number(fields.ongoing_labor_hours) > 0
+            ? scheduledMinutesForCrew(Number(fields.ongoing_labor_hours), Math.max(1, resourceIds.length), {
+                minimumJobMinutes: bookingConfig.minimumJobMinutes,
+                maximumJobMinutes: bookingConfig.maximumJobMinutes,
+                efficiency: bookingConfig.crewEfficiency,
+                slotMinutes: bookingConfig.slotMinutes,
+              })
+            : 0) ||
           Number(fields.ongoing_duration_minutes) ||
           duration,
         ongoingPriceCents: ongoingPrice,

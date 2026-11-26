@@ -212,6 +212,7 @@ interface VerifiedCandidate {
   tax: ServiceTaxResult;
   verifiedState: string | null;
   verifiedZip: string | null;
+  verifiedCounty: string | null;
   /** Automatic quote discount already included in cleaningAmountCents. */
   automaticDiscountCents?: number;
   automaticDiscountLabel?: string;
@@ -876,6 +877,7 @@ async function verifyFacilityPayment(
     serviceType,
     state: destination.state ?? null,
     zip: destination.zip ?? null,
+    county: destination.county ?? null,
     taxableBase: verification.expectedTotal,
   });
   if (!tax.canCharge) return { ok: false, reason: `tax_${tax.reviewReason ?? 'review_required'}` };
@@ -895,6 +897,7 @@ async function verifyFacilityPayment(
     tax,
     verifiedState: destination.state ?? null,
     verifiedZip: destination.zip ?? null,
+    verifiedCounty: destination.county ?? null,
     ...(verification.discountAmount && verification.discountAmount > 0
       ? {
           automaticDiscountCents: cents(verification.discountAmount),
@@ -974,6 +977,7 @@ async function verifyResidentialPayment(
     fields.ongoing_regular_price_per_visit = verification.ongoing.regularPerVisitPrice.toFixed(2);
     fields.ongoing_price_per_visit = verification.ongoing.perVisitPrice.toFixed(2);
     fields.ongoing_frequency = verification.ongoing.frequency;
+    fields.ongoing_labor_hours = String(verification.ongoing.laborHours);
     if (allocation) {
       fields.ongoing_discount_label = allocation.label;
       fields.ongoing_discount_amount = allocation.amount.toFixed(2);
@@ -987,6 +991,7 @@ async function verifyResidentialPayment(
     serviceType,
     state: verification.travel.destinationState ?? (nonTaxableService ? fields.address_state ?? null : null),
     zip: verification.travel.destinationZip ?? (nonTaxableService ? fields.zip ?? null : null),
+    county: verification.travel.destinationCounty ?? (nonTaxableService ? fields.address_county ?? null : null),
     taxableBase: verification.verifiedPrice,
   });
   if (!tax.canCharge) return { ok: false, reason: `tax_${tax.reviewReason ?? 'review_required'}` };
@@ -1005,6 +1010,7 @@ async function verifyResidentialPayment(
     tax,
     verifiedState: verification.travel.destinationState ?? null,
     verifiedZip: verification.travel.destinationZip ?? null,
+    verifiedCounty: verification.travel.destinationCounty ?? null,
     ...(recurring ? { recurring } : {}),
     ...(verification.breakdown?.discount
       ? {
@@ -1488,6 +1494,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         serviceType: candidate.serviceType,
         state: candidate.verifiedState,
         zip: candidate.verifiedZip,
+        county: candidate.verifiedCounty,
         taxableBase: cleaningAfter / 100,
       });
       if (!taxAfter.canCharge) {

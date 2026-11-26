@@ -30,6 +30,7 @@ export interface GeocodedAddress {
   zip?: string;
   city?: string;
   state?: string;
+  county?: string;
   /** True when the result contains the requested house number (or none was requested). */
   precise: boolean;
 }
@@ -50,6 +51,7 @@ interface PhotonProperties {
   housenumber?: unknown;
   city?: unknown;
   state?: unknown;
+  county?: unknown;
   postcode?: unknown;
   id?: unknown;
   osm_type?: unknown;
@@ -137,6 +139,7 @@ export function parsePhotonFeature(feature: PhotonFeature, source: 'mapmap'): Ge
   }
   if (typeof p.city === 'string' && p.city) result.city = p.city;
   if (typeof p.state === 'string' && p.state) result.state = p.state;
+  if (typeof p.county === 'string' && p.county) result.county = p.county.replace(/\s+County$/i, '');
   return result;
 }
 
@@ -154,12 +157,18 @@ async function mapMapJson(env: GeocodeEnv, path: string): Promise<{ status: numb
  *  matches only. */
 export async function censusResolve(query: string): Promise<GeocodedAddress | null> {
   const url =
-    'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress' +
-    `?address=${encodeURIComponent(query)}&benchmark=Public_AR_Current&format=json`;
+    'https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress' +
+    `?address=${encodeURIComponent(query)}&benchmark=Public_AR_Current&vintage=Current_Current&format=json`;
   const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!response.ok) return null;
   const data = (await response.json().catch(() => ({}))) as {
-    result?: { addressMatches?: Array<{ matchedAddress?: string; coordinates?: { x?: number; y?: number } }> };
+    result?: {
+      addressMatches?: Array<{
+        matchedAddress?: string;
+        coordinates?: { x?: number; y?: number };
+        geographies?: { Counties?: Array<{ NAME?: string }> };
+      }>;
+    };
   };
   const match = data.result?.addressMatches?.[0];
   const lat = Number(match?.coordinates?.y);
@@ -180,6 +189,8 @@ export async function censusResolve(query: string): Promise<GeocodedAddress | nu
   if (wantedState && !labelMatchesState(label, wantedState)) return null;
   const zip = label.match(/,\s*(\d{5})(?:-\d{4})?\s*$/)?.[1];
   if (zip) result.zip = zip;
+  const county = match.geographies?.Counties?.[0]?.NAME?.replace(/\s+County$/i, '');
+  if (county) result.county = county;
   // "4242 MAPLEWOOD LN, MOLINO, FL, 32577" → city + state when present.
   const parts = label.split(',').map((part) => part.trim());
   if (parts.length >= 3) {
@@ -331,6 +342,7 @@ function googleAddress(
   const streetNumber = componentValue(place.addressComponents, 'street_number');
   const route = componentValue(place.addressComponents, 'route');
   const city = componentValue(place.addressComponents, 'locality') || componentValue(place.addressComponents, 'postal_town');
+  const county = componentValue(place.addressComponents, 'administrative_area_level_2').replace(/\s+County$/i, '');
   const zip = componentValue(place.addressComponents, 'postal_code').match(FIVE_DIGIT_ZIP)?.[1];
   return {
     label,
@@ -340,6 +352,7 @@ function googleAddress(
     precise: Boolean(streetNumber && route),
     ...(zip ? { zip } : {}),
     ...(city ? { city } : {}),
+    ...(county ? { county } : {}),
     state,
   };
 }

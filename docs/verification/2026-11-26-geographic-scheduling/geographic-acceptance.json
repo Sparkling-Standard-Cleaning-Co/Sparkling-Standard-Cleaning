@@ -1,0 +1,3310 @@
+{
+  "generatedAt": "2026-11-26T19:25:30.631Z",
+  "source": "Census TIGER/Line 2024 ADDRFEAT address ranges; verified with U.S. Census Geocoder",
+  "addressCount": 70,
+  "zipCount": 35,
+  "failCount": 0,
+  "failures": [],
+  "results": [
+    {
+      "zip": "32501",
+      "address": "1 Attucks Ct, Pensacola, FL 32501",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1 ATTUCKS CT, PENSACOLA, FL, 32501",
+      "lat": 30.420364,
+      "lng": -87.232684,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1 ATTUCKS CT, PENSACOLA, FL, 32501",
+        "lat": 30.420364154104,
+        "lng": -87.232683639171,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 16,
+        "durationMinutes": 20,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32501",
+      "address": "1000 Baars St, Pensacola, FL 32501",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1000 BAARS ST, PENSACOLA, FL, 32501",
+      "lat": 30.442446,
+      "lng": -87.229961,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1000 BAARS ST, PENSACOLA, FL, 32501",
+        "lat": 30.44244633322,
+        "lng": -87.22996069621,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 13.9,
+        "durationMinutes": 18,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32502",
+      "address": "501 Aragon St, Pensacola, FL 32502",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "501 ARAGON ST, PENSACOLA, FL, 32502",
+      "lat": 30.413703,
+      "lng": -87.207868,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "501 ARAGON ST, PENSACOLA, FL, 32502",
+        "lat": 30.413703345845,
+        "lng": -87.207868499514,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 16,
+        "durationMinutes": 19,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32502",
+      "address": "1100 Barrancas Ave, Pensacola, FL 32502",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1100 BARRANCAS AVE, PENSACOLA, FL, 32502",
+      "lat": 30.41134,
+      "lng": -87.229574,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1100 BARRANCAS AVE, PENSACOLA, FL, 32502",
+        "lat": 30.411339671817,
+        "lng": -87.229573784564,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 16.4,
+        "durationMinutes": 21,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32503",
+      "address": "1801 11th Ave, Pensacola, FL 32503",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1801 11TH AVE, PENSACOLA, FL, 32503",
+      "lat": 30.434018,
+      "lng": -87.206952,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1801 11TH AVE, PENSACOLA, FL, 32503",
+        "lat": 30.434017887606,
+        "lng": -87.206952216461,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 14.7,
+        "durationMinutes": 19,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32503",
+      "address": "3100 19th Ave, Pensacola, FL 32503",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "3100 19TH AVE, PENSACOLA, FL, 32503",
+      "lat": 30.446876,
+      "lng": -87.196956,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "3100 19TH AVE, PENSACOLA, FL, 32503",
+        "lat": 30.446876285354,
+        "lng": -87.196955671675,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 14.8,
+        "durationMinutes": 22,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32504",
+      "address": "1900 750, Pensacola, FL 32504",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1900 750, PENSACOLA, FL, 32504",
+      "lat": 30.479441,
+      "lng": -87.207054,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1900 750, PENSACOLA, FL, 32504",
+        "lat": 30.479441369954,
+        "lng": -87.207054199624,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 12.2,
+        "durationMinutes": 18,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32504",
+      "address": "4700 Abercrombie Cir, Pensacola, FL 32504",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "4700 ABERCROMBIE CIR, PENSACOLA, FL, 32504",
+      "lat": 30.469793,
+      "lng": -87.166919,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "4700 ABERCROMBIE CIR, PENSACOLA, FL, 32504",
+        "lat": 30.469792702823,
+        "lng": -87.166919103681,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 16.6,
+        "durationMinutes": 22,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32505",
+      "address": "900 493, Pensacola, FL 32505",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "900 493, PENSACOLA, FL, 32505",
+      "lat": 30.421967,
+      "lng": -87.246741,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "900 493, PENSACOLA, FL, 32505",
+        "lat": 30.421966746266,
+        "lng": -87.246740670491,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 11.8,
+        "durationMinutes": 23,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32505",
+      "address": "1200 Albuquerque Cir, Pensacola, FL 32505",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1200 ALBUQUERQUE CIR, PENSACOLA, FL, 32505",
+      "lat": 30.449462,
+      "lng": -87.255331,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1200 ALBUQUERQUE CIR, PENSACOLA, FL, 32505",
+        "lat": 30.449462402377,
+        "lng": -87.255331176293,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 11.3,
+        "durationMinutes": 20,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32506",
+      "address": "600 3, Pensacola, FL 32506",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "600 3, PENSACOLA, FL, 32506",
+      "lat": 30.418904,
+      "lng": -87.322286,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "600 3, PENSACOLA, FL, 32506",
+        "lat": 30.418903531587,
+        "lng": -87.322285704103,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 11.5,
+        "durationMinutes": 21,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32506",
+      "address": "1000 46th Ave, Pensacola, FL 32506",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1000 46TH AVE, PENSACOLA, FL, 32506",
+      "lat": 30.422853,
+      "lng": -87.277608,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1000 46TH AVE, PENSACOLA, FL, 32506",
+        "lat": 30.422852820375,
+        "lng": -87.277607855152,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 10.7,
+        "durationMinutes": 21,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32507",
+      "address": "13501 292, Pensacola, FL 32507",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "13501 292, PENSACOLA, FL, 32507",
+      "lat": 30.313775,
+      "lng": -87.425411,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "13501 292, PENSACOLA, FL, 32507",
+        "lat": 30.313774923658,
+        "lng": -87.425410765508,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 21.3,
+        "durationMinutes": 36,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32507",
+      "address": "1 2nd St, Pensacola, FL 32507",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1 2ND ST, PENSACOLA, FL, 32507",
+      "lat": 30.387682,
+      "lng": -87.276357,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1 2ND ST, PENSACOLA, FL, 32507",
+        "lat": 30.387681963473,
+        "lng": -87.276356786598,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 13.3,
+        "durationMinutes": 27,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32508",
+      "address": "1 Abb St, Pensacola, FL 32508",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1 ABB ST, PENSACOLA, FL, 32508",
+      "lat": 30.352405,
+      "lng": -87.289865,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1 ABB ST, PENSACOLA, FL, 32508",
+        "lat": 30.352405022883,
+        "lng": -87.289864501323,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 21.9,
+        "durationMinutes": 39,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32508",
+      "address": "1898 Andrew Jackson Ct, Pensacola, FL 32508",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1898 ANDREW JACKSON CT, PENSACOLA, FL, 32508",
+      "lat": 30.355176,
+      "lng": -87.291525,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1898 ANDREW JACKSON CT, PENSACOLA, FL, 32508",
+        "lat": 30.355176440703,
+        "lng": -87.291525485608,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 21.8,
+        "durationMinutes": 39,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32511",
+      "address": "700 2nd St, Pensacola, FL 32511",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "700 2ND ST, PENSACOLA, FL, 32511",
+      "lat": 30.407793,
+      "lng": -87.288098,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "700 2ND ST, PENSACOLA, FL, 32511",
+        "lat": 30.407792704341,
+        "lng": -87.288098497395,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 12.4,
+        "durationMinutes": 27,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32511",
+      "address": "701 4th St, Pensacola, FL 32511",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "701 4TH ST, PENSACOLA, FL, 32511",
+      "lat": 30.406318,
+      "lng": -87.289887,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "701 4TH ST, PENSACOLA, FL, 32511",
+        "lat": 30.406317525631,
+        "lng": -87.289887031389,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 12.5,
+        "durationMinutes": 26,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32514",
+      "address": "4001 290, Pensacola, FL 32514",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "4001 290, PENSACOLA, FL, 32514",
+      "lat": 30.510232,
+      "lng": -87.186672,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "4001 290, PENSACOLA, FL, 32514",
+        "lat": 30.510232472449,
+        "lng": -87.186672396816,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 12.6,
+        "durationMinutes": 18,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32514",
+      "address": "8698 9th Avenue Ct, Pensacola, FL 32514",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "8698 9TH AVENUE CT, PENSACOLA, FL, 32514",
+      "lat": 30.521515,
+      "lng": -87.184987,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "8698 9TH AVENUE CT, PENSACOLA, FL, 32514",
+        "lat": 30.521515345911,
+        "lng": -87.184986859766,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 13.3,
+        "durationMinutes": 21,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32526",
+      "address": "5800 Abba Ln, Pensacola, FL 32526",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "5800 ABBA LN, PENSACOLA, FL, 32526",
+      "lat": 30.509678,
+      "lng": -87.352299,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "5800 ABBA LN, PENSACOLA, FL, 32526",
+        "lat": 30.509677768132,
+        "lng": -87.352299127475,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 7.6,
+        "durationMinutes": 15,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32526",
+      "address": "3000 Abel Ct, Pensacola, FL 32526",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "3000 ABEL CT, PENSACOLA, FL, 32526",
+      "lat": 30.46628,
+      "lng": -87.299352,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "3000 ABEL CT, PENSACOLA, FL, 32526",
+        "lat": 30.46628009973,
+        "lng": -87.29935162495,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 7.4,
+        "durationMinutes": 15,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32530",
+      "address": "6801 Bushnell St, Bagdad, FL 32530",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "6801 BUSHNELL ST, BAGDAD, FL, 32530",
+      "lat": 30.596725,
+      "lng": -87.034883,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "6801 BUSHNELL ST, BAGDAD, FL, 32530",
+        "lat": 30.59672452226,
+        "lng": -87.034883210127,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 24.9,
+        "durationMinutes": 28,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32530",
+      "address": "6900 Dorr St, Bagdad, FL 32530",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "6900 DORR ST, BAGDAD, FL, 32530",
+      "lat": 30.597863,
+      "lng": -87.031723,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "6900 DORR ST, BAGDAD, FL, 32530",
+        "lat": 30.597863418526,
+        "lng": -87.03172255509,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 24.7,
+        "durationMinutes": 27,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32533",
+      "address": "1598 2nd Ave, Cantonment, FL 32533",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1598 2ND AVE, CANTONMENT, FL, 32533",
+      "lat": 30.581157,
+      "lng": -87.292415,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1598 2ND AVE, CANTONMENT, FL, 32533",
+        "lat": 30.581156501655,
+        "lng": -87.292415110019,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 5.9,
+        "durationMinutes": 10,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32533",
+      "address": "1598 3rd Ave, Cantonment, FL 32533",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1598 3RD AVE, CANTONMENT, FL, 32533",
+      "lat": 30.581694,
+      "lng": -87.291535,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "1598 3RD AVE, CANTONMENT, FL, 32533",
+        "lat": 30.581693969701,
+        "lng": -87.291535245786,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 6,
+        "durationMinutes": 10,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32534",
+      "address": "8403 465, Pensacola, FL 32534",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "8403 465, PENSACOLA, FL, 32534",
+      "lat": 30.517883,
+      "lng": -87.279946,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "8403 465, PENSACOLA, FL, 32534",
+        "lat": 30.51788337349,
+        "lng": -87.279946048252,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 5,
+        "durationMinutes": 10,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32534",
+      "address": "7600 Aaron Dr, Pensacola, FL 32534",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "7600 AARON DR, PENSACOLA, FL, 32534",
+      "lat": 30.508105,
+      "lng": -87.283053,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "core",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "7600 AARON DR, PENSACOLA, FL, 32534",
+        "lat": 30.508104732932,
+        "lng": -87.283052764487,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 5.4,
+        "durationMinutes": 12,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32561",
+      "address": "100 10th Avenida, Pensacola Beach, FL 32561",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "100 10TH AVENIDA, PENSACOLA BEACH, FL, 32561",
+      "lat": 30.334166,
+      "lng": -87.130969,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia",
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "100 10TH AVENIDA, PENSACOLA BEACH, FL, 32561",
+        "lat": 30.334166092807,
+        "lng": -87.130969051645,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 23.9,
+        "durationMinutes": 32,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32561",
+      "address": "101 Andrew Jackson Trl, Gulf Breeze, FL 32561",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "101 ANDREW JACKSON TRL, GULF BREEZE, FL, 32561",
+      "lat": 30.363936,
+      "lng": -87.166175,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Escambia",
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "101 ANDREW JACKSON TRL, GULF BREEZE, FL, 32561",
+        "lat": 30.363935770557,
+        "lng": -87.166175172896,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 21.2,
+        "durationMinutes": 28,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32563",
+      "address": "2598 Abbie Elizabeth Ct, Gulf Breeze, FL 32563",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "2598 ABBIE ELIZABETH CT, GULF BREEZE, FL, 32563",
+      "lat": 30.380683,
+      "lng": -87.118879,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "2598 ABBIE ELIZABETH CT, GULF BREEZE, FL, 32563",
+        "lat": 30.380682994305,
+        "lng": -87.118879246473,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 24.6,
+        "durationMinutes": 32,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32563",
+      "address": "1700 Abercrombie Rd, Gulf Breeze, FL 32563",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "1700 ABERCROMBIE RD, GULF BREEZE, FL, 32563",
+      "lat": 30.399419,
+      "lng": -87.003074,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "1700 ABERCROMBIE RD, GULF BREEZE, FL, 32563",
+        "lat": 30.399419420186,
+        "lng": -87.003073877116,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 33.3,
+        "durationMinutes": 38,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32565",
+      "address": "3500 Aileens Ln, Jay, FL 32565",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "3500 AILEENS LN, JAY, FL, 32565",
+      "lat": 30.916996,
+      "lng": -87.164692,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "3500 AILEENS LN, JAY, FL, 32565",
+        "lat": 30.916996369096,
+        "lng": -87.164691578106,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 36.3,
+        "durationMinutes": 48,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32565",
+      "address": "6798 Allen Field Rd, Jay, FL 32565",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "6798 ALLEN FIELD RD, JAY, FL, 32565",
+      "lat": 30.916667,
+      "lng": -87.038986,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "6798 ALLEN FIELD RD, JAY, FL, 32565",
+        "lat": 30.916666825912,
+        "lng": -87.03898578694,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 42.5,
+        "durationMinutes": 56,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32566",
+      "address": "2598 1st Ct, Navarre, FL 32566",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "2598 1ST CT, NAVARRE, FL, 32566",
+      "lat": 30.431915,
+      "lng": -86.930161,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "2598 1ST CT, NAVARRE, FL, 32566",
+        "lat": 30.431915062812,
+        "lng": -86.930161028012,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 39.9,
+        "durationMinutes": 49,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32566",
+      "address": "2598 2nd Ct, Navarre, FL 32566",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "2598 2ND CT, NAVARRE, FL, 32566",
+      "lat": 30.431927,
+      "lng": -86.928658,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "2598 2ND CT, NAVARRE, FL, 32566",
+        "lat": 30.431927098092,
+        "lng": -86.928658055944,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 40,
+        "durationMinutes": 50,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32570",
+      "address": "298 2nd Ave, Milton, FL 32570",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "298 2ND AVE, MILTON, FL, 32570",
+      "lat": 30.636827,
+      "lng": -87.042348,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "298 2ND AVE, MILTON, FL, 32570",
+        "lat": 30.636826592513,
+        "lng": -87.042347510641,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 26.9,
+        "durationMinutes": 35,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32570",
+      "address": "100 3rd Ave, Milton, FL 32570",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "100 3RD AVE, MILTON, FL, 32570",
+      "lat": 30.635173,
+      "lng": -87.037776,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "100 3RD AVE, MILTON, FL, 32570",
+        "lat": 30.635173275085,
+        "lng": -87.037776386252,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 27.5,
+        "durationMinutes": 34,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32571",
+      "address": "4100 6th Ave, Pace, FL 32571",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "4100 6TH AVE, PACE, FL, 32571",
+      "lat": 30.588592,
+      "lng": -87.168741,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "4100 6TH AVE, PACE, FL, 32571",
+        "lat": 30.588591993489,
+        "lng": -87.168741135551,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 13.7,
+        "durationMinutes": 26,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32571",
+      "address": "4252 9th Ave, Pace, FL 32571",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "4252 9TH AVE, PACE, FL, 32571",
+      "lat": 30.590654,
+      "lng": -87.16459,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "4252 9TH AVE, PACE, FL, 32571",
+        "lat": 30.590654335841,
+        "lng": -87.164589948547,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 13.7,
+        "durationMinutes": 25,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32577",
+      "address": "7300 Abbott Ln, Molino, FL 32577",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "7300 ABBOTT LN, MOLINO, FL, 32577",
+      "lat": 30.734837,
+      "lng": -87.367471,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "7300 ABBOTT LN, MOLINO, FL, 32577",
+        "lat": 30.73483681227,
+        "lng": -87.367471005789,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 15.6,
+        "durationMinutes": 21,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32577",
+      "address": "8058 Abramovich Ln, Molino, FL 32577",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "8058 ABRAMOVICH LN, MOLINO, FL, 32577",
+      "lat": 30.744846,
+      "lng": -87.374486,
+      "state": "FL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Escambia",
+        "ratePercent": 7.5
+      },
+      "census": {
+        "matched": "8058 ABRAMOVICH LN, MOLINO, FL, 32577",
+        "lat": 30.744846368616,
+        "lng": -87.374485648863,
+        "county": "Escambia",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 16.6,
+        "durationMinutes": 22,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32583",
+      "address": "3001 12th Ave, Milton, FL 32583",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "3001 12TH AVE, MILTON, FL, 32583",
+      "lat": 30.544348,
+      "lng": -87.108448,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "3001 12TH AVE, MILTON, FL, 32583",
+        "lat": 30.544347511484,
+        "lng": -87.108448306551,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 20.5,
+        "durationMinutes": 23,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "32583",
+      "address": "2900 13th Ave, Milton, FL 32583",
+      "county": "Santa Rosa",
+      "censusCounty": "Santa Rosa",
+      "matched": "2900 13TH AVE, MILTON, FL, 32583",
+      "lat": 30.544343,
+      "lng": -87.107189,
+      "state": "FL",
+      "expectedCounty": "Santa Rosa",
+      "snapshotCounties": [
+        "Santa Rosa"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "surrounding",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "taxable",
+        "canCharge": true,
+        "county": "Santa Rosa",
+        "ratePercent": 7
+      },
+      "census": {
+        "matched": "2900 13TH AVE, MILTON, FL, 32583",
+        "lat": 30.544343028062,
+        "lng": -87.10718916601,
+        "county": "Santa Rosa",
+        "state": "FL"
+      },
+      "travel": {
+        "oneWayMiles": 20.4,
+        "durationMinutes": 23,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36426",
+      "address": "1 1st Ave, Brewton, AL 36426",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "1 1ST AVE, BREWTON, AL, 36426",
+      "lat": 31.087082,
+      "lng": -87.108543,
+      "state": "AL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia",
+        "Conecuh"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "1 1ST AVE, BREWTON, AL, 36426",
+        "lat": 31.087081759112,
+        "lng": -87.10854307764,
+        "county": "Escambia",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 46.9,
+        "durationMinutes": 54,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36426",
+      "address": "101 Adams St, Brewton, AL 36426",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "101 ADAMS ST, BREWTON, AL, 36426",
+      "lat": 31.086015,
+      "lng": -87.042465,
+      "state": "AL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia",
+        "Conecuh"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "101 ADAMS ST, BREWTON, AL, 36426",
+        "lat": 31.086014827064,
+        "lng": -87.042464596903,
+        "county": "Escambia",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 51.6,
+        "durationMinutes": 62,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36502",
+      "address": "298 10th Ave, Atmore, AL 36502",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "298 10TH AVE, ATMORE, AL, 36502",
+      "lat": 31.019799,
+      "lng": -87.47683,
+      "state": "AL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia",
+        "Baldwin",
+        "Monroe",
+        "Conecuh"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "298 10TH AVE, ATMORE, AL, 36502",
+        "lat": 31.019799078045,
+        "lng": -87.476830400903,
+        "county": "Escambia",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 38.9,
+        "durationMinutes": 48,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36502",
+      "address": "298 11th Ave, Atmore, AL 36502",
+      "county": "Escambia",
+      "censusCounty": "Escambia",
+      "matched": "298 11TH AVE, ATMORE, AL, 36502",
+      "lat": 31.019786,
+      "lng": -87.475603,
+      "state": "AL",
+      "expectedCounty": "Escambia",
+      "snapshotCounties": [
+        "Escambia",
+        "Baldwin",
+        "Monroe",
+        "Conecuh"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "298 11TH AVE, ATMORE, AL, 36502",
+        "lat": 31.019786255359,
+        "lng": -87.47560323913,
+        "county": "Escambia",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 39,
+        "durationMinutes": 48,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36507",
+      "address": "101 12th St, Bay Minette, AL 36507",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "101 12TH ST, BAY MINETTE, AL, 36507",
+      "lat": 30.893657,
+      "lng": -87.7791,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "101 12TH ST, BAY MINETTE, AL, 36507",
+        "lat": 30.893657074662,
+        "lng": -87.779099763656,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 39.8,
+        "durationMinutes": 46,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36507",
+      "address": "408 15th St, Bay Minette, AL 36507",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "408 15TH ST, BAY MINETTE, AL, 36507",
+      "lat": 30.895484,
+      "lng": -87.787486,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "408 15TH ST, BAY MINETTE, AL, 36507",
+        "lat": 30.895484302468,
+        "lng": -87.787485640857,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 40.5,
+        "durationMinutes": 48,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36526",
+      "address": "28100 10th Ave, Daphne, AL 36526",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "28100 10TH AVE, DAPHNE, AL, 36526",
+      "lat": 30.636287,
+      "lng": -87.902017,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "28100 10TH AVE, DAPHNE, AL, 36526",
+        "lat": 30.636287423557,
+        "lng": -87.902017396629,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 40.7,
+        "durationMinutes": 40,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36526",
+      "address": "28298 1st Ave N, Daphne, AL 36526",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "28298 1ST AVE N, DAPHNE, AL, 36526",
+      "lat": 30.636759,
+      "lng": -87.909588,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "28298 1ST AVE N, DAPHNE, AL, 36526",
+        "lat": 30.636758965807,
+        "lng": -87.90958796151,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 40.3,
+        "durationMinutes": 39,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36527",
+      "address": "8399 Pine Run, Spanish Fort, AL 36527",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "8399 PINE RUN, SPANISH FORT, AL, 36527",
+      "lat": 30.665488,
+      "lng": -87.873179,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "8399 PINE RUN, SPANISH FORT, AL, 36527",
+        "lat": 30.665487583716,
+        "lng": -87.873179185252,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 37.3,
+        "durationMinutes": 38,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36527",
+      "address": "101 Adams St, Spanish Fort, AL 36527",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "101 ADAMS ST, SPANISH FORT, AL, 36527",
+      "lat": 30.672157,
+      "lng": -87.880167,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "101 ADAMS ST, SPANISH FORT, AL, 36527",
+        "lat": 30.672156839976,
+        "lng": -87.88016722081,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 37.6,
+        "durationMinutes": 37,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36530",
+      "address": "11598 Acre Run Ln, Elberta, AL 36530",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "11598 ACRE RUN LN, ELBERTA, AL, 36530",
+      "lat": 30.392269,
+      "lng": -87.590059,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "11598 ACRE RUN LN, ELBERTA, AL, 36530",
+        "lat": 30.392269417502,
+        "lng": -87.590059214015,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 28.8,
+        "durationMinutes": 37,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36530",
+      "address": "13101 Illinois St, Elberta, AL 36530",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "13101 ILLINOIS ST, ELBERTA, AL, 36530",
+      "lat": 30.415682,
+      "lng": -87.601288,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "13101 ILLINOIS ST, ELBERTA, AL, 36530",
+        "lat": 30.41568175874,
+        "lng": -87.601288040443,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 27.8,
+        "durationMinutes": 36,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36532",
+      "address": "23650 2nd St, Fairhope, AL 36532",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "23650 2ND ST, FAIRHOPE, AL, 36532",
+      "lat": 30.569108,
+      "lng": -87.89965,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "23650 2ND ST, FAIRHOPE, AL, 36532",
+        "lat": 30.569108268901,
+        "lng": -87.899649618674,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 45.1,
+        "durationMinutes": 47,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36532",
+      "address": "23299 3rd St, Fairhope, AL 36532",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "23299 3RD ST, FAIRHOPE, AL, 36532",
+      "lat": 30.570887,
+      "lng": -87.897979,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "23299 3RD ST, FAIRHOPE, AL, 36532",
+        "lat": 30.570886914952,
+        "lng": -87.89797927553,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 44.9,
+        "durationMinutes": 46,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36535",
+      "address": "12698 2nd Ave, Foley, AL 36535",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "12698 2ND AVE, FOLEY, AL, 36535",
+      "lat": 30.388693,
+      "lng": -87.805957,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "12698 2ND AVE, FOLEY, AL, 36535",
+        "lat": 30.388692583705,
+        "lng": -87.805956855081,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 42.7,
+        "durationMinutes": 59,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36535",
+      "address": "12699 3rd Ave, Foley, AL 36535",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "12699 3RD AVE, FOLEY, AL, 36535",
+      "lat": 30.388039,
+      "lng": -87.805518,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "12699 3RD AVE, FOLEY, AL, 36535",
+        "lat": 30.3880392473,
+        "lng": -87.80551787808,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 42.7,
+        "durationMinutes": 59,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36542",
+      "address": "10301 2nd St, Gulf Shores, AL 36542",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "10301 2ND ST, GULF SHORES, AL, 36542",
+      "lat": 30.244112,
+      "lng": -87.846021,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "10301 2ND ST, GULF SHORES, AL, 36542",
+        "lat": 30.244112051622,
+        "lng": -87.846020764073,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 52.4,
+        "durationMinutes": 73,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36542",
+      "address": "9001 Adair Ln, Gulf Shores, AL 36542",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "9001 ADAIR LN, GULF SHORES, AL, 36542",
+      "lat": 30.234014,
+      "lng": -87.868506,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "9001 ADAIR LN, GULF SHORES, AL, 36542",
+        "lat": 30.234014183063,
+        "lng": -87.86850626685,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 54,
+        "durationMinutes": 75,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36551",
+      "address": "5100 A Ave, Loxley, AL 36551",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "5100 A AVE, LOXLEY, AL, 36551",
+      "lat": 30.622942,
+      "lng": -87.747607,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "5100 A AVE, LOXLEY, AL, 36551",
+        "lat": 30.622941658942,
+        "lng": -87.747607299068,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 30,
+        "durationMinutes": 33,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36551",
+      "address": "18500 Access Ave, Loxley, AL 36551",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "18500 ACCESS AVE, LOXLEY, AL, 36551",
+      "lat": 30.638311,
+      "lng": -87.708176,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "18500 ACCESS AVE, LOXLEY, AL, 36551",
+        "lat": 30.638311401017,
+        "lng": -87.708176158505,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 26.9,
+        "durationMinutes": 28,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36561",
+      "address": "26800 1st St, Orange Beach, AL 36561",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "26800 1ST ST, ORANGE BEACH, AL, 36561",
+      "lat": 30.300316,
+      "lng": -87.566281,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "26800 1ST ST, ORANGE BEACH, AL, 36561",
+        "lat": 30.300315528812,
+        "lng": -87.566281213356,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 35,
+        "durationMinutes": 58,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36561",
+      "address": "26899 2nd St, Orange Beach, AL 36561",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "26899 2ND ST, ORANGE BEACH, AL, 36561",
+      "lat": 30.299698,
+      "lng": -87.566393,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "26899 2ND ST, ORANGE BEACH, AL, 36561",
+        "lat": 30.299697910543,
+        "lng": -87.566393267048,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 35,
+        "durationMinutes": 58,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36567",
+      "address": "19700 Adams Acres Rd, Robertsdale, AL 36567",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "19700 ADAMS ACRES RD, ROBERTSDALE, AL, 36567",
+      "lat": 30.547473,
+      "lng": -87.687068,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "19700 ADAMS ACRES RD, ROBERTSDALE, AL, 36567",
+        "lat": 30.547472757097,
+        "lng": -87.687067825592,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 25.9,
+        "durationMinutes": 33,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36567",
+      "address": "20801 Adams Dr, Robertsdale, AL 36567",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "20801 ADAMS DR, ROBERTSDALE, AL, 36567",
+      "lat": 30.527433,
+      "lng": -87.691459,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "20801 ADAMS DR, ROBERTSDALE, AL, 36567",
+        "lat": 30.527433340028,
+        "lng": -87.691458743929,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 27.5,
+        "durationMinutes": 35,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36580",
+      "address": "16799 Acadiana Dr, Summerdale, AL 36580",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "16799 ACADIANA DR, SUMMERDALE, AL, 36580",
+      "lat": 30.479966,
+      "lng": -87.736885,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "16799 ACADIANA DR, SUMMERDALE, AL, 36580",
+        "lat": 30.479966060004,
+        "lng": -87.736885372946,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 32.2,
+        "durationMinutes": 42,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    },
+    {
+      "zip": "36580",
+      "address": "19000 Adams Dr, Summerdale, AL 36580",
+      "county": "Baldwin",
+      "censusCounty": "Baldwin",
+      "matched": "19000 ADAMS DR, SUMMERDALE, AL, 36580",
+      "lat": 30.501823,
+      "lng": -87.691355,
+      "state": "AL",
+      "expectedCounty": "Baldwin",
+      "snapshotCounties": [
+        "Baldwin"
+      ],
+      "branch": "branch_pensacola",
+      "branchReason": "matched_zip",
+      "zone": "extended",
+      "residentialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true
+      },
+      "commercialTax": {
+        "treatment": "not_taxable",
+        "canCharge": true,
+        "county": null,
+        "ratePercent": 0
+      },
+      "census": {
+        "matched": "19000 ADAMS DR, SUMMERDALE, AL, 36580",
+        "lat": 30.501823322291,
+        "lng": -87.691354762383,
+        "county": "Baldwin",
+        "state": "AL"
+      },
+      "travel": {
+        "oneWayMiles": 29.3,
+        "durationMinutes": 36,
+        "method": "route",
+        "verified": true
+      },
+      "calendar": {
+        "enabled": true,
+        "reason": "",
+        "branch": "branch_pensacola",
+        "days": 1,
+        "slots": 37
+      }
+    }
+  ]
+}

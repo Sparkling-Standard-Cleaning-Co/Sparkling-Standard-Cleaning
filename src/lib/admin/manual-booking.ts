@@ -25,7 +25,7 @@ import {
   type FlooringType,
 } from '../estimate/commercial.ts';
 import { selectInstantAmount } from '../estimate/quote.ts';
-import { effectiveCapacityPerMinute } from '../booking/crew.ts';
+import { scheduledMinutesForCrew } from '../booking/crew.ts';
 import { validateEstimateInput } from '../estimate/validation.ts';
 import type {
   Condition,
@@ -541,15 +541,12 @@ interface PriceContext {
  * rules, travel economics and service history rules can never diverge.
  */
 export function scheduledOnSiteMinutes(laborHours: number, crewSize: number): number {
-  const capacity = effectiveCapacityPerMinute(crewSize, bookingConfig.crewEfficiency);
-  const raw = (laborHours * 60) / capacity;
-  return Math.min(
-    bookingConfig.maximumJobMinutes,
-    Math.max(
-      bookingConfig.minimumJobMinutes,
-      Math.ceil(raw / 15) * 15,
-    ),
-  );
+  return scheduledMinutesForCrew(laborHours, crewSize, {
+    minimumJobMinutes: bookingConfig.minimumJobMinutes,
+    maximumJobMinutes: bookingConfig.maximumJobMinutes,
+    efficiency: bookingConfig.crewEfficiency,
+    slotMinutes: bookingConfig.slotMinutes,
+  });
 }
 
 export async function priceEstimateInput(

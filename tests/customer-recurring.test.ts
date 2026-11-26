@@ -217,3 +217,26 @@ test('a future recurring conflict is reported honestly while the paid first visi
   const plan = f.db.raw.prepare('SELECT sync_status FROM recurring_plans WHERE id = ?').get(committed.planId!) as { sync_status: string };
   assert.equal(plan.sync_status, 'partially_scheduled');
 });
+
+test('verified ongoing person-hours drive maintenance duration, not the initial Deep Cleaning duration', async () => {
+  const f = await fixture();
+  const row = f.db.raw.prepare('SELECT payload_json FROM booking_requests WHERE quote_reference = ?').get(f.reference) as { payload_json: string };
+  const fields = JSON.parse(row.payload_json) as Record<string, string>;
+  fields.ongoing_labor_hours = '2';
+  f.db.raw.prepare('UPDATE booking_requests SET payload_json = ? WHERE quote_reference = ?').run(JSON.stringify(fields), f.reference);
+  const committed = await commitConfirmedBooking(
+    { DB: f.db, RECURRING_SCHEDULING_ENABLED: 'true' } as never,
+    f.db,
+    { reference: f.reference, customerId: f.customerId, propertyId: f.propertyId },
+    f.calendar.deps,
+  );
+  assert.equal(committed.ok, true);
+  const plan = f.db.raw.prepare('SELECT duration_minutes, first_duration_minutes FROM recurring_plans WHERE id = ?').get(committed.planId!) as { duration_minutes: number; first_duration_minutes: number };
+  assert.equal(plan.first_duration_minutes, 180);
+  assert.equal(plan.duration_minutes, 120, '2 ongoing labor hours with one cleaner rounds to 120 minutes');
+  const first = f.db.raw.prepare('SELECT duration_minutes FROM appointments WHERE reference = ?').get(f.reference) as { duration_minutes: number };
+  assert.equal(first.duration_minutes, 180, 'the first Deep Cleaning keeps its own quote duration');
+  const maintenance = f.db.raw.prepare("SELECT duration_minutes FROM appointments WHERE source = 'recurring' AND duration_minutes > 0").all() as Array<{ duration_minutes: number }>;
+  assert.ok(maintenance.length > 0);
+  assert.ok(maintenance.every((appointment) => appointment.duration_minutes === 120));
+});

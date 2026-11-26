@@ -186,6 +186,8 @@ const SERVER_OWNED_KEYS = new Set([
   'ongoing_regular_price_per_visit',
   'ongoing_price_per_visit',
   'ongoing_frequency',
+  'ongoing_labor_hours',
+  'ongoing_duration_minutes',
   'ongoing_discount_label',
   'ongoing_discount_amount',
   'photo_count',
@@ -275,7 +277,7 @@ async function recordTermsAcceptance(
 function applyServiceTax(
   clean: Record<string, string>,
   taxableBase: number | null,
-  jurisdiction: { state?: string | null; zip?: string | null } = {},
+  jurisdiction: { state?: string | null; zip?: string | null; county?: string | null } = {},
 ): void {
   if (taxableBase === null || !Number.isFinite(taxableBase)) {
     clean.tax_status = 'review_required';
@@ -288,6 +290,7 @@ function applyServiceTax(
     serviceType: clean.service_type ?? '',
     state: jurisdiction.state ?? null,
     zip: jurisdiction.zip ?? null,
+    county: jurisdiction.county ?? null,
     taxableBase,
   });
   clean.tax_status = tax.treatment;
@@ -559,6 +562,7 @@ export async function onRequestPost(context: {
     applyServiceTax(clean, facility.expectedTotal, {
       state: facilityDestination?.state ?? null,
       zip: facilityDestination?.zip ?? null,
+      county: facilityDestination?.county ?? null,
     });
   }
 
@@ -680,6 +684,7 @@ export async function onRequestPost(context: {
         clean.ongoing_regular_price_per_visit = String(verification.ongoing.regularPerVisitPrice);
         clean.ongoing_price_per_visit = String(verification.ongoing.perVisitPrice);
         clean.ongoing_frequency = verification.ongoing.frequency;
+        clean.ongoing_labor_hours = String(verification.ongoing.laborHours);
         const allocation = verification.ongoing.discounts.find(
           (discount) => discount.source === 'supportive',
         );
@@ -699,6 +704,9 @@ export async function onRequestPost(context: {
         zip:
           verification.travel.destinationZip ??
           (nonTaxableService ? clean.zip ?? null : null),
+        county:
+          verification.travel.destinationCounty ??
+          (nonTaxableService ? clean.address_county ?? null : null),
       });
 
       // The customer-facing receipt carries the verdict (no prices) so the

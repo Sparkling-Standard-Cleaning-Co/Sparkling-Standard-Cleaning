@@ -184,3 +184,77 @@ test('service categories map to the correct tax families', () => {
   assert.equal(taxServiceCategory('church_cleaning'), 'church');
   assert.equal(taxServiceCategory(''), 'unknown');
 });
+
+test('the recovered ZIP 32534 is Escambia County', () => {
+  const tax = calculateServiceTax({
+    serviceType: 'commercial_cleaning',
+    state: 'FL',
+    zip: '32534',
+    taxableBase: 100,
+    at: new Date('2026-11-26T12:00:00Z'),
+  });
+  assert.equal(tax.treatment, 'taxable');
+  assert.equal(tax.county, 'Escambia');
+  assert.equal(tax.ratePercent, 7.5);
+});
+
+test('Molino ZIP 32577 is Escambia County, not Santa Rosa', () => {
+  const tax = calculateServiceTax({
+    serviceType: 'commercial_cleaning',
+    state: 'FL',
+    zip: '32577',
+    taxableBase: 100,
+    at: new Date('2026-11-26T12:00:00Z'),
+  });
+  assert.equal(tax.county, 'Escambia');
+  assert.equal(tax.ratePercent, 7.5);
+});
+
+test('split ZIP 32561 fails closed without a county and uses the confirmed address county', () => {
+  const unresolved = calculateServiceTax({
+    serviceType: 'commercial_cleaning',
+    state: 'FL',
+    zip: '32561',
+    taxableBase: 100,
+    at: new Date('2026-11-26T12:00:00Z'),
+  });
+  assert.equal(unresolved.treatment, 'review_required');
+  assert.equal(unresolved.reviewReason, 'county_unknown');
+  assert.equal(unresolved.canCharge, false);
+
+  const beach = calculateServiceTax({
+    serviceType: 'commercial_cleaning',
+    state: 'FL',
+    zip: '32561',
+    county: 'Escambia County',
+    taxableBase: 100,
+    at: new Date('2026-11-26T12:00:00Z'),
+  });
+  assert.equal(beach.county, 'Escambia');
+  assert.equal(beach.ratePercent, 7.5);
+
+  const gulfBreeze = calculateServiceTax({
+    serviceType: 'commercial_cleaning',
+    state: 'FL',
+    zip: '32561',
+    county: 'Santa Rosa',
+    taxableBase: 100,
+    at: new Date('2026-11-26T12:00:00Z'),
+  });
+  assert.equal(gulfBreeze.county, 'Santa Rosa');
+  assert.equal(gulfBreeze.ratePercent, 7);
+});
+
+test('a county that contradicts a single-county ZIP fails closed', () => {
+  const tax = calculateServiceTax({
+    serviceType: 'commercial_cleaning',
+    state: 'FL',
+    zip: '32502',
+    county: 'Santa Rosa',
+    taxableBase: 100,
+    at: new Date('2026-11-26T12:00:00Z'),
+  });
+  assert.equal(tax.treatment, 'review_required');
+  assert.equal(tax.reviewReason, 'jurisdiction_conflict');
+  assert.equal(tax.canCharge, false);
+});
