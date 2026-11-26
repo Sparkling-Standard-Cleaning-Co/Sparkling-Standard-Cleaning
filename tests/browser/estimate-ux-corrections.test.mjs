@@ -437,7 +437,7 @@ test('availability shows loading feedback, clears it, and offers a working retry
     attempt = 2;
     await page.fill('#est-date', OTHER_DATE);
     await page.waitForSelector('[data-calendar-times-retry]', { state: 'visible' });
-    assert.match((await page.textContent('[data-calendar-status]')) ?? '', /could not load available times/i);
+    assert.match((await page.textContent('[data-calendar-status]')) ?? '', /could not load live times/i);
     await page.click('[data-calendar-times-retry]');
     await page.waitForFunction(
       () => document.querySelector('[data-calendar-loading]')?.hasAttribute('hidden') === true,
@@ -923,6 +923,71 @@ test('checkout omits the three redundant paragraphs on desktop and mobile', asyn
         `${width}px: an empty note leaves no spacing`,
       );
     }
+  } finally {
+    await context.close();
+  }
+});
+
+test('a commercial address shows the branded notice, review request and commercial prefill', async () => {
+  const { context, page } = await setupPage({ reducedMotion: 'reduce', paymentReady: true });
+  try {
+    await page.route('**/api/geocode', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}');
+      if (body.action === 'suggest') {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"suggestions":[]}' });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          result: {
+            label: '100 S Baylen St, Pensacola, FL 32502',
+            lat: 30.4111,
+            lng: -87.2164,
+            zip: '32502',
+            city: 'Pensacola',
+            state: 'FL',
+            source: 'google',
+            precise: true,
+            commercial: true,
+            businessName: 'Acme Office Suites',
+          },
+        }),
+      });
+    });
+    let reviewBody = null;
+    await page.route('**/api/address-review', async (route) => {
+      reviewBody = JSON.parse(route.request().postData() ?? '{}');
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, reference: 'ADR-20261126-ABC123', status: 'new' }),
+      });
+    });
+    await page.fill('#est-address', '100 S Baylen St');
+    await page.fill('#est-address-city', 'Pensacola');
+    await page.fill('#est-state', 'FL').catch(() => undefined);
+    await page.fill('#est-zip', '32502');
+    await page.click('[data-address-resolve]');
+    await page.locator('[data-address-map]').waitFor({ state: 'visible' });
+    await page.click('[data-address-confirm]');
+    const notice = page.locator('[data-commercial-notice]');
+    await notice.waitFor({ state: 'visible' });
+    const copy = await notice.innerText();
+    assert.match(copy, /Commercial property detected/);
+    assert.match(copy, /Acme Office Suites/);
+    assert.match(copy, /Continue to Commercial Estimate/);
+    assert.match(copy, /Request Address Review/);
+    assert.equal(await page.locator('[data-schedule-section]').isVisible(), false, 'residential scheduling is suspended');
+    await page.click('[data-commercial-review]');
+    await page.waitForFunction(() => /Address review requested/.test(document.querySelector('[data-commercial-review-status]')?.textContent ?? ''));
+    assert.equal(reviewBody?.businessName, 'Acme Office Suites');
+    assert.equal(reviewBody?.classification, 'commercial');
+    await page.click('[data-commercial-continue]');
+    const prefill = await page.evaluate(() => sessionStorage.getItem('pcc-commercial-prefill'));
+    assert.match(String(prefill), /Acme Office Suites/);
   } finally {
     await context.close();
   }

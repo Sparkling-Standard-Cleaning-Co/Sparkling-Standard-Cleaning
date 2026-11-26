@@ -541,6 +541,36 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
     const name = (event.target as HTMLElement | null)?.getAttribute('name');
     if (name) clearFieldError(name);
   });
+
+  let commercialPrefillAddress = false;
+  try {
+    const rawPrefill = sessionStorage.getItem('pcc-commercial-prefill');
+    if (rawPrefill) {
+      const prefill = JSON.parse(rawPrefill) as Record<string, unknown>;
+      const assign = (name: string, value: unknown): void => {
+        if (typeof value !== 'string' || !value.trim()) return;
+        const element = namedElement(name);
+        if (element) element.value = value;
+      };
+      assign('organization', prefill.organization);
+      assign('name', prefill.name);
+      assign('email', prefill.email);
+      assign('phone', prefill.phone);
+      assign('serviceAddress', prefill.street);
+      assign('addressUnit', prefill.unit);
+      assign('addressCity', prefill.city);
+      assign('addressState', prefill.state);
+      assign('zip', prefill.zip);
+      const details = host.querySelector<HTMLDetailsElement>('[data-address-manual-details]');
+      if (details && typeof prefill.street === 'string' && prefill.street.trim()) {
+        details.open = true;
+        commercialPrefillAddress = true;
+      }
+      sessionStorage.removeItem('pcc-commercial-prefill');
+    }
+  } catch {
+    // Prefill is a convenience; the customer can still type the address.
+  }
   showStep(1, false);
   finder = initAddressFinder({
     form: host,
@@ -572,6 +602,10 @@ function initFacilityForm(host: HTMLFormElement, facilityEngine: Engine): void {
       window.setTimeout(() => showStep(stepPanels.length), 250);
     },
   });
+
+  if (commercialPrefillAddress && finder) {
+    void finder.verifyAddress();
+  }
 
   const bookingRoot = host.querySelector<HTMLElement>('[data-booking-picker]');
   if (bookingRoot) {

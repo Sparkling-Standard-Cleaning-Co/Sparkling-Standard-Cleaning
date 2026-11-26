@@ -1,6 +1,6 @@
-import { adminDb, type AdminDbEnv } from '../../src/lib/admin/d1.ts';
+﻿import { adminDb, type AdminDbEnv } from '../../src/lib/admin/d1.ts';
 import { checkPublicRateLimit, clientIp, consumePublicRateLimit, PUBLIC_RATE_LIMITS } from '../../src/lib/public-rate-limit.ts';
-import { CAREER_STATUSES } from '../../src/lib/careers.ts';
+import { CAREER_PIPELINE_STATUSES } from '../../src/lib/careers.ts';
 
 interface Env extends AdminDbEnv {}
 
@@ -26,10 +26,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     return json({ ok: false, error: 'invalid_reference' }, 400);
   }
   const row = await db.prepare(
-    'SELECT reference, status, created_at, updated_at FROM career_applications WHERE reference = ? AND lower(email) = ? LIMIT 1',
-  ).bind(reference, email).first<{ reference: string; status: string; created_at: string; updated_at: string }>();
-  if (!row || !CAREER_STATUSES.includes(row.status as typeof CAREER_STATUSES[number])) {
+    'SELECT reference, pipeline_status, created_at, updated_at FROM career_applications WHERE reference = ? AND lower(email) = ? LIMIT 1',
+  ).bind(reference, email).first<{ reference: string; pipeline_status: string; created_at: string; updated_at: string }>();
+  const valid = CAREER_PIPELINE_STATUSES.some((entry) => entry.value === row?.pipeline_status);
+  if (!row || !valid) {
     return json({ ok: false, error: 'not_found' }, 404);
   }
-  return json({ ok: true, reference: row.reference, status: row.status, submittedAt: row.created_at, updatedAt: row.updated_at });
+  return json({ ok: true, reference: row.reference, status: row.pipeline_status, submittedAt: row.created_at, updatedAt: row.updated_at });
 }
+

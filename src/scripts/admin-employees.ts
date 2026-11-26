@@ -112,10 +112,52 @@ export async function loadEmployees(): Promise<void> {
   employeeState.timeOff = data.timeOff ?? [];
   setEmployeeStatus('');
   renderEmployees();
+  void loadRecruitmentSummary().catch(() => undefined);
   if (employeeState.selectedMember) {
     await loadEmployeeMember(employeeState.selectedMember);
   }
 }
+
+async function loadRecruitmentSummary(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-employee-recruitment-summary]');
+  if (!target) return;
+  const response = await fetch('/api/admin/careers?limit=6&sort=created_at', {
+    headers: { Accept: 'application/json' },
+    credentials: 'same-origin',
+  });
+  if (!response.ok) {
+    target.innerHTML = '<p class="admin-muted">Recruitment records require owner or manager access.</p>';
+    return;
+  }
+  const data = (await response.json().catch(() => ({}))) as {
+    applications?: Array<Record<string, unknown>>;
+    total?: number;
+  };
+  const rows = data.applications ?? [];
+  target.innerHTML =
+    '<p><strong>' + escE(data.total ?? 0) + '</strong> application(s) in the current view.</p>' +
+    (rows.length
+      ? '<div class="admin-history">' +
+        rows
+          .map(
+            (application) =>
+              '<div class="admin-record"><p><strong>' +
+              escE(application.name) +
+              '</strong> <span class="admin-status">' +
+              escE(titleE(String(application.pipeline_status || application.status || 'new'))) +
+              '</span></p><p class="admin-muted">' +
+              escE(titleE(String(application.position_code || application.desired_role || ''))) +
+              ' - ' +
+              escE(titleE(String(application.branch_preference || ''))) +
+              ' - ' +
+              escE(String(application.created_at || '')) +
+              '</p></div>',
+          )
+          .join('') +
+        '</div>'
+      : '<p class="admin-muted">No applications received yet.</p>');
+}
+
 
 async function loadEmployeeMember(memberId: string): Promise<void> {
   const data = await employeeApi<EmployeeState['memberData'] & { ok?: boolean }>(
@@ -415,6 +457,9 @@ document.querySelector<HTMLElement>('[data-admin-view="employees"]')?.addEventLi
   };
   if (action === 'refresh') run(loadEmployees());
   if (action === 'select') run(loadEmployeeMember(id));
+  if (action === 'recruitment-open') {
+    window.dispatchEvent(new CustomEvent('ss-admin-navigate', { detail: { view: 'careers' } }));
+  }
   if (action === 'member-close') {
     employeeState.selectedMember = '';
     const panel = document.querySelector<HTMLElement>('[data-employee-member]');
@@ -580,4 +625,16 @@ document.querySelector<HTMLElement>('[data-admin-view="employees"]')?.addEventLi
       .then(() => openPayroll(String(payload.periodId)))
       .catch(employeeFailure);
   }
+});
+
+
+window.addEventListener('ss-admin-open-employee', (event) => {
+  const id = (event as CustomEvent<{ id?: string }>).detail?.id ?? '';
+  if (!id) return;
+  window.dispatchEvent(new CustomEvent('ss-admin-navigate', { detail: { view: 'employees' } }));
+  window.setTimeout(() => {
+    void loadEmployees()
+      .then(() => loadEmployeeMember(id))
+      .catch((error) => setEmployeeStatus(error instanceof Error ? error.message : 'Employee could not be opened.', 'error'));
+  }, 200);
 });

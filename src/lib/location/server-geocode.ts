@@ -33,6 +33,12 @@ export interface GeocodedAddress {
   county?: string;
   /** True when the result contains the requested house number (or none was requested). */
   precise: boolean;
+  /** Google place categories when the provider supplied them. */
+  placeTypes?: string[];
+  /** True only when Google's categories identify a commercial establishment. */
+  commercial?: boolean;
+  /** Verified Google business name. Never inferred from the street address. */
+  businessName?: string;
 }
 
 /** One provider credential for all mapping functions — no duplicate secrets. */
@@ -328,6 +334,7 @@ function googleAddress(
     addressComponents?: Array<{ longText?: string | undefined; shortText?: string | undefined; types?: string[] | undefined }> | undefined;
     location?: { latitude?: number | undefined; longitude?: number | undefined } | undefined;
     types?: string[] | undefined;
+    displayName?: { text?: string | undefined } | undefined;
   },
 ): GeocodedAddress | null {
   const lat = Number(place.location?.latitude);
@@ -344,6 +351,8 @@ function googleAddress(
   const city = componentValue(place.addressComponents, 'locality') || componentValue(place.addressComponents, 'postal_town');
   const county = componentValue(place.addressComponents, 'administrative_area_level_2').replace(/\s+County$/i, '');
   const zip = componentValue(place.addressComponents, 'postal_code').match(FIVE_DIGIT_ZIP)?.[1];
+  const classification = commercialPlaceTypes(place.types);
+  const businessName = (place.displayName?.text ?? '').trim().slice(0, 160);
   return {
     label,
     lat,
@@ -354,6 +363,9 @@ function googleAddress(
     ...(city ? { city } : {}),
     ...(county ? { county } : {}),
     state,
+    ...(place.types?.length ? { placeTypes: place.types.slice(0, 20) } : {}),
+    ...(classification.commercial ? { commercial: true } : {}),
+    ...(classification.commercial && businessName ? { businessName } : {}),
   };
 }
 
@@ -436,7 +448,7 @@ export async function googlePlaceDetails(
   const response = await fetch(url, {
     headers: {
       'X-Goog-Api-Key': key,
-      'X-Goog-FieldMask': 'id,formattedAddress,addressComponents,location,types',
+      'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents,location,types',
     },
     signal: AbortSignal.timeout(7000),
   });
@@ -559,3 +571,73 @@ export async function googleReverseGeocode(env: GeocodeEnv, lat: number, lng: nu
     types: first.types,
   });
 }
+
+const COMMERCIAL_PLACE_TYPES = new Set([
+  'establishment',
+  'store',
+  'lodging',
+  'restaurant',
+  'cafe',
+  'bar',
+  'bakery',
+  'meal_takeaway',
+  'meal_delivery',
+  'finance',
+  'bank',
+  'atm',
+  'insurance_agency',
+  'accounting',
+  'lawyer',
+  'real_estate_agency',
+  'travel_agency',
+  'health',
+  'doctor',
+  'dentist',
+  'hospital',
+  'pharmacy',
+  'veterinary_care',
+  'school',
+  'university',
+  'local_government_office',
+  'church',
+  'place_of_worship',
+  'car_repair',
+  'car_dealer',
+  'gas_station',
+  'convenience_store',
+  'supermarket',
+  'shopping_mall',
+  'department_store',
+  'beauty_salon',
+  'hair_care',
+  'gym',
+  'moving_company',
+  'storage',
+  'laundry',
+  'post_office',
+  'courthouse',
+  'city_hall',
+  'embassy',
+  'fire_station',
+  'police',
+  'train_station',
+  'transit_station',
+  'airport',
+  'amusement_park',
+  'casino',
+  'movie_theater',
+  'museum',
+  'night_club',
+  'park',
+  'stadium',
+  'zoo',
+]);
+
+export function commercialPlaceTypes(types: ReadonlyArray<string> | null | undefined): {
+  commercial: boolean;
+  matched: string[];
+} {
+  const matched = (types ?? []).filter((type) => COMMERCIAL_PLACE_TYPES.has(type));
+  return { commercial: matched.length > 0, matched };
+}
+

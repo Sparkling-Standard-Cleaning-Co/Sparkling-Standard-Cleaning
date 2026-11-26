@@ -111,7 +111,8 @@ const viewMeta: Record<string, [string, string]> = {
   'quick-estimate': ['Quick Estimate', 'Price a phone inquiry with live promotions, then save or convert it to a booking.'],
   recurring: ['Recurring Plans', 'Recurring cleaning administration.'],
   jobs: ['Jobs & Team', 'Cleaning jobs, assignments and checklists.'],
-  careers: ['Careers', 'Private applications and hiring workflow.'],
+  careers: ['Applicants / Recruitment', 'Private applications, hiring pipeline and recruitment settings.'],
+  'address-reviews': ['Address Reviews', 'Customer requests to review a residential/commercial address classification.'],
   communications: ['Communications & Notifications', 'Department routing, approved templates, delivery health and version history.'],
   documents: ['Documents & Agreements', 'Owner-controlled templates, bundles and electronic signatures.'],
   timekeeping: ['Timekeeping', 'Employee hours, corrections and location verification.'],
@@ -136,6 +137,8 @@ const navPermission: Record<string, string> = {
   'quick-estimate': 'booking.write',
   recurring: 'job.read',
   jobs: 'job.read',
+  careers: 'job.read',
+  'address-reviews': 'job.read',
   communications: 'settings.write',
   documents: 'job.read',
   timekeeping: 'job.write',
@@ -1949,7 +1952,7 @@ interface PageState {
 
 const leadPage: PageState & { status: string; q: string } = { status: 'active', q: '', limit: 25, offset: 0, sort: 'created_at' };
 const customerPage: PageState & { q: string; status: string } = { q: '', status: 'active', limit: 25, offset: 0, sort: 'created_at' };
-const careerPage: PageState & { status: string; branch: string; q: string } = { status: '', branch: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
+const careerPage: PageState & { status: string; branch: string; position: string; availability: string; q: string } = { status: '', branch: '', position: '', availability: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
 const financePage: PageState & { status: string; q: string } = { status: '', q: '', limit: 25, offset: 0, sort: 'created_at' };
 let checkoutSessions: Array<Record<string, unknown>> = [];
 let checkoutSessionFilter = 'review';
@@ -4816,15 +4819,28 @@ interface CareerApplication {
   reference: string;
   created_at: string;
   name: string;
+  first_name?: string;
+  last_name?: string;
   email: string;
   phone: string;
+  city?: string;
+  postal_code?: string;
   experience_level: string;
   desired_role: string;
+  position_code?: string;
   branch_preference: string;
+  branch_id?: string | null;
   availability: string;
   transportation: string;
+  employment_type?: string;
+  desired_weekly_hours?: number | null;
+  pipeline_status?: string;
   status: string;
   notes: string;
+  interview_at?: string | null;
+  interview_notes?: string;
+  follow_up_at?: string | null;
+  converted_team_member_id?: string | null;
   resume_key: string;
   resume_name: string;
   hiring_notified_at?: string | null;
@@ -4832,6 +4848,17 @@ interface CareerApplication {
 }
 
 let careerApplications: CareerApplication[] = [];
+let careerStatuses: Array<{ value: string; label: string }> = [];
+
+function careerStatusLabel(value: string): string {
+  return careerStatuses.find((entry) => entry.value === value)?.label ?? titleCase(String(value ?? ''));
+}
+
+function careerBranchLabel(value: string): string {
+  if (value === 'pensacola' || value === 'branch_pensacola') return 'Pensacola';
+  if (value === 'tampa' || value === 'branch_tampa') return 'Tampa future interest';
+  return value === 'either' ? 'Either branch' : titleCase(value);
+}
 
 async function loadCareers(status?: string): Promise<void> {
   if (status !== undefined && status !== careerPage.status) {
@@ -4843,46 +4870,150 @@ async function loadCareers(status?: string): Promise<void> {
   const params = new URLSearchParams({
     status: careerPage.status,
     branch: careerPage.branch,
+    position: careerPage.position,
+    availability: careerPage.availability,
     q: careerPage.q,
     limit: String(careerPage.limit),
     offset: String(careerPage.offset),
     sort: careerPage.sort,
   });
-  const data = await api<{ applications?: CareerApplication[]; total?: number; limit?: number; offset?: number }>('/api/admin/careers?' + params.toString());
+  const data = await api<{
+    applications?: CareerApplication[];
+    total?: number;
+    limit?: number;
+    offset?: number;
+    statuses?: Array<{ value: string; label: string }>;
+  }>('/api/admin/careers?' + params.toString());
   careerApplications = data.applications ?? [];
+  if (data.statuses?.length) careerStatuses = data.statuses;
   renderPager(document.querySelector<HTMLElement>('[data-careers-pagination]'), data, 'careers-page');
-  renderTable(target, ['Submitted', 'Applicant', 'Role', 'Branch', 'Experience', 'Status', 'Action'], careerApplications.map((application) => [
+  renderTable(target, ['Submitted', 'Applicant', 'Position', 'Branch', 'Availability', 'Status', 'Action'], careerApplications.map((application) => [
     esc(dateTime(application.created_at)),
     '<strong>' + esc(application.name) + '</strong><br /><span class="admin-muted">' + esc(application.email) + ' - ' + esc(application.reference) + '</span>',
-    esc(titleCase(application.desired_role)),
-    esc(titleCase(application.branch_preference)),
-    esc(titleCase(application.experience_level)),
-    esc(titleCase(application.status)),
+    esc(titleCase(application.position_code || application.desired_role)),
+    esc(careerBranchLabel(application.branch_preference)),
+    esc(application.availability || '-'),
+    esc(careerStatusLabel(application.pipeline_status || application.status)),
     '<button class="btn btn--ghost btn--small" type="button" data-admin-action="career-open" data-id="' + esc(application.id) + '">Open</button>',
   ]), 'No career applications have been received yet.');
+  void loadRecruitmentOptions().catch(() => undefined);
 }
 
 async function openCareer(id: string): Promise<void> {
-  const data = await api<{ application?: CareerApplication }>('/api/admin/careers?view=detail&id=' + encodeURIComponent(id));
+  const data = await api<{
+    application?: CareerApplication;
+    interviews?: Array<Record<string, unknown>>;
+    statuses?: Array<{ value: string; label: string }>;
+  }>('/api/admin/careers?view=detail&id=' + encodeURIComponent(id));
   const application = data.application;
+  if (data.statuses?.length) careerStatuses = data.statuses;
   const target = document.querySelector<HTMLElement>('[data-career-detail]');
   if (!application || !target) return;
-  target.innerHTML = '<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">' + esc(application.name) + '</h2><span class="admin-status">' + esc(titleCase(application.status)) + '</span></div>' +
-    '<dl class="admin-definition"><dt>Reference</dt><dd>' + esc(application.reference) + '</dd><dt>Email</dt><dd><a href="mailto:' + esc(application.email) + '">' + esc(application.email) + '</a></dd><dt>Phone</dt><dd>' + esc(application.phone) + '</dd><dt>Experience</dt><dd>' + esc(titleCase(application.experience_level)) + '</dd><dt>Desired role</dt><dd>' + esc(titleCase(application.desired_role)) + '</dd><dt>Branch</dt><dd>' + esc(titleCase(application.branch_preference)) + '</dd><dt>Transportation</dt><dd>' + esc(titleCase(application.transportation)) + '</dd><dt>Availability</dt><dd>' + esc(application.availability) + '</dd><dt>Resume</dt><dd>' + (application.resume_key ? '<a class="btn btn--ghost btn--small" href="/api/admin/careers?view=resume&id=' + encodeURIComponent(application.id) + '">Download private copy</a>' : 'Not attached') + '</dd></dl>' +
-    '<form class="admin-form" data-career-update><input type="hidden" name="applicationId" value="' + esc(application.id) + '" /><label>Status <select name="status">' + ['new','reviewing','interview','offer','declined','archived'].map((status) => '<option value="' + status + '"' + (status === application.status ? ' selected' : '') + '>' + esc(titleCase(status)) + '</option>').join('') + '</select></label><label>Private notes <textarea name="notes" rows="4">' + esc(application.notes) + '</textarea></label><button class="btn btn--primary btn--small" type="submit">Save application</button></form></div>';
+  const status = String(application.pipeline_status || application.status || 'new');
+  const interviews = data.interviews ?? [];
+  target.innerHTML = '<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">' + esc(application.name) + '</h2><span class="admin-status">' + esc(careerStatusLabel(status)) + '</span></div>' +
+    '<dl class="admin-definition"><dt>Reference</dt><dd>' + esc(application.reference) + '</dd><dt>Email</dt><dd><a href="mailto:' + esc(application.email) + '">' + esc(application.email) + '</a></dd><dt>Phone</dt><dd>' + esc(application.phone) + '</dd><dt>City / ZIP</dt><dd>' + esc([application.city, application.postal_code].filter(Boolean).join(' ') || '-') + '</dd><dt>Experience</dt><dd>' + esc(titleCase(application.experience_level)) + '</dd><dt>Position</dt><dd>' + esc(titleCase(application.position_code || application.desired_role)) + '</dd><dt>Branch</dt><dd>' + esc(careerBranchLabel(application.branch_preference)) + '</dd><dt>Transportation</dt><dd>' + esc(titleCase(application.transportation)) + '</dd><dt>Employment</dt><dd>' + esc(titleCase(application.employment_type || 'either')) + (application.desired_weekly_hours ? ' - ' + esc(application.desired_weekly_hours) + ' hrs/week' : '') + '</dd><dt>Availability</dt><dd>' + esc(application.availability) + '</dd><dt>Resume</dt><dd>' + (application.resume_key ? '<a class="btn btn--ghost btn--small" href="/api/admin/careers?view=resume&id=' + encodeURIComponent(application.id) + '">Download private copy</a>' : 'Not attached') + '</dd></dl>' +
+    (application.converted_team_member_id ? '<p class="admin-status">Converted to employee ' + esc(application.converted_team_member_id) + '</p><div class="admin-actions"><button class="btn btn--secondary btn--small" type="button" data-admin-action="career-open-employee" data-id="' + esc(application.converted_team_member_id) + '">Open employee file</button></div>' : '') +
+    '<form class="admin-form" data-career-update><input type="hidden" name="applicationId" value="' + esc(application.id) + '" /><label>Status <select name="status">' + careerStatuses.map((entry) => '<option value="' + esc(entry.value) + '"' + (entry.value === status ? ' selected' : '') + '>' + esc(entry.label) + '</option>').join('') + '</select></label><label>Private notes <textarea name="notes" rows="4">' + esc(application.notes) + '</textarea></label><button class="btn btn--primary btn--small" type="submit">Save application</button></form>' +
+    '<div class="admin-grid" style="margin-top:1rem;"><div><h3>Record an interview</h3><form class="admin-inline-form" data-career-interview><input type="hidden" name="applicationId" value="' + esc(application.id) + '" /><label>When <input name="scheduledAt" type="datetime-local" required /></label><label>Interviewer <input name="interviewer" maxlength="160" /></label><label>Notes <input name="notes" maxlength="3000" /></label><select name="outcome"><option value="">Outcome pending</option><option value="completed">Completed</option><option value="advance">Advance</option><option value="not_selected">Not selected</option></select><button class="btn btn--secondary btn--small" type="submit">Save interview</button></form></div><div><h3>Follow-up and communication</h3><form class="admin-inline-form" data-career-followup><input type="hidden" name="applicationId" value="' + esc(application.id) + '" /><label>Follow-up date <input name="followUpAt" type="date" value="' + esc(application.follow_up_at?.slice(0, 10) ?? '') + '" /></label><button class="btn btn--secondary btn--small" type="submit">Save follow-up</button></form><form class="admin-inline-form" data-career-email><input type="hidden" name="applicationId" value="' + esc(application.id) + '" /><label>Applicant email <select name="template"><option value="interview_request">Interview request</option><option value="follow_up">Follow-up</option><option value="not_selected">Not selected</option><option value="custom">Custom message</option></select></label><label>Custom subject <input name="subject" maxlength="160" /></label><label>Custom message <textarea name="message" rows="2" maxlength="5000"></textarea></label><button class="btn btn--secondary btn--small" type="submit">Send email</button></form>' + (!application.converted_team_member_id ? '<button class="btn btn--primary btn--small" type="button" data-admin-action="career-convert" data-id="' + esc(application.id) + '">Convert to employee profile</button>' : '') + '</div></div>' +
+    (interviews.length ? '<h3>Interview history</h3><div class="admin-history">' + interviews.map((entry) => '<div class="admin-record"><p><strong>' + esc(String(entry.scheduled_at || entry.created_at || '')) + '</strong> - ' + esc(String(entry.outcome || 'recorded')) + '</p><p class="admin-muted">' + esc(String(entry.interviewer || 'Interviewer not recorded')) + ' - ' + esc(String(entry.notes || 'No notes')) + '</p></div>').join('') + '</div>' : '') +
+    '</div>';
   target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function loadRecruitmentOptions(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-recruitment-options]');
+  if (!target) return;
+  const data = await api<{
+    opportunities?: Array<Record<string, unknown>>;
+    settings?: Array<Record<string, unknown>>;
+  }>('/api/admin/careers?view=options');
+  const opportunities = data.opportunities ?? [];
+  const settings = data.settings ?? [];
+  target.innerHTML =
+    (opportunities.length
+      ? '<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Role</th><th>Branch</th><th>Status</th><th></th></tr></thead><tbody>' +
+        opportunities.map((opportunity) => '<tr><td><strong>' + esc(String(opportunity.title ?? '')) + '</strong><br /><span class="admin-muted">' + esc(String(opportunity.description ?? '')) + '</span></td><td>' + esc(careerBranchLabel(String(opportunity.branch_id ?? ''))) + '</td><td><select data-recruitment-status="' + esc(String(opportunity.id)) + '">' + ['open', 'future', 'closed'].map((value) => '<option value="' + value + '"' + (value === opportunity.status ? ' selected' : '') + '>' + esc(titleCase(value)) + '</option>').join('') + '</select></td><td><button class="btn btn--ghost btn--small" type="button" data-admin-action="recruitment-opportunity-save" data-id="' + esc(String(opportunity.id)) + '">Save</button></td></tr>').join('') +
+        '</tbody></table></div>'
+      : '<p class="admin-muted">No recruitment opportunities configured.</p>') +
+    (settings.length
+      ? '<h3 style="margin-top:1rem;">Advertised pay</h3>' + settings.map((entry) => '<form class="admin-inline-form" data-recruitment-pay><input type="hidden" name="branchId" value="' + esc(String(entry.branch_id ?? '')) + '" /><strong>' + esc(careerBranchLabel(String(entry.branch_id ?? ''))) + '</strong><label>Regular $/hr <input name="regular" type="number" min="0" step="0.01" value="' + esc((Number(entry.pay_regular_cents ?? 1800) / 100).toFixed(2)) + '" /></label><label>Lead $/hr <input name="lead" type="number" min="0" step="0.01" value="' + esc((Number(entry.pay_lead_cents ?? 2200) / 100).toFixed(2)) + '" /></label><label>Solo $/hr <input name="solo" type="number" min="0" step="0.01" value="' + esc((Number(entry.pay_solo_cents ?? 2500) / 100).toFixed(2)) + '" /></label><button class="btn btn--secondary btn--small" type="submit">Save pay</button></form>').join('')
+      : '<p class="admin-muted">No advertised pay settings configured.</p>');
 }
 
 document.addEventListener('submit', (event) => {
   const form = event.target as HTMLFormElement;
-  if (!form.matches('[data-career-update]')) return;
-  event.preventDefault();
-  const data = new FormData(form);
-  const applicationId = String(data.get('applicationId') ?? '');
-  void api('/api/admin/careers', {
-    method: 'POST',
-    body: JSON.stringify({ action: 'update', applicationId, status: String(data.get('status') ?? ''), notes: String(data.get('notes') ?? '') }),
-  }).then(() => openCareer(applicationId)).then(() => loadCareers()).catch((error) => setAppError(friendly(error)));
+  if (form.matches('[data-career-update]')) {
+    event.preventDefault();
+    const data = new FormData(form);
+    const applicationId = String(data.get('applicationId') ?? '');
+    void api('/api/admin/careers', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'update_status', applicationId, status: String(data.get('status') ?? ''), notes: String(data.get('notes') ?? '') }),
+    }).then(() => openCareer(applicationId)).then(() => loadCareers()).catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (form.matches('[data-career-interview]')) {
+    event.preventDefault();
+    const data = new FormData(form);
+    const applicationId = String(data.get('applicationId') ?? '');
+    void api('/api/admin/careers', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: data.get('outcome') || data.get('scheduledAt') ? 'schedule_interview' : 'interview_event',
+        applicationId,
+        scheduledAt: String(data.get('scheduledAt') ?? ''),
+        interviewer: String(data.get('interviewer') ?? ''),
+        notes: String(data.get('notes') ?? ''),
+        outcome: String(data.get('outcome') ?? ''),
+      }),
+    }).then(() => openCareer(applicationId)).catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (form.matches('[data-career-followup]')) {
+    event.preventDefault();
+    const data = new FormData(form);
+    const applicationId = String(data.get('applicationId') ?? '');
+    void api('/api/admin/careers', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'set_follow_up', applicationId, followUpAt: String(data.get('followUpAt') ?? '') }),
+    }).then(() => openCareer(applicationId)).catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (form.matches('[data-career-email]')) {
+    event.preventDefault();
+    const data = new FormData(form);
+    const applicationId = String(data.get('applicationId') ?? '');
+    void api('/api/admin/careers', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'email_applicant',
+        applicationId,
+        template: String(data.get('template') ?? ''),
+        subject: String(data.get('subject') ?? ''),
+        message: String(data.get('message') ?? ''),
+      }),
+    }).then(() => {
+      setSuccess('Applicant email accepted by the provider.');
+      return openCareer(applicationId);
+    }).catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (form.matches('[data-recruitment-pay]')) {
+    event.preventDefault();
+    const data = new FormData(form);
+    void api('/api/admin/careers', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'update_pay',
+        branchId: String(data.get('branchId') ?? ''),
+        regular: Math.round(Number(data.get('regular') ?? 0) * 100),
+        lead: Math.round(Number(data.get('lead') ?? 0) * 100),
+        solo: Math.round(Number(data.get('solo') ?? 0) * 100),
+      }),
+    }).then(() => loadRecruitmentOptions()).then(() => setSuccess('Advertised pay updated.'))
+      .catch((error) => setAppError(friendly(error)));
+  }
 });
 
 document.querySelector<HTMLFormElement>('[data-careers-search]')?.addEventListener('submit', (event) => {
@@ -4890,6 +5021,8 @@ document.querySelector<HTMLFormElement>('[data-careers-search]')?.addEventListen
   const data = new FormData(event.currentTarget as HTMLFormElement);
   careerPage.status = String(data.get('status') ?? '');
   careerPage.branch = String(data.get('branch') ?? '');
+  careerPage.position = String(data.get('position') ?? '');
+  careerPage.availability = String(data.get('availability') ?? '');
   careerPage.q = String(data.get('q') ?? '');
   careerPage.sort = String(data.get('sort') ?? 'created_at');
   careerPage.limit = Number(data.get('pageSize') ?? 25) || 25;
@@ -4897,6 +5030,22 @@ document.querySelector<HTMLFormElement>('[data-careers-search]')?.addEventListen
   void loadCareers().catch((error) => setAppError(friendly(error)));
 });
 
+async function loadAddressReviews(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-address-reviews-list]');
+  if (!target) return;
+  const data = await api<{ requests?: Array<Record<string, unknown>> }>('/api/admin/address-reviews');
+  const rows = data.requests ?? [];
+  target.innerHTML = rows.length
+    ? '<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Requested</th><th>Address</th><th>Detected business</th><th>Customer</th><th>Status</th><th>Admin notes</th><th></th></tr></thead><tbody>' +
+      rows.map((entry) => '<tr><td>' + esc(dateTime(String(entry.created_at ?? ''))) + '<br /><span class="admin-muted">' + esc(String(entry.reference ?? '')) + '</span></td><td>' + esc(String(entry.address_text ?? '')) + '<br /><span class="admin-muted">' + esc([entry.city, entry.state, entry.zip].filter(Boolean).join(' ')) + '</span></td><td>' + esc(String(entry.detected_business_name ?? 'Not identified')) + '</td><td>' + esc(String(entry.customer_name ?? '')) + '<br /><span class="admin-muted">' + esc([entry.customer_email, entry.customer_phone].filter(Boolean).join(' - ')) + '</span></td><td><select data-address-review-status="' + esc(String(entry.id)) + '">' + ['new', 'reviewing', 'resolved', 'dismissed'].map((status) => '<option value="' + status + '"' + (status === entry.status ? ' selected' : '') + '>' + esc(titleCase(status)) + '</option>').join('') + '</select></td><td><textarea data-address-review-notes="' + esc(String(entry.id)) + '" rows="2" maxlength="3000">' + esc(String(entry.admin_notes ?? '')) + '</textarea></td><td><button class="btn btn--secondary btn--small" type="button" data-admin-action="address-review-save" data-id="' + esc(String(entry.id)) + '">Save</button></td></tr>').join('') +
+      '</tbody></table></div>'
+    : '<p class="admin-muted">No address review requests are waiting.</p>';
+}
+
+document.querySelector<HTMLFormElement>('[data-address-reviews-search]')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  void loadAddressReviews().catch((error) => setAppError(friendly(error)));
+});
 
 async function loadJobs(): Promise<void> {
   const data = await api<{ jobs?: Array<Record<string, unknown>>; team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=jobs');
@@ -7872,6 +8021,7 @@ async function loadView(view: string): Promise<void> {
     if (view === 'recurring') await loadRecurring();
     if (view === 'jobs') await loadJobs();
     if (view === 'careers') await loadCareers();
+    if (view === 'address-reviews') await loadAddressReviews();
     if (view === 'communications') await loadCommunications();
     if (view === 'documents') await loadDocuments();
     if (view === 'timekeeping') await loadTimekeeping();
@@ -9184,7 +9334,46 @@ document.addEventListener('click', (event) => {
   if (actionName === 'dispatch-reject') { void dispatchAction({ action: 'reject_recommendation', decisionId: id }); return; }
   if (actionName === 'dispatch-defer') { void dispatchAction({ action: 'defer_recommendation', decisionId: id }); return; }
   if (actionName === 'careers-refresh') { void loadCareers().catch((error) => setAppError(friendly(error))); return; }
+  if (actionName === 'address-reviews-refresh') { void loadAddressReviews().catch((error) => setAppError(friendly(error))); return; }
+  if (actionName === 'address-review-save') {
+    const status = document.querySelector<HTMLSelectElement>(`[data-address-review-status="${id}"]`)?.value ?? 'new';
+    const adminNotes = document.querySelector<HTMLTextAreaElement>(`[data-address-review-notes="${id}"]`)?.value ?? '';
+    void api('/api/admin/address-reviews', { method: 'POST', body: JSON.stringify({ id, status, adminNotes }) })
+      .then(() => loadAddressReviews())
+      .then(() => setSuccess('Address review updated.'))
+      .catch((error) => setAppError(friendly(error)));
+    return;
+  }
+
   if (actionName === 'career-open') { void openCareer(id).catch((error) => setAppError(friendly(error))); return; }
+  if (actionName === 'recruitment-options-refresh') { void loadRecruitmentOptions().catch((error) => setAppError(friendly(error))); return; }
+  if (actionName === 'recruitment-opportunity-save') {
+    const select = document.querySelector<HTMLSelectElement>(`[data-recruitment-status="${id.replaceAll('"', '')}"]`);
+    const status = select?.value ?? '';
+    void api('/api/admin/careers', { method: 'POST', body: JSON.stringify({ action: 'update_opportunity', id, status }) })
+      .then(() => loadRecruitmentOptions())
+      .then(() => setSuccess('Recruitment opportunity updated.'))
+      .catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (actionName === 'career-convert') {
+    if (!window.confirm('Create an employee profile from this application? This transfers the applicant information and creates onboarding tasks. No employee portal access is granted automatically.')) return;
+    void api<{ ok?: boolean; teamMemberId?: string }>('/api/admin/careers', { method: 'POST', body: JSON.stringify({ action: 'convert_to_employee', applicationId: id }) })
+      .then((result) => {
+        setSuccess('Employee profile created. Complete onboarding, agreements and training in Employees & Payroll.');
+        return openCareer(id).then(() => {
+          if (result.teamMemberId) {
+            window.dispatchEvent(new CustomEvent('ss-admin-open-employee', { detail: { id: result.teamMemberId } }));
+          }
+        });
+      })
+      .catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (actionName === 'career-open-employee') {
+    window.dispatchEvent(new CustomEvent('ss-admin-open-employee', { detail: { id } }));
+    return;
+  }
   if (actionName === 'time-load') void loadTimekeeping();
   if (actionName === 'time-export') {
     const week = document.querySelector<HTMLInputElement>('[data-time-week]')?.value ?? '';
@@ -10447,3 +10636,5 @@ document.addEventListener('keydown', (event) => {
   event.preventDefault();
   card.click();
 });
+
+

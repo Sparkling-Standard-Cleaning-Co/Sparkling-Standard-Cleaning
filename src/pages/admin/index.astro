@@ -124,7 +124,8 @@ import {
               <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
               <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
               <button type="button" data-admin-nav="employees">Employees &amp; Payroll</button>
-              <button type="button" data-admin-nav="careers">Careers</button>
+              <button type="button" data-admin-nav="careers">Applicants / Recruitment</button>
+              <button type="button" data-admin-nav="address-reviews">Address Reviews</button>
             </div>
             <div class="admin-nav__group"><span class="admin-nav__label">Sales &amp; Marketing</span>
               <button type="button" data-admin-nav="leads">Leads &amp; Inquiries</button>
@@ -761,7 +762,7 @@ import {
           <section class="admin-view" data-admin-view="careers" hidden>
             <div class="admin-card">
               <div class="admin-detail-head">
-                <div><h2 class="admin-section-title">Career Applications</h2><p class="admin-muted">Private applicant records. Resumes are stored in private object storage and downloaded only through an authorized owner session.</p></div>
+                <div><h2 class="admin-section-title">Applicants / Recruitment</h2><p class="admin-muted">Private applicant records. Resumes are stored in private object storage and downloaded only through an authorized owner or branch manager session.</p></div>
                 <button class="btn btn--ghost btn--small" type="button" data-admin-action="careers-refresh">Refresh</button>
               </div>
               <form class="admin-inline-form" data-careers-search>
@@ -769,10 +770,15 @@ import {
                   <select data-careers-filter name="status">
                     <option value="">All</option>
                     <option value="new">New</option>
-                    <option value="reviewing">Reviewing</option>
-                    <option value="interview">Interview</option>
-                    <option value="offer">Offer</option>
-                    <option value="declined">Declined</option>
+                    <option value="under_review">Under review</option>
+                    <option value="interview_requested">Interview requested</option>
+                    <option value="interview_scheduled">Interview scheduled</option>
+                    <option value="interview_completed">Interview completed</option>
+                    <option value="selected">Selected</option>
+                    <option value="onboarding">Onboarding</option>
+                    <option value="hired">Hired</option>
+                    <option value="not_selected">Not selected</option>
+                    <option value="withdrawn">Withdrawn</option>
                     <option value="archived">Archived</option>
                   </select>
                 </label>
@@ -783,7 +789,26 @@ import {
                     <option value="tampa">Tampa future interest</option>
                   </select>
                 </label>
-                <label>Search <input name="q" type="search" placeholder="Name, email, reference or role" /></label>
+                <label>Position
+                  <select name="position">
+                    <option value="">All positions</option>
+                    <option value="residential">Residential</option>
+                    <option value="commercial">Commercial</option>
+                    <option value="str">Vacation rental</option>
+                    <option value="lead">Lead cleaner</option>
+                    <option value="management">Management</option>
+                  </select>
+                </label>
+                <label>Availability
+                  <select name="availability">
+                    <option value="">Any</option>
+                    <option value="morning">Morning</option>
+                    <option value="afternoon">Afternoon</option>
+                    <option value="evening">Evening</option>
+                    <option value="weekend">Weekend</option>
+                  </select>
+                </label>
+                <label>Search <input name="q" type="search" placeholder="Name, email, reference, city or role" /></label>
                 <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="name">Applicant name</option><option value="status">Status</option></select></label>
                 <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
                 <button class="btn btn--secondary btn--small" type="submit">Filter</button>
@@ -791,6 +816,23 @@ import {
               <div data-careers-list style="margin-top:1rem;"></div>
               <div data-careers-pagination style="margin-top:.75rem;"></div>
               <div data-career-detail style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <div class="admin-detail-head">
+                <div><h3 class="admin-section-title">Recruitment opportunities and advertised pay</h3><p class="admin-muted">Only roles marked open should be presented as actively available. Pay changes update the public careers page.</p></div>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="recruitment-options-refresh">Refresh</button>
+              </div>
+              <div data-recruitment-options style="margin-top:1rem;"></div>
+            </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="address-reviews" hidden>
+            <div class="admin-card">
+              <div class="admin-detail-head">
+                <div><h2 class="admin-section-title">Address Reviews</h2><p class="admin-muted">Customer requests to review a residential address that was classified as commercial. Internal notes are private.</p></div>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="address-reviews-refresh">Refresh</button>
+              </div>
+              <div data-address-reviews-list style="margin-top:1rem;"></div>
             </div>
           </section>
 
@@ -821,6 +863,13 @@ import {
                 <button class="btn btn--secondary btn--small" type="button" data-admin-action="employees-refresh">Refresh</button>
               </div>
               <div data-employees-status role="status" aria-live="polite"></div>
+            </div>
+            <div class="admin-card" style="margin-top:1rem;">
+              <div class="admin-detail-head">
+                <div><h2 class="admin-section-title">Applicants / Recruitment</h2><p class="admin-muted">New applications, hiring pipeline and branch recruitment status.</p></div>
+                <button class="btn btn--secondary btn--small" type="button" data-employee-action="recruitment-open">Open Applicants / Recruitment</button>
+              </div>
+              <div data-employee-recruitment-summary style="margin-top:.75rem;"></div>
             </div>
             <div data-employees-workspace style="margin-top:1rem;"></div>
           </section>
@@ -1989,3 +2038,6 @@ import {
     </script>
   </body>
 </html>
+
+
+

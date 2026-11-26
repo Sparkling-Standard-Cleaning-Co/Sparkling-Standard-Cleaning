@@ -537,12 +537,28 @@ export function initBookingCalendar(
       const data = (await response.json().catch(() => ({}))) as {
         ok?: boolean;
         enabled?: boolean;
+        reason?: string;
         slots?: Slot[];
       };
       if (!response.ok || data.ok !== true || data.enabled !== true) {
         availableSlots = [];
         liveAvailability = false;
-        setStatus('We could not load available times. Retry or choose a preferred start.', 'error');
+        const messages: Record<string, string> = {
+          service_area_inquiry_required:
+            'This address is outside the standard online booking area. Request a reservation and our team will review travel and availability with you.',
+          branch_not_bookable:
+            'Online booking is not open for this branch yet. Request a reservation and our team will follow up.',
+          no_public_start_window:
+            'No public appointment start is available on this date. Choose another date.',
+          travel_unavailable:
+            'We could not verify travel to this address. Confirm the address pin, or request a reservation and we will review it personally.',
+        };
+        const message = data.reason ? messages[data.reason] : '';
+        setStatus(message || 'We could not load live times for this address. Choose a preferred start or request a reservation, and our team will confirm with you.', 'error');
+        if (emptyEl) {
+          emptyEl.hidden = !message;
+          if (message) emptyEl.textContent = message;
+        }
         if (timesRetryButton) timesRetryButton.hidden = false;
         renderPeriods();
         return;
@@ -1018,3 +1034,4 @@ export function initBookingCalendar(
     },
   };
 }
+

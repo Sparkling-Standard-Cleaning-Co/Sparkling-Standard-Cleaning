@@ -34,10 +34,12 @@ async function open() {
 test('the careers page supports experienced and entry-level applications', async () => {
   const { context, page } = await open();
   try {
-    assert.match(await page.textContent('body') ?? '', /Experienced professional cleaners and entry-level applicants/);
-    assert.match(await page.textContent('body') ?? '', /Tampa Bay is future interest only/);
+    assert.match(await page.textContent('body') ?? '', /Build Your Future With Sparkling Standard/);
+    assert.match(await page.textContent('body') ?? '', /Tampa Bay applications are/);
     assert.equal(await page.locator('[data-careers-form] select[name="experience_level"] option').count(), 5);
-    assert.equal(await page.locator('[data-careers-form] select[name="desired_role"] option').count(), 7);
+    assert.equal(await page.locator('[data-careers-form] select[name="desired_role"] option').count(), 9);
+    assert.equal(await page.locator('[data-careers-form] input[name="available_days"]').count(), 7);
+    assert.equal(await page.locator('[data-careers-form] input[name="privacy_ack"]').count(), 1);
     assert.equal(await page.locator('[data-careers-form] input[name="resume"]').getAttribute('accept'), '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document');
   } finally { await context.close(); }
 });
@@ -45,16 +47,25 @@ test('the careers page supports experienced and entry-level applications', async
 test('an application submits securely and returns a reference', async () => {
   const { context, page } = await open();
   try {
-    await page.fill('[data-careers-form] input[name="name"]', 'Synthetic Applicant');
+    await page.fill('[data-careers-form] input[name="first_name"]', 'Synthetic');
+    await page.fill('[data-careers-form] input[name="last_name"]', 'Applicant');
     await page.fill('[data-careers-form] input[name="email"]', 'applicant@example.test');
     await page.fill('[data-careers-form] input[name="phone"]', '8505550100');
+    await page.fill('[data-careers-form] input[name="city"]', 'Pensacola');
+    await page.fill('[data-careers-form] input[name="postal_code"]', '32502');
     await page.selectOption('[data-careers-form] select[name="experience_level"]', 'entry');
     await page.selectOption('[data-careers-form] select[name="desired_role"]', 'residential');
     await page.selectOption('[data-careers-form] select[name="branch_preference"]', 'pensacola');
     await page.selectOption('[data-careers-form] select[name="transportation"]', 'own_vehicle');
+    await page.check('[data-careers-form] input[name="available_days"][value="mon"]');
+    await page.check('[data-careers-form] input[name="availability_morning"]');
+    await page.fill('[data-careers-form] input[name="desired_weekly_hours"]', '30');
     await page.fill('[data-careers-form] textarea[name="availability"]', 'Weekdays and Saturday mornings');
     await page.setInputFiles('[data-careers-form] input[name="resume"]', { name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic') });
+    await page.check('[data-careers-form] input[name="essential_duties_ack"]');
+    await page.check('[data-careers-form] input[name="privacy_ack"]');
     await page.check('[data-careers-form] input[name="consent"]');
+    await page.check('[data-careers-form] input[name="accuracy_ack"]');
     await page.click('[data-careers-form] button[type="submit"]');
     await page.waitForSelector('[data-careers-result]:not([hidden])');
     assert.match(await page.textContent('[data-careers-result]') ?? '', /APP-20261120-ABC123/);

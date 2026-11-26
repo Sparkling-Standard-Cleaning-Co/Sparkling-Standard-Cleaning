@@ -102,6 +102,8 @@ interface ResolvedCandidate {
    * location.
    */
   approximate?: boolean;
+  commercial?: boolean;
+  businessName?: string;
 }
 
 interface ResolveResult {
@@ -116,6 +118,10 @@ interface ResolveResult {
   precise?: boolean;
   /** True when the server fell back to the ZIP-reference centre. */
   approximate?: boolean;
+  /** Provider identified a commercial establishment. */
+  commercial?: boolean;
+  /** Verified provider business name, when available. */
+  businessName?: string;
 }
 
 type PermissionReason = 'denied' | 'unavailable' | 'timeout' | 'unsupported';
@@ -391,6 +397,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       ...(resolved.zip ? { zip: resolved.zip } : {}),
       ...(resolved.city ? { city: resolved.city } : {}),
       ...(resolved.state ? { state: resolved.state } : {}),
+      ...(resolved.commercial ? { commercial: true } : {}),
+      ...(resolved.businessName ? { businessName: resolved.businessName } : {}),
     };
   }
 
@@ -581,6 +589,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
             ...(gpsParts.zip ? { zip: gpsParts.zip } : {}),
             ...(gpsParts.city ? { city: gpsParts.city } : {}),
             ...(gpsParts.state ? { state: gpsParts.state } : {}),
+            ...(result.commercial ? { commercial: true } : {}),
+            ...(result.businessName ? { businessName: result.businessName } : {}),
           };
         }
         applyingResolved = true;
@@ -1143,6 +1153,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
       source: 'gps',
       precision: 'gps',
       ...(gpsCandidate.adjusted ? { adjusted: true } : {}),
+      ...(gpsCandidate.commercial ? { commercial: true } : {}),
+      ...(gpsCandidate.businessName ? { businessName: gpsCandidate.businessName } : {}),
       confirmedAt: new Date().toISOString(),
     };
     if (showUi) {
@@ -1208,6 +1220,8 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
             ? 'street'
             : 'exact',
       ...(candidate.adjusted ? { adjusted: true } : {}),
+      ...(candidate.commercial ? { commercial: true } : {}),
+      ...(candidate.businessName ? { businessName: candidate.businessName } : {}),
       confirmedAt: new Date().toISOString(),
     };
   }
@@ -1463,3 +1477,4 @@ export function initAddressFinder(options: AddressFinderOptions): AddressFinderH
     },
   };
 }
+

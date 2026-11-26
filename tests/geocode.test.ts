@@ -788,3 +788,34 @@ test('geocode: a single IP is throttled within the minute window', async () => {
   }
   assert.equal(lastStatus, 429, 'requests beyond the per-IP window must be refused');
 });
+
+test('commercial place classification never labels a residential premise as a business', async () => {
+  const { commercialPlaceTypes, googlePlaceDetails } = await import('../src/lib/location/server-geocode.ts');
+  assert.equal(commercialPlaceTypes(['street_address']).commercial, false);
+  assert.equal(commercialPlaceTypes(['premise', 'subpremise']).commercial, false);
+  assert.equal(commercialPlaceTypes(['establishment', 'store']).commercial, true);
+  const details = await withFetch(
+    async () =>
+      jsonResponse({
+        id: 'place_business',
+        displayName: { text: 'Acme Office Suites' },
+        formattedAddress: '100 S Baylen St, Pensacola, FL 32502',
+        addressComponents: [
+          { longText: '100', shortText: '100', types: ['street_number'] },
+          { longText: 'S Baylen St', shortText: 'S Baylen St', types: ['route'] },
+          { longText: 'Pensacola', shortText: 'Pensacola', types: ['locality'] },
+          { longText: 'Florida', shortText: 'FL', types: ['administrative_area_level_1'] },
+          { longText: '32502', shortText: '32502', types: ['postal_code'] },
+        ],
+        location: { latitude: 30.4111, longitude: -87.2164 },
+        types: ['establishment', 'point_of_interest'],
+      }),
+    () =>
+      googlePlaceDetails(
+        { GOOGLE_MAPS_SERVER_API_KEY: 'synthetic-key' },
+        'place_business',
+      ),
+  );
+  assert.equal(details?.commercial, true);
+  assert.equal(details?.businessName, 'Acme Office Suites');
+});

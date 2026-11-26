@@ -149,8 +149,9 @@ const phone = isPending(business.phone) ? null : business.phone;
     <div class="site-footer__bottom">
       <span>© {year} {isPending(business.legalName) ? siteName() : business.legalName}. All rights reserved.</span>
       <span>
-        <a href={`mailto:${business.hiringEmail}?subject=${encodeURIComponent('Cleaning career inquiry')}`} data-cta="footer-hiring">Careers</a> &middot; <a href="/portal/">Customer Portal</a> &middot; <a href="/privacy/">Privacy</a> &middot; <a href="/terms/">Terms</a> &middot; <a href="/terms/#cancellation-rescheduling">Cancellation</a> &middot; <a href="/gift-certificates/">Gift Certificates</a> &middot; <a href="/service-area/">Service Area</a>
+        <a href="/careers/" data-cta="footer-hiring">Careers</a> &middot; <a href="/portal/">Customer Portal</a> &middot; <a href="/privacy/">Privacy</a> &middot; <a href="/terms/">Terms</a> &middot; <a href="/terms/#cancellation-rescheduling">Cancellation</a> &middot; <a href="/gift-certificates/">Gift Certificates</a> &middot; <a href="/service-area/">Service Area</a>
       </span>
     </div>
   </div>
 </footer>
+

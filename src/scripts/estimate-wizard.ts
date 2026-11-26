@@ -147,6 +147,12 @@ function initEstimateWizard(form: HTMLFormElement): void {
   const addressCardEl = form.querySelector<HTMLElement>('[data-address-card]');
   const calendarGateEl = form.querySelector<HTMLElement>('[data-calendar-gate]');
   const scheduleSectionEl = form.querySelector<HTMLElement>('[data-schedule-section]');
+  const commercialNotice = form.querySelector<HTMLElement>('[data-commercial-notice]');
+  const commercialCopy = form.querySelector<HTMLElement>('[data-commercial-copy]');
+  const commercialContinue = form.querySelector<HTMLAnchorElement>('[data-commercial-continue]');
+  const commercialReview = form.querySelector<HTMLButtonElement>('[data-commercial-review]');
+  const commercialReviewStatus = form.querySelector<HTMLElement>('[data-commercial-review-status]');
+  const commercialChange = form.querySelector<HTMLButtonElement>('[data-commercial-change]');
   let calendarRootEl: HTMLElement | null = null;
   const addressDetailsEl = form.querySelector<HTMLElement>('[data-address-details]');
   const streetInputEl = form.querySelector<HTMLInputElement>('#est-address');
@@ -2122,6 +2128,8 @@ function initEstimateWizard(form: HTMLFormElement): void {
       location = next;
       const nextKey = next ? locationKey(next.lat, next.lng) : null;
       const destinationChanged = previousKey !== nextKey;
+      if (next?.commercial) revealCommercialNotice(next);
+      else clearCommercialNotice();
       if (destinationChanged) {
         bookingCalendar?.reset();
         if (!next) setSchedulingLocked(true);
@@ -2146,6 +2154,10 @@ function initEstimateWizard(form: HTMLFormElement): void {
       });
     },
     onConfirm: () => {
+      if (location?.commercial) {
+        revealCommercialNotice(location);
+        return;
+      }
       revealScheduling();
       if (!addressVerificationPending) {
         // The address form collapses on confirmation. Re-anchor directly to
@@ -2173,6 +2185,104 @@ function initEstimateWizard(form: HTMLFormElement): void {
       }
       window.setTimeout(() => showStep(steps.length), 250);
     },
+  });
+
+  function revealCommercialNotice(next: ConfirmedLocation): void {
+    if (!commercialNotice) return;
+    const business = next.businessName?.trim() ?? '';
+    if (commercialCopy) {
+      commercialCopy.textContent = business
+        ? `This address appears to be associated with ${business}. Our residential estimator is intended for residential properties only.`
+        : 'This address appears to be a commercial property. Our residential estimator is intended for residential properties only.';
+    }
+    commercialNotice.hidden = false;
+    if (scheduleSectionEl) scheduleSectionEl.hidden = true;
+    if (calendarGateEl) calendarGateEl.hidden = true;
+    const nextButton = form.querySelector<HTMLButtonElement>('[data-next]');
+    if (nextButton) nextButton.hidden = true;
+    if (commercialReviewStatus) commercialReviewStatus.textContent = '';
+    requestAnimationFrame(() => commercialNotice.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }
+
+  function clearCommercialNotice(): void {
+    if (!commercialNotice || commercialNotice.hidden) return;
+    commercialNotice.hidden = true;
+    const nextButton = form.querySelector<HTMLButtonElement>('[data-next]');
+    if (nextButton) nextButton.hidden = false;
+    if (location) revealScheduling();
+    else setSchedulingLocked(true);
+  }
+
+  commercialChange?.addEventListener('click', () => {
+    clearCommercialNotice();
+    addressFinder?.focusManual();
+    addressFinder?.reset();
+  });
+
+  commercialReview?.addEventListener('click', async () => {
+    const current = submissionAddress();
+    if (!current.location) return;
+    if (commercialReview) commercialReview.disabled = true;
+    if (commercialReviewStatus) commercialReviewStatus.textContent = 'Sending your address review request???';
+    try {
+      const response = await fetch('/api/address-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          addressText: current.street || formatLocationLine(current.location),
+          unit: current.unit,
+          city: current.city,
+          state: current.state,
+          zip: current.zip,
+          lat: current.location.lat,
+          lng: current.location.lng,
+          businessName: current.location.businessName ?? '',
+          customerName: textValue('name') ?? '',
+          customerEmail: textValue('email') ?? '',
+          customerPhone: textValue('phone') ?? '',
+          classification: 'commercial',
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; reference?: string; error?: string };
+      if (!response.ok || body.ok !== true) throw new Error(body.error ?? 'request_failed');
+      if (commercialReviewStatus) {
+        commercialReviewStatus.textContent = body.reference
+          ? `Address review requested. Reference ${body.reference}. Our team will review this address and follow up.`
+          : 'Address review requested. Our team will review this address and follow up.';
+        commercialReviewStatus.dataset.state = 'success';
+      }
+    } catch {
+      if (commercialReviewStatus) {
+        commercialReviewStatus.textContent = 'We could not send the address review request. Please try again.';
+        commercialReviewStatus.dataset.state = 'error';
+      }
+      if (commercialReview) commercialReview.disabled = false;
+    }
+  });
+
+  commercialContinue?.addEventListener('click', () => {
+    const current = submissionAddress();
+    if (!current.location) return;
+    try {
+      sessionStorage.setItem(
+        'pcc-commercial-prefill',
+        JSON.stringify({
+          organization: current.location.businessName ?? '',
+          name: textValue('name') ?? '',
+          email: textValue('email') ?? '',
+          phone: textValue('phone') ?? '',
+          street: current.street,
+          unit: current.unit,
+          city: current.city,
+          state: current.state,
+          zip: current.zip,
+          lat: current.location.lat,
+          lng: current.location.lng,
+        }),
+      );
+    } catch {
+      // The commercial estimator still opens; the customer can retype.
+    }
   });
 
   streetInputEl?.addEventListener('input', () => revealAddressDetails(false));
@@ -3484,3 +3594,5 @@ function initEstimateWizard(form: HTMLFormElement): void {
     });
   }
 }
+
+

@@ -22,7 +22,7 @@ const application = {
   name: 'Synthetic Applicant', email: 'applicant@example.test', phone: '8505550100',
   experience_level: 'entry', desired_role: 'residential', branch_preference: 'pensacola',
   availability: 'Weekdays and Saturday mornings', transportation: 'own_vehicle',
-  status: 'new', notes: '', resume_key: 'careers/2026/11/app_1/resume.pdf', resume_name: 'resume.pdf',
+  status: 'new', pipeline_status: 'new', position_code: 'residential', notes: '', resume_key: 'careers/2026/11/app_1/resume.pdf', resume_name: 'resume.pdf',
   hiring_notified_at: '2026-11-20T12:00:00.000Z', applicant_notified_at: '2026-11-20T12:00:00.000Z',
 };
 
@@ -45,28 +45,32 @@ test('the owner can review and update a private career application', async () =>
     }
     const url = new URL(request.url());
     if (url.searchParams.get('view') === 'detail') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, application }) });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, application, interviews: [], statuses: [{ value: 'new', label: 'New' }, { value: 'under_review', label: 'Under Review' }, { value: 'selected', label: 'Selected' }, { value: 'archived', label: 'Archived' }] }) });
       return;
     }
     if (url.searchParams.get('view') === 'resume') {
       await route.fulfill({ status: 200, headers: { 'Content-Type': 'application/pdf' }, body: '%PDF-1.4' });
       return;
     }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, applications: [application], total: 1 }) });
+    if (url.searchParams.get('view') === 'options') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, opportunities: [], settings: [] }) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, applications: [application], total: 1, statuses: [{ value: 'new', label: 'New' }, { value: 'under_review', label: 'Under Review' }, { value: 'selected', label: 'Selected' }, { value: 'archived', label: 'Archived' }] }) });
   });
   try {
     await page.goto(BASE + '/admin/', { waitUntil: 'networkidle' });
-    await page.getByRole('button', { name: 'Careers' }).click();
+    await page.getByRole('button', { name: 'Applicants / Recruitment' }).click();
     await page.waitForSelector('[data-admin-view="careers"]:not([hidden])');
     assert.match(await page.textContent('[data-careers-list]') ?? '', /Synthetic Applicant/);
     await page.getByRole('button', { name: 'Open' }).click();
     await page.waitForSelector('[data-career-update]');
     assert.match(await page.textContent('[data-career-detail]') ?? '', /Weekdays and Saturday mornings/);
     assert.equal(await page.locator('[data-career-detail] a[href*="view=resume"]').count(), 1);
-    await page.selectOption('[data-career-update] select[name="status"]', 'reviewing');
+    await page.selectOption('[data-career-update] select[name="status"]', 'under_review');
     await page.fill('[data-career-update] textarea[name="notes"]', 'Synthetic review note');
     await page.click('[data-career-update] button[type="submit"]');
     await page.waitForFunction(() => true);
-    assert.ok(posts.some((body) => body.action === 'update' && body.status === 'reviewing' && body.notes === 'Synthetic review note'));
+    assert.ok(posts.some((body) => body.action === 'update_status' && body.status === 'under_review' && body.notes === 'Synthetic review note'));
   } finally { await context.close(); }
 });

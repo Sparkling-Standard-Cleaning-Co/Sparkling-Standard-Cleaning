@@ -237,6 +237,26 @@ const stepTitle = (index: number): string => ESTIMATE_STEPS[index]?.title ?? '';
           </div>
         </div>
 
+        <div class="commercial-address-notice" data-commercial-notice hidden role="status" aria-live="polite">
+          <p class="commercial-address-notice__eyebrow">Residential estimator</p>
+          <h3 class="commercial-address-notice__title">Commercial property detected</h3>
+          <p class="commercial-address-notice__copy" data-commercial-copy>
+            This address appears to be associated with a commercial property. Our residential estimator is intended for residential properties only.
+          </p>
+          <div class="commercial-address-notice__actions">
+            <a class="btn btn--primary btn--small" href="/estimate/commercial/" data-commercial-continue>
+              Continue to Commercial Estimate
+            </a>
+            <button class="btn btn--secondary btn--small" type="button" data-commercial-review>
+              Request Address Review
+            </button>
+          </div>
+          <p class="commercial-address-notice__status small" data-commercial-review-status role="status"></p>
+          <button class="btn btn--ghost btn--small commercial-address-notice__change" type="button" data-commercial-change>
+            Use a different residential address
+          </button>
+        </div>
+
         <div class="booking-calendar__availability-gate" data-calendar-gate>
           <p class="booking-calendar__gate-title">Enter your cleaning address to see available dates and times.</p>
           <p class="booking-calendar__gate-copy small">Availability is checked against the live cleaning calendar and travel time.</p>

@@ -1,75 +1,166 @@
 ---
 import TurnstileWidget from './TurnstileWidget.astro';
 import {
+  CAREER_AVAILABILITY,
   CAREER_BRANCHES,
+  CAREER_DAYS,
+  CAREER_EMPLOYMENT_TYPES,
   CAREER_EXPERIENCE_LEVELS,
   CAREER_ROLES,
   CAREER_TRANSPORT,
 } from '../lib/careers.ts';
 ---
 
-<section class="section section--tight" id="application">
+<section class="section careers-application" id="application">
   <div class="container container--narrow">
     <div class="section-head">
       <p class="eyebrow">Application</p>
       <h2>Tell us about your work.</h2>
-      <p class="lead">Experienced professional cleaners and entry-level applicants are welcome. We review every application against the current hiring need and will be direct about what is available.</p>
+      <p class="lead">
+        Experienced professional cleaners and entry-level applicants are welcome. We review every
+        application against the current hiring need and will be direct about what is available.
+      </p>
     </div>
-    <form class="form-card" data-careers-form enctype="multipart/form-data" novalidate>
-      <div class="form-grid">
-        <label>Name <input class="input" name="name" autocomplete="name" required maxlength="120" /></label>
-        <label>Email <input class="input" name="email" type="email" autocomplete="email" required maxlength="200" /></label>
-        <label>Phone <input class="input" name="phone" type="tel" autocomplete="tel" required maxlength="40" /></label>
-        <label>Experience
-          <select class="select" name="experience_level" required>
-            <option value="">Choose one</option>
-            {CAREER_EXPERIENCE_LEVELS.map((option) => <option value={option.value}>{option.label}</option>)}
-          </select>
+    <form class="careers-form" data-careers-form enctype="multipart/form-data" novalidate>
+      <fieldset class="careers-form__section">
+        <legend>Applicant information</legend>
+        <div class="careers-field-grid">
+          <label>First name <input class="input" name="first_name" autocomplete="given-name" required maxlength="80" /></label>
+          <label>Last name <input class="input" name="last_name" autocomplete="family-name" required maxlength="80" /></label>
+          <label>Email address <input class="input" name="email" type="email" autocomplete="email" required maxlength="200" /></label>
+          <label>Telephone number <input class="input" name="phone" type="tel" autocomplete="tel" required maxlength="40" /></label>
+          <label>City <input class="input" name="city" autocomplete="address-level2" required maxlength="80" /></label>
+          <label>ZIP code <input class="input" name="postal_code" inputmode="numeric" autocomplete="postal-code" required maxlength="10" pattern="[0-9]{5}(-[0-9]{4})?" /></label>
+          <label>Preferred branch
+            <select class="select" name="branch_preference" required>
+              <option value="">Choose one</option>
+              {CAREER_BRANCHES.map((option) => <option value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>Position of interest
+            <select class="select" name="desired_role" required>
+              <option value="">Choose one</option>
+              {CAREER_ROLES.map((option) => <option value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>Earliest available start date <input class="input" name="earliest_start_date" type="date" /></label>
+          <label>Previous cleaning experience
+            <select class="select" name="experience_level" required>
+              <option value="">Choose one</option>
+              {CAREER_EXPERIENCE_LEVELS.map((option) => <option value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="careers-form__section">
+        <legend>Availability</legend>
+        <p class="hint">Choose every day and time block you can reliably work.</p>
+        <div class="careers-checks" data-career-days>
+          {CAREER_DAYS.map((day) => (
+            <label class="careers-check"><input type="checkbox" name="available_days" value={day.value} /> {day.label}</label>
+          ))}
+        </div>
+        <div class="careers-checks">
+          {CAREER_AVAILABILITY.map((block) => (
+            <label class="careers-check">
+              <input
+                type="checkbox"
+                name={`availability_${block.value}`}
+                value="yes"
+              />
+              {block.label}
+            </label>
+          ))}
+        </div>
+        <div class="careers-field-grid">
+          <label>Desired weekly hours
+            <input class="input" name="desired_weekly_hours" type="number" min="0" max="80" step="1" inputmode="numeric" placeholder="e.g. 30" />
+          </label>
+          <label>Full-time or part-time
+            <select class="select" name="employment_type">
+              {CAREER_EMPLOYMENT_TYPES.map((option) => <option value={option.value} selected={option.value === 'either'}>{option.label}</option>)}
+            </select>
+          </label>
+        </div>
+        <label>Additional availability notes <span class="text-muted">(optional)</span>
+          <textarea class="textarea" name="availability" rows="2" maxlength="800" placeholder="School schedule, notice period or other scheduling limits."></textarea>
         </label>
-        <label>Desired role
-          <select class="select" name="desired_role" required>
-            <option value="">Choose one</option>
-            {CAREER_ROLES.map((option) => <option value={option.value}>{option.label}</option>)}
-          </select>
+      </fieldset>
+
+      <fieldset class="careers-form__section">
+        <legend>Qualifications and experience</legend>
+        <div class="careers-checks careers-checks--stacked">
+          <label class="careers-check"><input type="checkbox" name="residential_experience" value="yes" /> Residential cleaning experience</label>
+          <label class="careers-check"><input type="checkbox" name="commercial_experience" value="yes" /> Commercial cleaning experience</label>
+          <label class="careers-check"><input type="checkbox" name="str_experience" value="yes" /> Vacation rental / turnover experience</label>
+          <label class="careers-check"><input type="checkbox" name="supervisory_experience" value="yes" /> Supervisory or leadership experience</label>
+        </div>
+        <div class="careers-field-grid">
+          <label>Reliable transportation
+            <select class="select" name="transportation" required>
+              <option value="">Choose one</option>
+              {CAREER_TRANSPORT.map((option) => <option value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>Driver's license
+            <select class="select" name="driver_license">
+              <option value="prefer_not_to_say">Prefer not to say</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+        </div>
+        <label>Relevant qualifications or certifications <span class="text-muted">(optional)</span>
+          <textarea class="textarea" name="qualifications" rows="2" maxlength="1000" placeholder="Floor care, sanitation, safety or other job-related training."></textarea>
         </label>
-        <label>Preferred branch
-          <select class="select" name="branch_preference" required>
-            <option value="">Choose one</option>
-            {CAREER_BRANCHES.map((option) => <option value={option.value}>{option.label}</option>)}
-          </select>
+        <label class="careers-check careers-check--wide">
+          <input type="checkbox" name="essential_duties_ack" value="yes" required />
+          I can perform the essential duties of the role, with or without reasonable accommodation.
         </label>
-        <label>Transportation
-          <select class="select" name="transportation" required>
-            <option value="">Choose one</option>
-            {CAREER_TRANSPORT.map((option) => <option value={option.value}>{option.label}</option>)}
-          </select>
+        <label>Additional information <span class="text-muted">(optional)</span>
+          <textarea class="textarea" name="additional_information" rows="3" maxlength="2000" placeholder="Anything else we should know about your experience or availability."></textarea>
         </label>
-        <label>Driver's license
-          <select class="select" name="driver_license">
-            <option value="prefer_not_to_say">Prefer not to say</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-        </label>
-        <label class="form-field--wide">Availability
-          <textarea class="textarea" name="availability" rows="3" required maxlength="800" placeholder="Days, times, and any scheduling limits."></textarea>
-        </label>
-        <label class="form-field--wide">Resume (optional, PDF or DOCX, max 5 MB)
+      </fieldset>
+
+      <fieldset class="careers-form__section">
+        <legend>Supporting documentation</legend>
+        <label>Resume <span class="text-muted">(optional, PDF or DOCX, max 5 MB)</span>
           <input class="input" name="resume" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
         </label>
-      </div>
-      <p class="small text-muted">Do not upload a Social Security number, driver's license image, banking information or medical records. We will request any needed onboarding documents through the approved process.</p>
+        <p class="small text-muted">
+          Do not upload a Social Security number, driver's license image, banking information or
+          medical records. We will request any needed onboarding documents through the approved
+          process after a hiring decision.
+        </p>
+      </fieldset>
+
+      <fieldset class="careers-form__section">
+        <legend>Acknowledgments</legend>
+        <label class="careers-check careers-check--wide">
+          <input type="checkbox" name="privacy_ack" value="yes" required />
+          I have read the <a href="/privacy/">privacy policy</a> and understand how my application is used.
+        </label>
+        <label class="careers-check careers-check--wide">
+          <input type="checkbox" name="consent" value="yes" required />
+          I consent to Sparkling Standard contacting me about this application and future cleaning work.
+        </label>
+        <label class="careers-check careers-check--wide">
+          <input type="checkbox" name="accuracy_ack" value="yes" required />
+          I confirm the information in this application is accurate to the best of my knowledge.
+        </label>
+      </fieldset>
+
       <TurnstileWidget />
-      <label class="check"><input type="checkbox" name="consent" value="yes" required /> I agree that Sparkling Standard may use this application to evaluate me for current or future cleaning work and may contact me about it. See the <a href="/privacy/">privacy policy</a>.</label>
-      <button class="btn btn--primary btn--large" type="submit">Submit Application</button>
       <p class="form-status" data-careers-status role="status" aria-live="polite"></p>
+      <button class="btn btn--primary btn--large btn--block" type="submit">Submit Application</button>
     </form>
     <div data-careers-result hidden></div>
 
-    <details class="form-card" id="status" style="margin-top:1.5rem;">
+    <details class="careers-status-card" id="status">
       <summary><strong>Check an application status</strong></summary>
-      <form class="form-card" data-career-status-form style="border:0;box-shadow:none;padding:1rem 0 0;">
-        <div class="form-grid">
+      <form class="careers-status-form" data-career-status-form>
+        <div class="careers-field-grid">
           <label>Application reference <input class="input" name="reference" placeholder="APP-20261120-ABC123" required maxlength="40" /></label>
           <label>Email used <input class="input" name="email" type="email" required maxlength="200" /></label>
         </div>
@@ -82,6 +173,7 @@ import {
 
 <script>
   import { waitForTurnstileToken } from '../lib/forms/submit';
+
   const form = document.querySelector<HTMLFormElement>('[data-careers-form]');
   const result = document.querySelector<HTMLElement>('[data-careers-result]');
   const status = document.querySelector<HTMLElement>('[data-careers-status]');
@@ -90,12 +182,9 @@ import {
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!form.reportValidity()) return;
     if (status) { status.textContent = 'Submitting application...'; status.dataset.kind = 'info'; }
     const data = new FormData(form);
-    if (data.get('consent') !== 'yes') {
-      if (status) { status.textContent = 'Please agree to the application privacy terms.'; status.dataset.kind = 'error'; }
-      return;
-    }
     const token = await waitForTurnstileToken();
     if (token) data.set('turnstile_token', token);
     try {
@@ -110,6 +199,10 @@ import {
           resume_storage_not_configured: 'Resume upload is unavailable right now. You may apply without a resume and email it to the hiring team.',
           applicant_contact_invalid: 'Check your name, email and phone number.',
           application_fields_invalid: 'Complete every required application question.',
+          application_acknowledgements_required: 'Complete the privacy, contact and accuracy acknowledgments.',
+          duplicate_application: `An application for this role was already submitted recently. Reference ${String(body.reference ?? '')}.`,
+          start_date_invalid: 'Enter a valid earliest start date.',
+          weekly_hours_invalid: 'Enter weekly hours between 0 and 80.',
         };
         throw new Error(messages[String(body.error ?? '')] ?? 'The application could not be submitted. Please try again.');
       }
@@ -117,11 +210,17 @@ import {
       if (result) {
         result.hidden = false;
         const reference = String(body.reference ?? '');
-        result.innerHTML = '<div class="form-success"><h3>Application received</h3><p>Your reference is <strong>' + reference + '</strong>. The hiring team will review your application against the current need. This is not an offer or a promise of work.</p><p><a href="#status">Check your application status</a></p></div>';
+        result.innerHTML =
+          '<div class="form-success"><h3>Application received</h3><p>Your reference is <strong>' +
+          reference +
+          '</strong>. The hiring team will review your application against the current need. This is not an offer or a promise of work.</p><p><a href="#status">Check your application status</a></p></div>';
       }
       if (status) status.textContent = '';
     } catch (error) {
-      if (status) { status.textContent = error instanceof Error ? error.message : 'The application could not be submitted.'; status.dataset.kind = 'error'; }
+      if (status) {
+        status.textContent = error instanceof Error ? error.message : 'The application could not be submitted.';
+        status.dataset.kind = 'error';
+      }
     }
   });
 
@@ -132,15 +231,21 @@ import {
     const email = String(data.get('email') ?? '').trim();
     if (statusResult) statusResult.textContent = 'Checking...';
     try {
-      const response = await fetch('/api/careers-status?reference=' + encodeURIComponent(reference) + '&email=' + encodeURIComponent(email));
+      const response = await fetch(
+        '/api/careers-status?reference=' + encodeURIComponent(reference) + '&email=' + encodeURIComponent(email),
+      );
       const body = await response.json().catch(() => ({}));
       if (!response.ok || body.ok !== true) throw new Error('No application matched that reference and email.');
       if (statusResult) {
-        statusResult.textContent = 'Application ' + body.reference + ': ' + String(body.status).replaceAll('_', ' ') + '.';
+        statusResult.textContent =
+          'Application ' + body.reference + ': ' + String(body.status).replaceAll('_', ' ') + '.';
         statusResult.dataset.kind = 'success';
       }
     } catch (error) {
-      if (statusResult) { statusResult.textContent = error instanceof Error ? error.message : 'Status could not be checked.'; statusResult.dataset.kind = 'error'; }
+      if (statusResult) {
+        statusResult.textContent = error instanceof Error ? error.message : 'Status could not be checked.';
+        statusResult.dataset.kind = 'error';
+      }
     }
   });
 </script>

@@ -33,6 +33,10 @@ export interface ConfirmedLocation {
   precision?: 'exact' | 'street' | 'approximate' | 'gps' | 'pin';
   /** True when the customer corrected the pin after resolution. */
   adjusted?: boolean;
+  /** Provider classified the address as a commercial establishment. */
+  commercial?: boolean;
+  /** Verified provider business name, when available. Never inferred. */
+  businessName?: string;
   confirmedAt: string;
 }
 

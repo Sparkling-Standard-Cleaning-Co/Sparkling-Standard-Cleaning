@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
@@ -30,16 +30,28 @@ function db(): TestD1 {
 }
 function applicationForm(resume?: File): FormData {
   const form = new FormData();
+  form.set('first_name', 'Synthetic');
+  form.set('last_name', 'Applicant');
   form.set('name', 'Synthetic Applicant');
   form.set('email', 'applicant@example.test');
   form.set('phone', '8505550100');
+  form.set('city', 'Pensacola');
+  form.set('postal_code', '32502');
   form.set('experience_level', 'entry');
   form.set('desired_role', 'residential');
   form.set('branch_preference', 'pensacola');
   form.set('availability', 'Weekdays and Saturday mornings');
+  form.append('available_days', 'mon');
+  form.append('available_days', 'wed');
+  form.set('availability_morning', 'yes');
+  form.set('desired_weekly_hours', '30');
+  form.set('employment_type', 'part_time');
   form.set('transportation', 'own_vehicle');
   form.set('driver_license', 'yes');
+  form.set('essential_duties_ack', 'yes');
+  form.set('privacy_ack', 'yes');
   form.set('consent', 'yes');
+  form.set('accuracy_ack', 'yes');
   if (resume) form.set('resume', resume);
   return form;
 }
@@ -66,10 +78,16 @@ test('a valid application is stored privately with an optional resume and no liv
   assert.match(body.reference ?? '', /^APP-\d{8}-[A-Z0-9]{6}$/);
   assert.equal(body.resumeStored, true);
   assert.equal(puts.length, 1);
-  const row = database.raw.prepare('SELECT name, email, status, resume_key FROM career_applications LIMIT 1').get() as Record<string, unknown>;
+  const row = database.raw.prepare('SELECT name, first_name, last_name, email, pipeline_status, branch_id, position_code, available_days_json, privacy_ack_at, resume_key FROM career_applications LIMIT 1').get() as Record<string, unknown>;
   assert.equal(row.name, 'Synthetic Applicant');
+  assert.equal(row.first_name, 'Synthetic');
+  assert.equal(row.last_name, 'Applicant');
   assert.equal(row.email, 'applicant@example.test');
-  assert.equal(row.status, 'new');
+  assert.equal(row.pipeline_status, 'new');
+  assert.equal(row.branch_id, 'branch_pensacola');
+  assert.equal(row.position_code, 'residential');
+  assert.equal(row.available_days_json, '["mon","wed"]');
+  assert.ok(row.privacy_ack_at);
   assert.match(String(row.resume_key), /^careers\//);
 });
 
@@ -81,3 +99,80 @@ test('an invalid resume is rejected before any application record is stored', as
   const count = database.raw.prepare('SELECT COUNT(*) AS count FROM career_applications').get() as { count: number };
   assert.equal(Number(count.count), 0);
 });
+
+
+test('an authorized owner can convert an applicant into an employee profile with onboarding', async () => {
+  const { createOpsSession, enrollOwner, readOpsActor } = await import('../src/lib/admin/operations.ts');
+  const adminCareers = await import('../functions/api/admin/careers.ts');
+  const database = db();
+  const owner = await enrollOwner(database, {
+    email: 'owner-careers@example.test',
+    name: 'Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  const session = await createOpsSession(database, owner.id, new Request('https://sparkling-standard.test/admin'));
+  const actor = await readOpsActor(database, new Request('https://sparkling-standard.test/api/admin/careers', {
+    headers: { Cookie: `ss_ops=${session.token}` },
+  }));
+  assert.ok(actor);
+  const applicationResponse = await onRequestPost({
+    request: new Request('https://sparkling-standard.test/api/careers-application', {
+      method: 'POST',
+      headers: { Origin: 'https://sparkling-standard.test' },
+      body: applicationForm(),
+    }),
+    env: { DB: database },
+  });
+  assert.equal(applicationResponse.status, 201);
+  const application = database.raw.prepare('SELECT id, reference FROM career_applications LIMIT 1').get() as { id: string; reference: string };
+  const listed = await adminCareers.onRequestGet({
+    request: new Request('https://sparkling-standard.test/api/admin/careers', {
+      headers: { Cookie: `ss_ops=${session.token}` },
+    }),
+    env: { DB: database },
+  });
+  assert.equal(listed.status, 200);
+  const listBody = await listed.json() as { applications?: Array<Record<string, unknown>> };
+  assert.ok(listBody.applications?.some((entry) => entry.reference === application.reference));
+  const converted = await adminCareers.onRequestPost({
+    request: new Request('https://sparkling-standard.test/api/admin/careers', {
+      method: 'POST',
+      headers: {
+        Cookie: `ss_ops=${session.token}`,
+        'X-CSRF-Token': actor!.csrf,
+        'Content-Type': 'application/json',
+        Origin: 'https://sparkling-standard.test',
+      },
+      body: JSON.stringify({ action: 'convert_to_employee', applicationId: application.id }),
+    }),
+    env: { DB: database },
+  });
+  assert.equal(converted.status, 200);
+  const convertedBody = await converted.json() as { teamMemberId?: string };
+  assert.ok(convertedBody.teamMemberId);
+  const employee = database.raw.prepare('SELECT display_name, branch_id, status, is_bookable FROM team_members WHERE id = ?').get(convertedBody.teamMemberId!) as Record<string, unknown>;
+  assert.equal(employee.display_name, 'Synthetic Applicant');
+  assert.equal(employee.branch_id, 'branch_pensacola');
+  assert.equal(employee.status, 'active');
+  assert.equal(employee.is_bookable, 0);
+  const onboarding = database.raw.prepare('SELECT COUNT(*) AS count FROM employee_onboarding_tasks WHERE team_member_id = ?').get(convertedBody.teamMemberId!) as { count: number };
+  assert.equal(onboarding.count, 4);
+  const updated = database.raw.prepare('SELECT pipeline_status, converted_team_member_id FROM career_applications WHERE id = ?').get(application.id) as Record<string, unknown>;
+  assert.equal(updated.pipeline_status, 'onboarding');
+  assert.equal(updated.converted_team_member_id, convertedBody.teamMemberId);
+  const duplicate = await adminCareers.onRequestPost({
+    request: new Request('https://sparkling-standard.test/api/admin/careers', {
+      method: 'POST',
+      headers: {
+        Cookie: `ss_ops=${session.token}`,
+        'X-CSRF-Token': actor!.csrf,
+        'Content-Type': 'application/json',
+        Origin: 'https://sparkling-standard.test',
+      },
+      body: JSON.stringify({ action: 'convert_to_employee', applicationId: application.id }),
+    }),
+    env: { DB: database },
+  });
+  assert.equal(duplicate.status, 409);
+});
+

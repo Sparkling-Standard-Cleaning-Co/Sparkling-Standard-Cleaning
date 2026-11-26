@@ -65,19 +65,26 @@ test('the gift page sells a certificate through secure checkout', async () => {
     });
 
     await page.goto(BASE + '/gift-certificates/', { waitUntil: 'load' });
-    assert.match((await page.locator('h1').textContent()) ?? '', /beautifully kept home/i);
-    assert.match((await page.textContent('body')) ?? '', /value toward Sparkling Standard cleaning services/i);
-    assert.match((await page.textContent('body')) ?? '', /SSGC-SAMP-LE42/, 'sample certificate code shown');
+    assert.match((await page.locator('h1').textContent()) ?? '', /beautifully clean space/i);
+    assert.match((await page.textContent('body')) ?? '', /apply the certificate value/i);
+    assert.doesNotMatch((await page.textContent('body')) ?? '', /Honest gifting/i);
+    assert.doesNotMatch((await page.textContent('body')) ?? '', /SSGC-SAMP-LE42/);
     assert.equal(await page.locator('[data-gift-purchase]').count(), 1, 'purchase mode is live');
-    assert.equal(await page.locator('#gift-denomination').inputValue(), '50');
+    assert.equal(await page.locator('input[name="denominationUsd"][value="100"]').isChecked(), true);
+    assert.equal((await page.locator('[data-gift-preview-value]').textContent())?.trim(), '$100');
 
-    await page.selectOption('#gift-denomination', '100');
+    await page.check('input[name="denominationUsd"][value="100"]');
     await page.fill('#gift-purchaser-name', 'Synthetic Purchaser');
     await page.fill('#gift-purchaser-email', 'purchaser@example.com');
     await page.fill('#gift-recipient-name', 'Synthetic Recipient');
     await page.fill('#gift-recipient-email', 'recipient@example.com');
     await page.selectOption('#gift-delivery-method', 'recipient_email');
     await page.fill('#gift-message', 'Enjoy a beautifully kept home!');
+    assert.equal((await page.locator('[data-gift-preview-recipient]').textContent())?.trim(), 'Synthetic Recipient');
+    assert.equal((await page.locator('[data-gift-preview-message]').textContent())?.trim(), 'Enjoy a beautifully kept home!');
+    assert.equal((await page.locator('[data-gift-summary-total]').textContent())?.trim(), '$100.00');
+    assert.doesNotMatch((await page.textContent('body')) ?? '', /Payment is completed on Stripe/);
+    assert.doesNotMatch((await page.textContent('body')) ?? '', /Payment is handled entirely by Stripe/);
     await page.check('#gift-terms');
     await page.click('button[type="submit"]');
     await page.waitForURL(/gift-certificates\/success/);
@@ -112,7 +119,7 @@ test('a custom gift amount and valid-from date are sent to checkout', async () =
       });
     });
     await page.goto(BASE + '/gift-certificates/', { waitUntil: 'load' });
-    await page.selectOption('#gift-denomination', 'custom');
+    await page.check('input[name="denominationUsd"][value="custom"]');
     await page.locator('#gift-custom-value').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#gift-custom-value').isVisible(), true);
     await page.fill('#gift-custom-value', '75');
