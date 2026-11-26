@@ -35,7 +35,17 @@ interface BranchSettings {
   originLng: number | null;
   originPlaceId: string;
   travelLimitMiles: number | null;
-  readiness?: { ready: boolean; blockers: string[]; warnings: string[] };
+  readiness?: {
+    ready: boolean;
+    blockers: string[];
+    warnings: string[];
+    checklist?: Array<{
+      key: string;
+      label: string;
+      status: 'complete' | 'warning' | 'blocked';
+      detail: string;
+    }>;
+  };
 }
 
 interface BranchResponse {
@@ -136,13 +146,36 @@ function renderReadiness(branch: BranchSettings): void {
   if (!target) return;
   const blockers = branch.readiness?.blockers ?? [];
   const warnings = branch.readiness?.warnings ?? [];
-  target.innerHTML = branch.readiness?.ready
-    ? '<div class="admin-dispatch-good"><strong>Infrastructure checks passed.</strong> All configured branch launch prerequisites are present. Owner activation still controls public availability.</div>' +
-      (warnings.length ? '<div class="admin-dispatch-warning" style="margin-top:.5rem;"><strong>Warnings:</strong> ' + esc(warnings.join(', ')) + '</div>' : '')
-    : '<div class="admin-dispatch-warning"><strong>Not ready for activation.</strong><ul>' +
-      blockers.map((reason) => '<li>' + esc(reason) + '</li>').join('') +
-      warnings.map((reason) => '<li>Warning: ' + esc(reason) + '</li>').join('') +
-      '</ul></div>';
+  const checklist = branch.readiness?.checklist ?? [];
+  const checklistHtml = checklist.length
+    ? '<div class="admin-card" style="margin-top:.75rem;"><h3 style="font-size:1rem;">Branch readiness checklist</h3><div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Requirement</th><th>Status</th><th>Detail</th></tr></thead><tbody>' +
+      checklist
+        .map(
+          (item) =>
+            '<tr><td>' +
+            esc(item.label) +
+            '</td><td>' +
+            esc(item.status === 'complete' ? 'Complete' : item.status === 'warning' ? 'Warning' : 'Blocked') +
+            '</td><td>' +
+            esc(item.detail) +
+            '</td></tr>',
+        )
+        .join('') +
+      '</tbody></table></div></div>'
+    : '';
+  target.innerHTML =
+    (branch.readiness?.ready
+      ? '<div class="admin-dispatch-good"><strong>Infrastructure checks passed.</strong> All configured branch launch prerequisites are present. Owner activation still controls public availability.</div>' +
+        (warnings.length
+          ? '<div class="admin-dispatch-warning" style="margin-top:.5rem;"><strong>Warnings:</strong> ' +
+            esc(warnings.join(', ')) +
+            '</div>'
+          : '')
+      : '<div class="admin-dispatch-warning"><strong>Not ready for activation.</strong><ul>' +
+        blockers.map((reason) => '<li>' + esc(reason) + '</li>').join('') +
+        warnings.map((reason) => '<li>Warning: ' + esc(reason) + '</li>').join('') +
+        '</ul></div>') +
+    checklistHtml;
 }
 
 function renderSelect(): void {

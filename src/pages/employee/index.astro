@@ -136,6 +136,36 @@ import '../../styles/employee.css';
           <a class="btn btn--primary btn--full" data-employee-documents-link hidden>Review and sign documents</a>
         </section>
 
+        <section class="employee-card" aria-labelledby="training-title">
+          <h2 id="training-title">Training</h2>
+          <p class="employee-muted">Required procedures and assessments assigned to you.</p>
+          <div data-employee-training></div>
+        </section>
+
+        <section class="employee-card" aria-labelledby="shifts-title">
+          <h2 id="shifts-title">Upcoming shifts</h2>
+          <p class="employee-muted">Manager-published shift changes and availability exceptions.</p>
+          <div data-employee-shifts></div>
+        </section>
+
+        <section class="employee-card" aria-labelledby="earnings-title">
+          <h2 id="earnings-title">Approved earnings</h2>
+          <p class="employee-muted">Approved payroll periods only. Payment is handled separately by the owner.</p>
+          <div data-employee-earnings></div>
+        </section>
+
+        <section class="employee-card" aria-labelledby="timeoff-title">
+          <h2 id="timeoff-title">Time off</h2>
+          <div data-employee-timeoff></div>
+          <form class="employee-form" data-employee-timeoff-form>
+            <label>Start <input name="startAt" type="datetime-local" required /></label>
+            <label>End <input name="endAt" type="datetime-local" required /></label>
+            <label>Reason <textarea name="reason" rows="2" maxlength="1000"></textarea></label>
+            <button class="btn btn--secondary" type="submit">Request time off</button>
+            <p class="employee-status" data-employee-timeoff-status role="status" aria-live="polite"></p>
+          </form>
+        </section>
+
         <section class="employee-card" aria-labelledby="time-title">
           <h2 id="time-title">This week's time</h2>
           <p class="employee-muted">Preliminary until management reviews it. Meal periods are unpaid unless a manager corrects them.</p>

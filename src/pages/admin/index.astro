@@ -117,11 +117,13 @@ import {
             <div class="admin-nav__group"><span class="admin-nav__label">Operations</span>
               <button type="button" data-admin-nav="calendar">Calendar &amp; Requests</button>
               <button type="button" data-admin-nav="customers">Customers</button>
+              <button type="button" data-admin-nav="commercial">Commercial Accounts</button>
               <button type="button" data-admin-nav="new-booking">New Booking</button>
               <button type="button" data-admin-nav="quick-estimate">Quick Estimate</button>
               <button type="button" data-admin-nav="recurring">Recurring Plans</button>
               <button type="button" data-admin-nav="jobs">Jobs &amp; Team</button>
               <button type="button" data-admin-nav="timekeeping">Timekeeping</button>
+              <button type="button" data-admin-nav="employees">Employees &amp; Payroll</button>
               <button type="button" data-admin-nav="careers">Careers</button>
             </div>
             <div class="admin-nav__group"><span class="admin-nav__label">Sales &amp; Marketing</span>
@@ -788,6 +790,37 @@ import {
               <div data-careers-pagination style="margin-top:.75rem;"></div>
               <div data-career-detail style="margin-top:1rem;"></div>
             </div>
+          </section>
+
+          <section class="admin-view" data-admin-view="commercial" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Commercial accounts</h2>
+              <p class="admin-muted">
+                Facility accounts, custom proposals, electronically signed commercial agreements and
+                contract billing. Prices and scope are owner-authored; the public estimator is not a limit.
+              </p>
+              <div class="admin-actions">
+                <button class="btn btn--secondary btn--small" type="button" data-commercial-action="refresh">Refresh</button>
+                <button class="btn btn--primary btn--small" type="button" data-commercial-action="new">New proposal</button>
+              </div>
+              <div data-commercial-status role="status" aria-live="polite"></div>
+            </div>
+            <div data-commercial-workspace style="margin-top:1rem;"></div>
+          </section>
+
+          <section class="admin-view" data-admin-view="employees" hidden>
+            <div class="admin-card">
+              <h2 class="admin-section-title">Employees, training and payroll</h2>
+              <p class="admin-muted">
+                Employee profiles, onboarding, training, quality records and payroll calculation.
+                Payroll is calculated and approved for management reporting; it does not disburse wages or file taxes.
+              </p>
+              <div class="admin-actions">
+                <button class="btn btn--secondary btn--small" type="button" data-admin-action="employees-refresh">Refresh</button>
+              </div>
+              <div data-employees-status role="status" aria-live="polite"></div>
+            </div>
+            <div data-employees-workspace style="margin-top:1rem;"></div>
           </section>
 
           <section class="admin-view" data-admin-view="documents" hidden>
@@ -1823,6 +1856,7 @@ import {
               <div data-admin-communications-provider></div>
               <div data-admin-communications-health style="margin-top:1rem;"></div>
               <div data-admin-communications-failures style="margin-top:1rem;"></div>
+              <div data-admin-communications-retries style="margin-top:1rem;"></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;" data-admin-owner-section>
               <h2 class="admin-section-title">Routing and templates</h2>

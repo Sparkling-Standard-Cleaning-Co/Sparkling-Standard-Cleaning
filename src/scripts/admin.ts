@@ -6,6 +6,8 @@ import {
 } from '../lib/password-policy.ts';
 import { loadPricingView } from './pricing-admin';
 import { loadBranchView } from './admin-branches';
+import { loadCommercial } from './admin-commercial';
+import { loadEmployees } from './admin-employees';
 import './admin-address-autocomplete';
 import { PET_OPTIONS, PROPERTY_TYPE_OPTIONS, RESIDENTIAL_INPUT_LIMITS } from '../config/estimators/input-definitions';
 import { pricing } from '../config/pricing';
@@ -101,6 +103,8 @@ const viewMeta: Record<string, [string, string]> = {
   calendar: ['Calendar & Requests', 'Pending reservations and upcoming appointments.'],
   leads: ['Leads & Inquiries', 'Website inquiries, delivery status and follow-up.'],
   customers: ['Customers', 'Customer profiles, properties and history.'],
+  commercial: ['Commercial Accounts', 'Facility accounts, custom proposals, signed agreements and contract billing.'],
+  employees: ['Employees & Payroll', 'Employee files, onboarding, training, quality and payroll calculation.'],
   'new-booking': ['New Booking', 'Create a one-time estimate and booking from a saved customer and property.'],
   'quick-estimate': ['Quick Estimate', 'Price a phone inquiry with live promotions, then save or convert it to a booking.'],
   recurring: ['Recurring Plans', 'Recurring cleaning administration.'],
@@ -124,6 +128,8 @@ const navPermission: Record<string, string> = {
   calendar: 'booking.read',
   leads: 'lead.read',
   customers: 'customer.read',
+  commercial: 'booking.read',
+  employees: 'job.write',
   'new-booking': 'booking.write',
   'quick-estimate': 'booking.write',
   recurring: 'job.read',
@@ -386,6 +392,7 @@ async function confirmStepUp(): Promise<boolean> {
 }
 
 async function api<T>(path: string, init: RequestInit = {}, stepUpRetried = false): Promise<T> {
+  (window as unknown as { __ssAdminCsrf?: string }).__ssAdminCsrf = csrf;
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body) headers.set('Content-Type', 'application/json');
@@ -5683,6 +5690,24 @@ function renderCommunicationHealth(payload: CommunicationsPayload): void {
   }
 }
 
+async function loadNotificationRetries(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-admin-communications-retries]');
+  if (!target) return;
+  const data = await api<{ retries?: Array<Record<string, unknown>> }>(
+    '/api/admin/communications?view=retries',
+  );
+  const rows = data.retries ?? [];
+  target.innerHTML = `<h3 style="font-size:.95rem;">Failed email retry queue (${rows.length})</h3>${
+    rows.length
+      ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>When</th><th>Event</th><th>Recipient</th><th>Subject</th><th>Status</th><th>Attempts</th><th>Actions</th></tr></thead><tbody>${rows
+          .map(
+            (row) => `<tr><td>${esc(dateTime(row.created_at))}</td><td>${esc(row.event_key)}</td><td>${esc(row.recipient)}</td><td>${esc(row.subject)}</td><td>${esc(titleCase(String(row.status)))}${row.last_error ? `<br /><span class="admin-muted">${esc(row.last_error)}</span>` : ''}</td><td>${esc(row.attempts)}</td><td>${row.status === 'pending' || row.status === 'failed' ? `<button class="btn btn--secondary btn--small" type="button" data-admin-action="communications-retry" data-id="${esc(row.id)}">Retry</button> <button class="btn btn--ghost btn--small" type="button" data-admin-action="communications-discard" data-id="${esc(row.id)}">Discard</button>` : ''}</td></tr>`,
+          )
+          .join('')}</tbody></table></div>`
+      : '<p class="admin-muted">No failed provider deliveries are queued.</p>'
+  }`;
+}
+
 async function loadCommunications(): Promise<void> {
   const data = await api<CommunicationsPayload>('/api/admin/communications');
   communicationsPayload = data;
@@ -5693,6 +5718,7 @@ async function loadCommunications(): Promise<void> {
       (data.valid === false && data.errors?.length ? `<ul class="admin-muted">${data.errors.map((error) => `<li>${esc(error)}</li>`).join('')}</ul>` : '');
   }
   renderCommunicationHealth(data);
+  void loadNotificationRetries().catch(() => undefined);
   populateCommunicationForm();
   const versionsTarget = document.querySelector<HTMLElement>('[data-communications-versions]');
   if (versionsTarget) {
@@ -5745,6 +5771,17 @@ document.querySelector<HTMLElement>('[data-admin-view="communications"]')?.addEv
   }
   if (action === 'communications-reset') {
     void loadCommunications().catch((error) => setAppError(friendly(error)));
+  }
+  if (action === 'communications-retry' || action === 'communications-discard') {
+    const id = (event.target as HTMLElement).closest<HTMLElement>('[data-admin-action]')?.dataset.id ?? '';
+    const retry = action === 'communications-retry';
+    void api('/api/admin/communications', {
+      method: 'POST',
+      body: JSON.stringify({ action: retry ? 'retry_notification' : 'discard_retry', id }),
+    })
+      .then(() => loadNotificationRetries())
+      .catch((error) => setAppError(friendly(error)));
+    return;
   }
   if (action === 'communications-test') {
     const select = document.querySelector<HTMLSelectElement>('[data-communications-test-department]');
@@ -7625,6 +7662,8 @@ async function loadView(view: string): Promise<void> {
     if (view === 'calendar') await loadCalendar();
     if (view === 'leads') await loadLeads();
     if (view === 'customers') await loadCustomers();
+    if (view === 'commercial') await loadCommercial();
+    if (view === 'employees') await loadEmployees();
     if (view === 'new-booking') await loadManualBooking();
     if (view === 'quick-estimate') await loadQuickEstimate();
     if (view === 'recurring') await loadRecurring();

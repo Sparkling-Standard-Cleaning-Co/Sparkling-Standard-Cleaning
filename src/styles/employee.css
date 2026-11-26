@@ -100,3 +100,9 @@
   .employee-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .employee-actions .btn--full { grid-column: 1 / -1; }
 }
+
+.employee-table-scroll { overflow-x: auto; }
+.employee-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.employee-table th, .employee-table td { text-align: left; padding: .45rem .35rem; border-bottom: 1px solid rgba(109,52,60,.15); vertical-align: top; }
+.employee-record { border: 1px solid rgba(109,52,60,.15); border-radius: .6rem; padding: .65rem; margin: .5rem 0; }
+.employee-record p { margin: .2rem 0; }

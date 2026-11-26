@@ -329,10 +329,6 @@ function normalizeInput(input: Record<string, unknown>, existing: BranchSettings
       throw new BranchSettingsError('launch_origin_required');
     }
     if (next.travelLimitMiles === null) throw new BranchSettingsError('launch_travel_limit_required');
-    const readiness = branchReadiness(next);
-    if (readiness.blockers.length > 0) {
-      throw new BranchSettingsError('launch_readiness_incomplete', 409, `Missing: ${readiness.blockers.join(', ')}`);
-    }
   }
   return next;
 }
@@ -348,12 +344,21 @@ export async function saveBranchSettings(
   const existing = row ? rowToBranchSettings(row) : null;
   if (!existing) throw new BranchSettingsError('branch_not_found', 404);
   const next = normalizeInput(input, existing);
-
   const duplicate = await db
     .prepare('SELECT id FROM branches WHERE public_slug = ? AND id <> ? LIMIT 1')
     .bind(next.publicSlug, next.id)
     .first<{ id: string }>();
   if (duplicate) throw new BranchSettingsError('public_slug_in_use', 409);
+  if (next.lifecycle === 'live') {
+    const readiness = await branchOperationalReadiness(db, next);
+    if (readiness.blockers.length > 0) {
+      throw new BranchSettingsError(
+        'launch_readiness_incomplete',
+        409,
+        `Missing: ${readiness.blockers.join(', ')}`,
+      );
+    }
+  }
 
   const config = {
     id: next.id,
@@ -475,4 +480,119 @@ export async function saveBranchSettings(
     for (const statement of statements) await statement.run();
   }
   return next;
+}
+
+export interface BranchChecklistItem {
+  key: string;
+  label: string;
+  status: 'complete' | 'warning' | 'blocked';
+  detail: string;
+}
+
+export async function branchOperationalReadiness(
+  db: D1Database,
+  settings: BranchSettings,
+): Promise<BranchReadiness & { checklist: BranchChecklistItem[] }> {
+  const base = branchReadiness(settings);
+  const blockers = [...base.blockers];
+  const warnings = [...base.warnings];
+  const checklist: BranchChecklistItem[] = [];
+  const add = (key: string, label: string, ok: boolean, detail: string, blocking = true): void => {
+    checklist.push({ key, label, status: ok ? 'complete' : blocking ? 'blocked' : 'warning', detail });
+    if (!ok) {
+      if (blocking) blockers.push(key);
+      else warnings.push(key);
+    }
+  };
+  const staff = await db
+    .prepare("SELECT COUNT(*) AS count FROM team_members WHERE branch_id = ? AND status = 'active' AND is_bookable = 1")
+    .bind(settings.id)
+    .first<{ count: number }>();
+  add(
+    'branch_staffing_missing',
+    'At least one active bookable employee',
+    Number(staff?.count ?? 0) > 0,
+    Number(staff?.count ?? 0) + ' active bookable employee(s) assigned to this branch.',
+  );
+  const managers = await db
+    .prepare("SELECT COUNT(*) AS count FROM admin_users WHERE status = 'active' AND (role_id = 'owner' OR branch_id = ?)")
+    .bind(settings.id)
+    .first<{ count: number }>();
+  add(
+    'branch_manager_missing',
+    'Operations manager or owner access',
+    Number(managers?.count ?? 0) > 0,
+    Number(managers?.count ?? 0) + ' active owner/manager account(s) can operate this branch.',
+    false,
+  );
+  add(
+    'branch_calendar_missing',
+    'Dedicated booking calendar',
+    Boolean(settings.calendarId.trim()),
+    settings.calendarId
+      ? 'Calendar ' + (settings.calendarName || settings.calendarId)
+      : 'No branch calendar id is configured.',
+  );
+  const expectedZone = settings.id === 'branch_tampa' ? 'America/New_York' : 'America/Chicago';
+  add(
+    'branch_timezone_mismatch',
+    'Correct branch timezone',
+    settings.timezone === expectedZone,
+    'Configured ' + settings.timezone + '; expected ' + expectedZone + '.',
+  );
+  const enabledServices = Object.entries(settings.services).filter(([, mode]) => mode !== 'disabled');
+  add(
+    'branch_services_missing',
+    'At least one enabled service line',
+    enabledServices.length > 0,
+    enabledServices.map(([key, mode]) => key + ': ' + mode).join(', ') || 'All service lines are disabled.',
+  );
+  add(
+    'branch_commercial_disabled',
+    'Commercial capability (for commercial accounts)',
+    settings.services.commercial !== 'disabled',
+    'Commercial mode: ' + settings.services.commercial + '.',
+    false,
+  );
+  add(
+    'branch_church_disabled',
+    'Church capability',
+    settings.services.church !== 'disabled',
+    'Church mode: ' + settings.services.church + '.',
+    false,
+  );
+  add(
+    'branch_review_url_missing',
+    'Approved Google review destination',
+    !settings.reviewRequestsEnabled || Boolean(settings.reviewUrl.trim()),
+    settings.reviewUrl || 'Review requests are disabled or no review URL is configured.',
+    false,
+  );
+  add(
+    'branch_origin_missing',
+    'Operating origin for travel',
+    Boolean(settings.originAddress && settings.originLat !== null && settings.originLng !== null),
+    settings.originAddress || 'No operating origin configured.',
+    false,
+  );
+  add(
+    'branch_travel_limit_missing',
+    'Travel limit',
+    settings.travelLimitMiles !== null,
+    settings.travelLimitMiles !== null ? settings.travelLimitMiles + ' mile one-way limit' : 'No travel limit configured.',
+    false,
+  );
+  add(
+    'branch_gbp_unverified',
+    'Google Business Profile verified',
+    settings.gbpStatus === 'verified',
+    'GBP status: ' + settings.gbpStatus + '.',
+    false,
+  );
+  return {
+    ready: blockers.length === 0,
+    blockers: [...new Set(blockers)],
+    warnings: [...new Set(warnings)],
+    checklist,
+  };
 }

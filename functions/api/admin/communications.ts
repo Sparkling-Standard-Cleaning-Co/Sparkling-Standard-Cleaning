@@ -14,6 +14,9 @@ import {
   defaultCommunicationSettings,
   deliveryHealth,
   listCommunicationVersions,
+  listNotificationRetries,
+  retryNotification,
+  discardNotificationRetry,
   previewTemplate,
   readCommunicationSettings,
   saveCommunicationSettings,
@@ -60,6 +63,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     }
     if (view === 'versions') {
       return json({ ok: true, versions: await listCommunicationVersions(db, Number(url.searchParams.get('limit') ?? 20)) });
+    }
+    if (view === 'retries') {
+      return json({ ok: true, retries: await listNotificationRetries(db, Number(url.searchParams.get('limit') ?? 100)) });
     }
     if (view === 'health') {
       return json({ ok: true, health: await deliveryHealth(db), provider: communicationProviderStatus(context.env) });
@@ -109,6 +115,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       const validation = validateCommunicationSettings(body.settings);
       if (!validation.ok) return json({ ok: false, error: 'invalid_settings', details: validation.errors }, 400);
       return json({ ok: true, preview: previewTemplate(validation.settings, templateKey) });
+    }
+    if (action === 'retry_notification') {
+      const result = await retryNotification(db, actor, context.env, String(body.id ?? ''));
+      return json({ ...result, ok: result.ok }, result.ok ? 200 : 502);
+    }
+    if (action === 'discard_retry') {
+      await discardNotificationRetry(db, actor, String(body.id ?? ''));
+      return json({ ok: true });
     }
     if (action === 'send_test') {
       const department = String(body.department ?? '') as DepartmentKey;

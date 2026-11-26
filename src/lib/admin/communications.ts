@@ -830,6 +830,41 @@ export async function sendOperationalNotification(
       result.failed += 1;
     }
     if (db) {
+      if (!outcome.ok && outcome.error !== 'not_configured') {
+        const duplicate = await db
+          .prepare(
+            `SELECT id FROM notification_retry_queue
+             WHERE event_key = ? AND recipient = ? AND related_id = ? AND status IN ('pending','failed')
+             LIMIT 1`,
+          )
+          .bind(input.eventKey, recipient.address, input.relatedId ?? '')
+          .first<{ id: string }>()
+          .catch(() => null);
+        if (!duplicate) {
+          await db
+            .prepare(
+              `INSERT INTO notification_retry_queue
+               (id, event_key, department, recipient, subject, html, text_body, reply_to,
+                related_type, related_id, last_error)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              `retry_${crypto.randomUUID()}`,
+              input.eventKey,
+              recipient.department,
+              recipient.address,
+              input.subject.slice(0, 200),
+              html.slice(0, 100_000),
+              input.text.slice(0, 20_000),
+              input.replyTo ?? '',
+              input.relatedType ?? '',
+              input.relatedId ?? '',
+              (outcome.error ?? 'provider_failed').slice(0, 200),
+            )
+            .run()
+            .catch(() => undefined);
+        }
+      }
       await recordNotificationDelivery(db, {
         eventKey: input.eventKey,
         department: recipient.department,
@@ -1139,4 +1174,84 @@ export async function sendTestNotification(
     detail: status === 'sent' ? 'provider_accepted' : errorCode,
   });
   return { status, recipient, eventId };
+}
+
+export async function listNotificationRetries(
+  db: D1Database,
+  limit = 100,
+): Promise<Array<Record<string, unknown>>> {
+  const bounded = Math.min(Math.max(Number(limit) || 100, 1), 200);
+  const rows = await db
+    .prepare(
+      `SELECT id, event_key, department, recipient, subject, status, attempts,
+              last_error, related_type, related_id, created_at
+       FROM notification_retry_queue
+       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'failed' THEN 1 ELSE 2 END, created_at DESC
+       LIMIT ?`,
+    )
+    .bind(bounded)
+    .all<Record<string, unknown>>();
+  return rows.results ?? [];
+}
+
+export async function retryNotification(
+  db: D1Database,
+  actor: AdminActor,
+  env: CommunicationEnv,
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (actor.role !== 'owner') throw new AdminAuthError(403, 'owner_required');
+  const row = await db
+    .prepare('SELECT * FROM notification_retry_queue WHERE id = ? LIMIT 1')
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!row) throw new AdminAuthError(404, 'retry_not_found');
+  if (row.status === 'sent' || row.status === 'discarded') {
+    return { ok: true };
+  }
+  const outcome = await sendAdminEmailDetailed(
+    env,
+    String(row.recipient ?? ''),
+    { subject: String(row.subject ?? ''), html: String(row.html ?? ''), text: String(row.text_body ?? '') },
+    `retry-${id}-${Number(row.attempts ?? 0) + 1}`.slice(0, 200),
+    {
+      ...(row.reply_to ? { replyTo: String(row.reply_to) } : {}),
+    },
+  );
+  await db
+    .prepare(
+      `UPDATE notification_retry_queue
+       SET status = ?, attempts = attempts + 1, last_error = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    )
+    .bind(outcome.ok ? 'sent' : 'failed', outcome.ok ? '' : outcome.error ?? 'provider_failed', id)
+    .run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'communications.retry_attempted',
+    entityType: 'notification_retry',
+    entityId: id,
+    detail: outcome.ok ? 'sent' : 'failed',
+  });
+  return outcome.ok ? { ok: true } : { ok: false, error: outcome.error };
+}
+
+export async function discardNotificationRetry(
+  db: D1Database,
+  actor: AdminActor,
+  id: string,
+): Promise<void> {
+  if (actor.role !== 'owner') throw new AdminAuthError(403, 'owner_required');
+  await db
+    .prepare(
+      `UPDATE notification_retry_queue SET status = 'discarded', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    )
+    .bind(id)
+    .run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'communications.retry_discarded',
+    entityType: 'notification_retry',
+    entityId: id,
+  });
 }

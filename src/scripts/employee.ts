@@ -248,6 +248,7 @@ async function loadMe(): Promise<void> {
     renderJobs();
     await loadTime();
     await loadEmployeeDocuments();
+    await loadSelfService();
   } catch (error) {
     if (String((error as Error).message) === 'employee_profile_missing' || String((error as Error).message) === 'employee_profile_inactive') {
       if (gate) gate.hidden = false;
@@ -556,6 +557,105 @@ document.querySelector<HTMLButtonElement>('[data-employee-logout]')?.addEventLis
     csrf = '';
     actor = null;
     showGate('login');
+  }
+});
+
+interface SelfServiceData {
+  training?: Array<Record<string, unknown>>;
+  earnings?: Array<Record<string, unknown>>;
+  timeOff?: Array<Record<string, unknown>>;
+  shifts?: Array<Record<string, unknown>>;
+}
+
+let selfService: SelfServiceData = {};
+
+async function loadSelfService(): Promise<void> {
+  selfService = await api<SelfServiceData>('/api/employee/requests');
+  const training = document.querySelector<HTMLElement>('[data-employee-training]');
+  if (training) {
+    const rows = selfService.training ?? [];
+    training.innerHTML = rows.length
+      ? rows
+          .map(
+            (entry) => `<div class="employee-record">
+              <p><strong>${esc(entry.title)}</strong> · ${esc(entry.category)} · v${esc(entry.version)}</p>
+              <p class="employee-muted">${esc(entry.status === 'completed' ? 'Completed' : 'Assigned')}${entry.completed_at ? ` ${esc(timeFormat(entry.completed_at))}` : ''}</p>
+              ${entry.content_text ? `<details><summary>Read the procedure</summary><p>${esc(entry.content_text).replaceAll('\n', '<br>')}</p></details>` : ''}
+              ${entry.status === 'completed' ? '' : `<button class="btn btn--secondary btn--small" type="button" data-employee-training-complete="${esc(entry.id)}">Mark complete</button>`}
+            </div>`,
+          )
+          .join('')
+      : '<p class="employee-muted">No training assigned.</p>';
+  }
+  const shifts = document.querySelector<HTMLElement>('[data-employee-shifts]');
+  if (shifts) {
+    const rows = selfService.shifts ?? [];
+    shifts.innerHTML = rows.length
+      ? rows
+          .map(
+            (entry) => `<div class="employee-record"><p><strong>${esc(entry.work_date)} ${esc(entry.start_time)}–${esc(entry.end_time)}</strong></p><p class="employee-muted">${Number(entry.available) === 1 ? 'Available' : 'Unavailable'}${entry.note ? ` · ${esc(entry.note)}` : ''}</p></div>`,
+          )
+          .join('')
+      : '<p class="employee-muted">No published shift changes.</p>';
+  }
+  const earnings = document.querySelector<HTMLElement>('[data-employee-earnings]');
+  if (earnings) {
+    const rows = selfService.earnings ?? [];
+    earnings.innerHTML = rows.length
+      ? `<div class="employee-table-scroll"><table class="employee-table"><thead><tr><th>Period</th><th>Regular</th><th>Overtime</th><th>Gross</th></tr></thead><tbody>${rows.map((entry) => `<tr><td>${esc(entry.period_start)} – ${esc(entry.period_end)}</td><td>${(Number(entry.regular_minutes ?? 0) / 60).toFixed(2)} h</td><td>${(Number(entry.overtime_minutes ?? 0) / 60).toFixed(2)} h</td><td>$${(Number(entry.gross_cents ?? 0) / 100).toFixed(2)}</td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="employee-muted">No approved payroll periods yet.</p>';
+  }
+  const timeOff = document.querySelector<HTMLElement>('[data-employee-timeoff]');
+  if (timeOff) {
+    const rows = selfService.timeOff ?? [];
+    timeOff.innerHTML = rows.length
+      ? `<div class="employee-table-scroll"><table class="employee-table"><thead><tr><th>Dates</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((entry) => `<tr><td>${esc(timeFormat(entry.start_at))} – ${esc(timeFormat(entry.end_at))}</td><td>${esc(entry.status)}</td><td>${entry.status === 'pending' ? `<button class="btn btn--ghost btn--small" type="button" data-employee-timeoff-cancel="${esc(entry.id)}">Cancel</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="employee-muted">No time-off requests.</p>';
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const training = (event.target as HTMLElement).closest<HTMLElement>('[data-employee-training-complete]');
+  if (training) {
+    void api('/api/employee/requests', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'complete_training', assignmentId: training.dataset.employeeTrainingComplete }),
+    })
+      .then(() => loadSelfService())
+      .catch((error) => setStatus(clockStatus, friendly(error), 'error'));
+    return;
+  }
+  const cancel = (event.target as HTMLElement).closest<HTMLElement>('[data-employee-timeoff-cancel]');
+  if (cancel) {
+    void api('/api/employee/requests', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'cancel_time_off', id: cancel.dataset.employeeTimeoffCancel }),
+    })
+      .then(() => loadSelfService())
+      .catch((error) => setStatus(clockStatus, friendly(error), 'error'));
+  }
+});
+
+document.querySelector<HTMLFormElement>('[data-employee-timeoff-form]')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  const status = document.querySelector<HTMLElement>('[data-employee-timeoff-status]');
+  try {
+    await api('/api/employee/requests', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'request_time_off',
+        startAt: new Date(String(data.get('startAt'))).toISOString(),
+        endAt: new Date(String(data.get('endAt'))).toISOString(),
+        reason: data.get('reason'),
+      }),
+    });
+    setStatus(status, 'Time-off request sent for review.', 'success');
+    form.reset();
+    await loadSelfService();
+  } catch (error) {
+    setStatus(status, friendly(error), 'error');
   }
 });
 

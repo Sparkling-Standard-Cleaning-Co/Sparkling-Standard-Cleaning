@@ -1,0 +1,238 @@
+// Employee administration, training, quality and payroll calculation API.
+import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import {
+  acknowledgeHandbook,
+  addOnboardingTask,
+  addPerformanceNote,
+  assignTraining,
+  completeTraining,
+  createQualityInspection,
+  createTrainingModule,
+  employeeDocumentExpirations,
+  listEmployeeProfiles,
+  listOnboarding,
+  listPerformanceNotes,
+  listQualityInspections,
+  listTimeOffRequests,
+  reviewTimeOffRequest,
+  listTrainingAssignments,
+  listTrainingModules,
+  listShiftOverrides,
+  setShiftOverride,
+  setOnboardingStatus,
+  updateEmployeeProfile,
+} from '../../../src/lib/employee/admin.ts';
+import {
+  addPayrollAdjustment,
+  approvePayrollPeriod,
+  calculatePayrollPeriod,
+  createPayrollPeriod,
+  getPayrollPeriod,
+  listPayrollPeriods,
+  payrollCsv,
+} from '../../../src/lib/employee/payroll.ts';
+
+interface Env extends AdminDbEnv {}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+}
+
+function text(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+export async function onRequestGet(context: { request: Request; env: Env }): Promise<Response> {
+  const db = adminDb(context.env);
+  if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
+  try {
+    const actor = await requireActor(db, context.request, 'job.read');
+    const url = new URL(context.request.url);
+    const view = text(url.searchParams.get('view'), 30) || 'all';
+    const payrollView = view === 'payroll' || view === 'payroll_csv';
+    if (payrollView && !['owner', 'finance'].includes(actor.role)) {
+      return json({ ok: false, error: 'finance_required' }, 403);
+    }
+    if (!payrollView && !['owner', 'manager'].includes(actor.role)) {
+      return json({ ok: false, error: 'manager_required' }, 403);
+    }
+    if (view === 'member') {
+      const memberId = text(url.searchParams.get('id'), 100);
+      if (!memberId) return json({ ok: false, error: 'employee_required' }, 400);
+      const [onboarding, training, performance, expirations, shifts] = await Promise.all([
+        listOnboarding(db, memberId),
+        listTrainingAssignments(db, memberId),
+        listPerformanceNotes(db, memberId),
+        employeeDocumentExpirations(db, memberId),
+        listShiftOverrides(db, memberId),
+      ]);
+      return json({ ok: true, onboarding, training, performance, expirations, shifts });
+    }
+    if (view === 'payroll') {
+      const periodId = text(url.searchParams.get('id'), 100);
+      if (!periodId) return json({ ok: false, error: 'payroll_period_required' }, 400);
+      return json({ ok: true, ...(await getPayrollPeriod(db, periodId)) });
+    }
+    if (view === 'payroll_csv') {
+      const periodId = text(url.searchParams.get('id'), 100);
+      const detail = await getPayrollPeriod(db, periodId);
+      const csv = payrollCsv(detail.period, detail.entries);
+      return new Response(csv, {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="payroll-${String(detail.period.period_start)}-${String(detail.period.period_end)}.csv"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+    const [profiles, modules, assignments, inspections, payroll, timeOff] = await Promise.all([
+      listEmployeeProfiles(db, actor),
+      listTrainingModules(db),
+      listTrainingAssignments(db),
+      listQualityInspections(db, actor),
+      listPayrollPeriods(db),
+      listTimeOffRequests(db, actor),
+    ]);
+    return json({
+      ok: true,
+      profiles,
+      modules,
+      assignments,
+      inspections,
+      payroll: ['owner', 'finance'].includes(actor.role) ? payroll : [],
+      timeOff,
+    });
+  } catch (error) {
+    return json(
+      { ok: false, error: error instanceof AdminAuthError ? error.code : 'employee_load_failed' },
+      error instanceof AdminAuthError ? error.status : 500,
+    );
+  }
+}
+
+export async function onRequestPost(context: { request: Request; env: Env }): Promise<Response> {
+  const db = adminDb(context.env);
+  if (!db) return json({ ok: false, error: 'database_not_configured' }, 503);
+  try {
+    const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = text(body.action, 50);
+    const actor = await requireActor(db, context.request, 'job.write');
+    const payrollAction = action.startsWith('payroll_');
+    if (payrollAction ? !['owner', 'finance'].includes(actor.role) : !['owner', 'manager'].includes(actor.role)) {
+      return json({ ok: false, error: payrollAction ? 'finance_required' : 'manager_required' }, 403);
+    }
+    requireCsrf(context.request, actor);
+    if (action === 'update_profile') {
+      await updateEmployeeProfile(db, actor, text(body.teamMemberId, 100), body);
+      return json({ ok: true });
+    }
+    if (action === 'handbook') {
+      await acknowledgeHandbook(db, actor, text(body.teamMemberId, 100));
+      return json({ ok: true });
+    }
+    if (action === 'add_onboarding') return json({ ok: true, ...(await addOnboardingTask(db, actor, body)) });
+    if (action === 'onboarding_status') {
+      await setOnboardingStatus(db, actor, text(body.taskId, 100), text(body.status, 20));
+      return json({ ok: true });
+    }
+    if (action === 'create_module') return json({ ok: true, ...(await createTrainingModule(db, actor, body)) });
+    if (action === 'assign_training') {
+      return json({
+        ok: true,
+        ...(await assignTraining(db, actor, {
+          moduleId: text(body.moduleId, 100),
+          teamMemberId: text(body.teamMemberId, 100),
+        })),
+      });
+    }
+    if (action === 'complete_training') {
+      await completeTraining(db, actor, text(body.assignmentId, 100), {
+        ...(body.score !== undefined ? { score: Number(body.score) } : {}),
+        ...(text(body.notes, 1000) ? { notes: text(body.notes, 1000) } : {}),
+      });
+      return json({ ok: true });
+    }
+    if (action === 'create_inspection') return json({ ok: true, ...(await createQualityInspection(db, actor, body)) });
+    if (action === 'add_performance') return json({ ok: true, ...(await addPerformanceNote(db, actor, body)) });
+    if (action === 'payroll_create') {
+      return json({
+        ok: true,
+        ...(await createPayrollPeriod(db, actor, {
+          periodStart: text(body.periodStart, 10),
+          periodEnd: text(body.periodEnd, 10),
+          ...(text(body.notes, 1000) ? { notes: text(body.notes, 1000) } : {}),
+        })),
+      });
+    }
+    if (action === 'payroll_calculate') {
+      const result = await calculatePayrollPeriod(db, actor, text(body.periodId, 100));
+      return json({ ok: true, ...result });
+    }
+    if (action === 'payroll_approve') {
+      await approvePayrollPeriod(db, actor, text(body.periodId, 100));
+      return json({ ok: true });
+    }
+    if (action === 'payroll_adjustment') {
+      return json({
+        ok: true,
+        ...(await addPayrollAdjustment(db, actor, {
+          periodId: text(body.periodId, 100),
+          teamMemberId: text(body.teamMemberId, 100),
+          kind: text(body.kind, 20),
+          label: text(body.label, 200),
+          amountCents: Math.round(Number(body.amountCents) || 0),
+        })),
+      });
+    }
+    if (action === 'set_shift') {
+      return json({
+        ok: true,
+        ...(await setShiftOverride(db, actor, {
+          teamMemberId: text(body.teamMemberId, 100),
+          workDate: text(body.workDate, 10),
+          startTime: text(body.startTime, 5),
+          endTime: text(body.endTime, 5),
+          available: body.available !== false,
+          ...(text(body.note, 500) ? { note: text(body.note, 500) } : {}),
+        })),
+      });
+    }
+    if (action === 'time_off_review') {
+      await reviewTimeOffRequest(
+        db,
+        actor,
+        text(body.requestId, 100),
+        body.status === 'approved' ? 'approved' : 'declined',
+      );
+      return json({ ok: true });
+    }
+    if (action === 'inspection_status') {
+      const id = text(body.id, 100);
+      const status = ['draft', 'completed', 'follow_up'].includes(String(body.status))
+        ? String(body.status)
+        : 'completed';
+      await db
+        .prepare('UPDATE quality_inspections SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(status, id)
+        .run();
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'employee.inspection_status',
+        entityType: 'quality_inspection',
+        entityId: id,
+        detail: status,
+      });
+      return json({ ok: true });
+    }
+    return json({ ok: false, error: 'invalid_action' }, 400);
+  } catch (error) {
+    return json(
+      { ok: false, error: error instanceof AdminAuthError ? error.code : 'employee_action_failed' },
+      error instanceof AdminAuthError ? error.status : 500,
+    );
+  }
+}
