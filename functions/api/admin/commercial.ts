@@ -135,6 +135,15 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (view === 'property') {
       const propertyId = text(url.searchParams.get('propertyId'), 100);
       if (!propertyId) return json({ ok: false, error: 'property_required' }, 400);
+      if (actor.role !== 'owner') {
+        const property = await db
+          .prepare('SELECT branch_id FROM properties WHERE id = ? LIMIT 1')
+          .bind(propertyId)
+          .first<{ branch_id: string | null }>();
+        if (!property || !actor.branchId || property.branch_id !== actor.branchId) {
+          return json({ ok: false, error: 'branch_scope_denied' }, 403);
+        }
+      }
       const [contacts, walkthroughs] = await Promise.all([
         listPropertyContacts(db, propertyId),
         listWalkthroughs(db, propertyId),
@@ -210,6 +219,18 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         detail: text(body.contractId, 100),
       });
       return json({ ok: true, invoice });
+    }
+    if (action === 'add_contact' || action === 'add_walkthrough') {
+      const propertyId = text(body.propertyId, 100);
+      if (actor.role !== 'owner') {
+        const property = await db
+          .prepare('SELECT branch_id FROM properties WHERE id = ? LIMIT 1')
+          .bind(propertyId)
+          .first<{ branch_id: string | null }>();
+        if (!property || !actor.branchId || property.branch_id !== actor.branchId) {
+          return json({ ok: false, error: 'branch_scope_denied' }, 403);
+        }
+      }
     }
     if (action === 'add_contact') {
       return json({ ok: true, ...(await addPropertyContact(db, actor, body)) });

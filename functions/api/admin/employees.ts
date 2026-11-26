@@ -48,6 +48,22 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+async function assertMemberScope(
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  actor: { role: string; branchId: string | null },
+  teamMemberId: string,
+): Promise<void> {
+  if (actor.role === 'owner') return;
+  if (!actor.branchId || !teamMemberId) throw new AdminAuthError(403, 'branch_scope_denied');
+  const row = await db
+    .prepare('SELECT branch_id FROM team_members WHERE id = ? LIMIT 1')
+    .bind(teamMemberId)
+    .first<{ branch_id: string | null }>();
+  if (!row || row.branch_id !== actor.branchId) {
+    throw new AdminAuthError(403, 'branch_scope_denied');
+  }
+}
+
 function text(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
@@ -69,6 +85,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     if (view === 'member') {
       const memberId = text(url.searchParams.get('id'), 100);
       if (!memberId) return json({ ok: false, error: 'employee_required' }, 400);
+      await assertMemberScope(db, actor, memberId);
       const [onboarding, training, performance, expirations, shifts] = await Promise.all([
         listOnboarding(db, memberId),
         listTrainingAssignments(db, memberId),
@@ -132,6 +149,8 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       return json({ ok: false, error: payrollAction ? 'finance_required' : 'manager_required' }, 403);
     }
     requireCsrf(context.request, actor);
+    const directMemberId = text(body.teamMemberId, 100);
+    if (directMemberId) await assertMemberScope(db, actor, directMemberId);
     if (action === 'update_profile') {
       await updateEmployeeProfile(db, actor, text(body.teamMemberId, 100), body);
       return json({ ok: true });
@@ -220,6 +239,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'add_onboarding') return json({ ok: true, ...(await addOnboardingTask(db, actor, body)) });
     if (action === 'onboarding_status') {
+      const task = await db
+        .prepare('SELECT team_member_id FROM employee_onboarding_tasks WHERE id = ? LIMIT 1')
+        .bind(text(body.taskId, 100))
+        .first<{ team_member_id: string }>();
+      if (task) await assertMemberScope(db, actor, task.team_member_id);
       await setOnboardingStatus(db, actor, text(body.taskId, 100), text(body.status, 20));
       return json({ ok: true });
     }
@@ -234,6 +258,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       });
     }
     if (action === 'complete_training') {
+      const assignment = await db
+        .prepare('SELECT team_member_id FROM training_assignments WHERE id = ? LIMIT 1')
+        .bind(text(body.assignmentId, 100))
+        .first<{ team_member_id: string }>();
+      if (assignment) await assertMemberScope(db, actor, assignment.team_member_id);
       await completeTraining(db, actor, text(body.assignmentId, 100), {
         ...(body.score !== undefined ? { score: Number(body.score) } : {}),
         ...(text(body.notes, 1000) ? { notes: text(body.notes, 1000) } : {}),
@@ -286,6 +315,11 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       });
     }
     if (action === 'time_off_review') {
+      const request = await db
+        .prepare('SELECT team_member_id FROM time_off_requests WHERE id = ? LIMIT 1')
+        .bind(text(body.requestId, 100))
+        .first<{ team_member_id: string }>();
+      if (request) await assertMemberScope(db, actor, request.team_member_id);
       await reviewTimeOffRequest(
         db,
         actor,
@@ -296,6 +330,15 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'inspection_status') {
       const id = text(body.id, 100);
+      if (actor.role !== 'owner') {
+        const inspection = await db
+          .prepare('SELECT branch_id FROM quality_inspections WHERE id = ? LIMIT 1')
+          .bind(id)
+          .first<{ branch_id: string | null }>();
+        if (!inspection || !actor.branchId || inspection.branch_id !== actor.branchId) {
+          return json({ ok: false, error: 'branch_scope_denied' }, 403);
+        }
+      }
       const status = ['draft', 'completed', 'follow_up'].includes(String(body.status))
         ? String(body.status)
         : 'completed';
