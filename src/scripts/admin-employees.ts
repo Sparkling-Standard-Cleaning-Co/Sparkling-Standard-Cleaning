@@ -306,6 +306,7 @@ function renderEmployeeMember(): void {
       <label class="admin-field--wide">Personnel notes <textarea name="personnelNotes" rows="2">${escE(member.personnel_notes ?? '')}</textarea></label>
       <button class="btn btn--primary btn--small" type="submit">Save profile</button>
       ${!member.handbook_acknowledged_at ? '<button class="btn btn--secondary btn--small" type="button" data-employee-action="handbook" data-id="' + escE(member.id) + '">Record handbook acknowledgment</button>' : '<span class="admin-status">Handbook acknowledged</span>'}
+      <button class="btn btn--secondary btn--small" type="button" data-employee-action="send-agreement" data-id="${escE(member.id)}">Send onboarding agreement packet</button>
     </form>
     <h4>Onboarding checklist</h4>
     ${onboarding ? `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Task</th><th>Category</th><th>Status</th><th>Due</th><th></th></tr></thead><tbody>${onboarding}</tbody></table></div>` : '<p class="admin-muted">No onboarding tasks.</p>'}
@@ -408,6 +409,17 @@ document.querySelector<HTMLElement>('[data-admin-view="employees"]')?.addEventLi
     employeeState.selectedMember = '';
     const panel = document.querySelector<HTMLElement>('[data-employee-member]');
     if (panel) panel.innerHTML = '';
+  }
+  if (action === 'send-agreement') {
+    run(
+      employeePost({ action: 'send_agreement', teamMemberId: id }).then((result) => {
+        setEmployeeStatus(
+          `Agreement packet created. Email: ${String(result.emailStatus ?? 'sent')}.`,
+          'success',
+        );
+        return loadEmployeeMember(id);
+      }),
+    );
   }
   if (action === 'handbook') {
     run(employeePost({ action: 'handbook', teamMemberId: id }).then(() => loadEmployees()));

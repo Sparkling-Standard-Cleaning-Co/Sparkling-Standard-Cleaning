@@ -5,6 +5,7 @@
  */
 import type { D1Database } from '../admin/d1.ts';
 import { AdminAuthError, audit, type AdminActor } from '../admin/operations.ts';
+import { createSigningRequest, sendSigningEmail } from '../documents/service.ts';
 
 function text(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -582,3 +583,49 @@ export async function setShiftOverride(
   });
   return { id };
 }
+
+export async function createEmployeeAgreementRequest(
+  db: D1Database,
+  actor: AdminActor,
+  teamMemberId: string,
+  env: { RESEND_API_KEY?: string; RESEND_FROM_EMAIL?: string; PUBLIC_SITE_URL?: string },
+): Promise<{ requestId: string; emailStatus: string }> {
+  const employee = await db
+    .prepare('SELECT id, email, status FROM team_members WHERE id = ? LIMIT 1')
+    .bind(teamMemberId)
+    .first<{ id: string; email: string; status: string }>();
+  if (!employee) throw new AdminAuthError(404, 'employee_not_found');
+  if (employee.status !== 'active') throw new AdminAuthError(409, 'employee_inactive');
+  if (!employee.email) throw new AdminAuthError(409, 'employee_email_required');
+  const request = await createSigningRequest(
+    db,
+    {
+      subjectType: 'employee',
+      teamMemberId,
+      email: employee.email,
+      role: 'cleaner',
+    },
+    { createdByAdminUserId: actor.id },
+  );
+  if (!request.required || !request.requestId) {
+    throw new AdminAuthError(409, 'employee_packet_not_configured');
+  }
+  const sent = request.token
+    ? await sendSigningEmail(
+        env,
+        employee.email,
+        request.token,
+        request.bundleName ?? 'Employee onboarding documents',
+        `employee-onboarding-${teamMemberId}-${Date.now()}`,
+      ).catch(() => false)
+    : false;
+  await audit(db, {
+    actorUserId: actor.id,
+    action: 'employee.agreement_request_created',
+    entityType: 'team_member',
+    entityId: teamMemberId,
+    detail: request.requestId,
+  });
+  return { requestId: request.requestId, emailStatus: sent ? 'sent' : 'not_sent' };
+}
+

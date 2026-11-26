@@ -7,6 +7,7 @@ import {
   addPerformanceNote,
   assignTraining,
   completeTraining,
+  createEmployeeAgreementRequest,
   createQualityInspection,
   createTrainingModule,
   employeeDocumentExpirations,
@@ -33,7 +34,11 @@ import {
   payrollCsv,
 } from '../../../src/lib/employee/payroll.ts';
 
-interface Env extends AdminDbEnv {}
+interface Env extends AdminDbEnv {
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  PUBLIC_SITE_URL?: string;
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -129,6 +134,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     if (action === 'update_profile') {
       await updateEmployeeProfile(db, actor, text(body.teamMemberId, 100), body);
       return json({ ok: true });
+    }
+    if (action === 'send_agreement') {
+      return json({
+        ok: true,
+        ...(await createEmployeeAgreementRequest(db, actor, text(body.teamMemberId, 100), context.env)),
+      });
     }
     if (action === 'handbook') {
       await acknowledgeHandbook(db, actor, text(body.teamMemberId, 100));
