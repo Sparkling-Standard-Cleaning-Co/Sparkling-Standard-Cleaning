@@ -337,6 +337,13 @@ function renderEmployeeMember(): void {
       <label>Note <input name="note" maxlength="500" /></label>
       <button class="btn btn--ghost btn--small" type="submit">Save shift</button>
     </form>
+    <h4>Record an employee callout</h4>
+    <form class="admin-inline-form" data-employee-form="callout">
+      <input type="hidden" name="teamMemberId" value="${escE(member.id)}" />
+      <label>Assigned job ID <input name="appointmentId" required placeholder="appt_…" /></label>
+      <label>Reason <input name="reason" maxlength="1000" /></label>
+      <button class="btn btn--danger btn--small" type="submit">Record callout and notify</button>
+    </form>
     <h4>Performance and quality</h4>
     ${performance || '<p class="admin-muted">No performance records.</p>'}
     <form class="admin-inline-form" data-employee-form="performance">
@@ -535,6 +542,19 @@ document.querySelector<HTMLElement>('[data-admin-view="employees"]')?.addEventLi
       note: payload.note,
     })
       .then(() => loadEmployeeMember(String(payload.teamMemberId)))
+      .catch(employeeFailure);
+  }
+  if (kind === 'callout') {
+    employeePost({
+      action: 'record_callout',
+      teamMemberId: payload.teamMemberId,
+      appointmentId: payload.appointmentId,
+      reason: payload.reason,
+    })
+      .then(() => {
+        setEmployeeStatus('Callout recorded and operational notice sent.', 'success');
+        return loadEmployeeMember(String(payload.teamMemberId));
+      })
       .catch(employeeFailure);
   }
   if (kind === 'payroll-period') {

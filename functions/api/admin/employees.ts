@@ -1,6 +1,7 @@
 // Employee administration, training, quality and payroll calculation API.
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
 import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
+import { sendOperationalNotification, type CommunicationEnv } from '../../../src/lib/admin/communications.ts';
 import {
   acknowledgeHandbook,
   addOnboardingTask,
@@ -133,6 +134,78 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     requireCsrf(context.request, actor);
     if (action === 'update_profile') {
       await updateEmployeeProfile(db, actor, text(body.teamMemberId, 100), body);
+      return json({ ok: true });
+    }
+    if (action === 'record_callout') {
+      const teamMemberId = text(body.teamMemberId, 100);
+      const appointmentId = text(body.appointmentId, 100);
+      const reason = text(body.reason, 1000);
+      const appointment = await db
+        .prepare(
+          `SELECT a.id, a.start_at, a.end_at, a.reference, a.branch_id, tm.display_name
+           FROM appointments a
+           JOIN appointment_resources ar ON ar.appointment_id = a.id
+           JOIN team_members tm ON tm.id = ar.team_member_id
+           WHERE a.id = ? AND ar.team_member_id = ? LIMIT 1`,
+        )
+        .bind(appointmentId, teamMemberId)
+        .first<{
+          id: string;
+          start_at: string;
+          end_at: string;
+          reference: string;
+          branch_id: string | null;
+          display_name: string;
+        }>();
+      if (!appointment) throw new AdminAuthError(404, 'callout_assignment_not_found');
+      await db
+        .prepare(
+          `INSERT INTO time_off_requests (id, team_member_id, start_at, end_at, reason, status, reviewed_by_admin_user_id, reviewed_at)
+           VALUES (?, ?, ?, ?, ?, 'approved', ?, ?)`,
+        )
+        .bind(
+          `callout_${crypto.randomUUID()}`,
+          teamMemberId,
+          appointment.start_at,
+          appointment.end_at,
+          reason || 'Employee callout',
+          actor.id,
+          new Date().toISOString(),
+        )
+        .run();
+      await db
+        .prepare('INSERT INTO team_time_off (id, team_member_id, start_at, end_at, reason) VALUES (?, ?, ?, ?, ?)')
+        .bind(
+          `toff_${crypto.randomUUID()}`,
+          teamMemberId,
+          appointment.start_at,
+          appointment.end_at,
+          reason || 'Employee callout',
+        )
+        .run();
+      await sendOperationalNotification(db, context.env as unknown as CommunicationEnv, {
+        eventKey: 'employee_callout',
+        subject: `Employee callout - ${appointment.display_name} - ${appointment.reference}`,
+        text: [
+          `Employee: ${appointment.display_name}`,
+          `Reference: ${appointment.reference}`,
+          `Scheduled: ${appointment.start_at} - ${appointment.end_at}`,
+          `Reason: ${reason || 'not provided'}`,
+          '',
+          'Reassign the job or notify the customer.',
+        ].join('\n'),
+        relatedType: 'appointment',
+        relatedId: appointmentId,
+        ...(appointment.branch_id ? { branchId: appointment.branch_id } : {}),
+        idempotencyKey: `employee-callout-${appointmentId}-${Date.now()}`,
+      }).catch(() => undefined);
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'employee.callout_recorded',
+        entityType: 'appointment',
+        entityId: appointmentId,
+        detail: teamMemberId,
+      });
       return json({ ok: true });
     }
     if (action === 'send_agreement') {

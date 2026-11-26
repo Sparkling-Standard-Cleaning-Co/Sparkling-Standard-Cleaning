@@ -1,4 +1,8 @@
 import { adminDb, type AdminDbEnv } from '../../../src/lib/admin/d1.ts';
+import {
+  sendOperationalNotification,
+  type CommunicationEnv,
+} from '../../../src/lib/admin/communications.ts';
 import { AdminAuthError, audit, requireActor, requireCsrf } from '../../../src/lib/admin/operations.ts';
 import {
   assignmentFor,
@@ -21,7 +25,12 @@ import {
   type TimeIntervalLike,
 } from '../../../src/lib/employee/timekeeping.ts';
 
-interface Env extends AdminDbEnv {}
+interface Env extends AdminDbEnv {
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  RESEND_REPLY_TO?: string;
+  PUBLIC_SITE_URL?: string;
+}
 
 type ClockAction = 'clock_in' | 'start_break' | 'end_break' | 'start_meal' | 'end_meal' | 'clock_out';
 const ACTIONS: ClockAction[] = ['clock_in', 'start_break', 'end_break', 'start_meal', 'end_meal', 'clock_out'];
@@ -159,6 +168,38 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         entityId: event.id,
         detail: `${rateType}${appointmentId ? `:${appointmentId}` : ''}:${location.status}`,
       });
+      if (appointmentId) {
+        const appointment = await db
+          .prepare('SELECT start_at, branch_id, reference FROM appointments WHERE id = ? LIMIT 1')
+          .bind(appointmentId)
+          .first<{ start_at: string; branch_id: string | null; reference: string }>();
+        const lateMinutes = appointment
+          ? Math.round((now.getTime() - Date.parse(appointment.start_at)) / 60_000)
+          : 0;
+        if (appointment && lateMinutes > 10) {
+          await sendOperationalNotification(
+            db,
+            context.env as unknown as CommunicationEnv,
+            {
+              eventKey: 'employee_late',
+              subject: `Late arrival - ${profile.displayName} - ${appointment.reference}`,
+              text: [
+                `Employee: ${profile.displayName}`,
+                `Reference: ${appointment.reference}`,
+                `Scheduled start: ${appointment.start_at}`,
+                `Clocked in: ${now.toISOString()}`,
+                `Late by: ${lateMinutes} minutes`,
+                '',
+                'Review the assignment and notify the customer if service will be affected.',
+              ].join('\n'),
+              relatedType: 'appointment',
+              relatedId: appointmentId,
+              ...(appointment.branch_id ? { branchId: appointment.branch_id } : {}),
+              idempotencyKey: `employee-late-${appointmentId}-${now.toISOString().slice(0, 10)}`,
+            },
+          ).catch(() => undefined);
+        }
+      }
     } else {
       if (!open) return json({ ok: false, error: 'not_clocked_in' }, 409);
       const kind = String(open.kind ?? 'work');

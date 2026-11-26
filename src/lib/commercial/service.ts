@@ -409,11 +409,24 @@ async function proposalRow(
     .first<Record<string, unknown>>();
 }
 
+async function expireProposals(db: D1Database): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  await db
+    .prepare(
+      `UPDATE commercial_proposals SET status = 'expired', updated_at = ?
+       WHERE status IN ('published','sent') AND expiration_date IS NOT NULL AND expiration_date < ?`,
+    )
+    .bind(new Date().toISOString(), today)
+    .run()
+    .catch(() => undefined);
+}
+
 export async function listCommercialProposals(
   db: D1Database,
   actor: AdminActor,
   filters: { status?: string; customerId?: string } = {},
 ): Promise<Array<Record<string, unknown>>> {
+  await expireProposals(db);
   const clauses = ['1 = 1'];
   const binds: unknown[] = [];
   if (actor.role !== 'owner' && actor.branchId) {
@@ -453,6 +466,7 @@ export async function getCommercialProposal(
   actor: AdminActor,
   id: string,
 ): Promise<Record<string, unknown>> {
+  await expireProposals(db);
   const row = await proposalRow(db, actor, id);
   if (!row) throw new AdminAuthError(404, 'proposal_not_found');
   await syncProposalSigningStatus(db, id);
@@ -738,6 +752,9 @@ export async function sendCommercialProposal(
   if (!row) throw new AdminAuthError(404, 'proposal_not_found');
   if (!['published', 'sent'].includes(String(row.status))) {
     throw new AdminAuthError(409, 'publish_proposal_first');
+  }
+  if (row.expiration_date && String(row.expiration_date) < new Date().toISOString().slice(0, 10)) {
+    throw new AdminAuthError(409, 'proposal_expired');
   }
   const email = await customerEmail(db, String(row.customer_id));
   if (!email) throw new AdminAuthError(409, 'customer_email_required');
