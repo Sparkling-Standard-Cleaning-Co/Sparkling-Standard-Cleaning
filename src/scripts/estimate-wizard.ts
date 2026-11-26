@@ -2606,8 +2606,30 @@ function initEstimateWizard(form: HTMLFormElement): void {
       return;
     }
 
+    if (failure.error === 'quote_not_payable') {
+      // The request was saved; do not permanently strand the customer on a
+      // transient geocode/route disagreement. Explain the reason and allow a
+      // fresh verification attempt.
+      paymentBlocked = false;
+      paymentRetryAvailable = true;
+      acceptedPaymentAmount = null;
+      markRequestReceived();
+      setPayNowBusy(false);
+      syncPaymentAvailability(true);
+      if (status) {
+        const reason = failure.reason ?? '';
+        status.dataset.state = 'error';
+        status.textContent =
+          reason === 'quote_not_verified'
+            ? 'Your request was received, but we could not verify the exact travel route to this address for online payment. Confirm the address pin and try again, or Sparkling Standard will confirm the price and payment options with you. No payment has been taken.'
+            : reason === 'quote_stale'
+              ? 'Your request was received, but the estimate changed before payment. Refresh the estimate and try again, or Sparkling Standard will confirm the price with you. No payment has been taken.'
+              : 'Your request was received, but secure payment could not be verified for this estimate. Try again, or Sparkling Standard will confirm the price and payment options with you. No payment has been taken.';
+      }
+      return;
+    }
+
     if (
-      failure.error === 'quote_not_payable' ||
       failure.error === 'payment_not_ready' ||
       failure.error === 'recurring_scheduling_gated' ||
       failure.error === 'email_required' ||

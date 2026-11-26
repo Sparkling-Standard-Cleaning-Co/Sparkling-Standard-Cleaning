@@ -31,7 +31,7 @@ import {
   resolveRoute,
   type RoutingEnv,
 } from '../travel/server-routing.ts';
-import { resolveAddress, reverseGeocode, type GeocodeEnv } from '../location/server-geocode.ts';
+import { googleGeocode, googleMapsKey, resolveAddress, reverseGeocode, type GeocodeEnv } from '../location/server-geocode.ts';
 import { formatDriveDuration } from '../travel/calculateTravelAdjustment.ts';
 
 export interface QuoteVerificationEnv extends RoutingEnv, GeocodeEnv {}
@@ -294,7 +294,24 @@ export async function resolveServerDestination(
     const line1 = unit ? `${street} ${unit}` : street;
     const region = [city, state].filter(Boolean).join(', ');
     const queryParts = [line1, region, zip].filter(Boolean);
-    const resolved = await resolveAddress(env, queryParts.join(', ')).catch(() => null);
+    const query = queryParts.join(', ');
+    // Prefer the same Google Geocoding authority the customer used when they
+    // selected the address. Census/MapMap can disagree with Google by more
+    // than the pin-divergence threshold for the same rural abbreviation,
+    // which previously blocked legitimate Pay Now checkouts.
+    if (googleMapsKey(env)) {
+      const google = await googleGeocode(env, query).catch(() => null);
+      if (google?.precise) {
+        return {
+          lat: google.lat,
+          lng: google.lng,
+          source: 'address_geocode',
+          ...(google.zip ? { zip: google.zip } : {}),
+          ...(google.state ? { state: google.state } : {}),
+        };
+      }
+    }
+    const resolved = await resolveAddress(env, query).catch(() => null);
     if (resolved) {
       return {
         lat: resolved.lat,

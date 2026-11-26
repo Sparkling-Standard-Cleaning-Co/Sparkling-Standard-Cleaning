@@ -46,7 +46,7 @@ after(async () => {
   server?.kill();
 });
 
-async function openScenario({ staffingPending = false } = {}) {
+async function openScenario({ staffingPending = false, checkoutFailure = null } = {}) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   const page = await context.newPage();
   const holdRequests = [];
@@ -180,9 +180,9 @@ async function openScenario({ staffingPending = false } = {}) {
     }
     checkoutRequests.push(route.request().postDataJSON());
     await route.fulfill({
-      status: 503,
+      status: checkoutFailure ? 409 : 503,
       contentType: 'application/json',
-      body: '{"ok":false,"error":"payment_not_ready"}',
+      body: JSON.stringify(checkoutFailure ?? { ok: false, error: 'payment_not_ready' }),
     });
   });
   await page.route('https://checkout.stripe.com/**', (route) => route.abort());
@@ -277,6 +277,29 @@ test('a mandatory second cleaner keeps both payment paths with a clear disclosur
     assert.match(note, /Additional cleaner required/i);
     assert.match(note, /2 cleaners/i);
     assert.match(note, /preserved/i);
+  } finally {
+    await context.close();
+  }
+});
+
+test('a verified-quote failure never permanently blocks Pay Now retry', async () => {
+  const { context, page, checkoutRequests } = await openScenario({
+    checkoutFailure: { ok: false, error: 'quote_not_payable', reason: 'quote_not_verified' },
+  });
+  try {
+    await chooseAddressAndDate(page);
+    await finishToPayment(page);
+    await page.click('[data-pay-now]');
+    await page.waitForFunction(() => {
+      const status = document.querySelector('[data-form-status]');
+      return Boolean(status && /could not verify the exact travel route/i.test(status.textContent ?? ''));
+    });
+    const retry = page.locator('[data-pay-now]');
+    assert.equal(await retry.isVisible(), true, 'the customer can retry without starting over');
+    assert.equal(await retry.isDisabled(), false);
+    await retry.click();
+    await page.waitForTimeout(300);
+    assert.equal(checkoutRequests.length, 2, 'a second secure-payment attempt is allowed');
   } finally {
     await context.close();
   }

@@ -1,4 +1,4 @@
-// Reservation quote verification tests — the server NEVER trusts the browser.
+﻿// Reservation quote verification tests â€” the server NEVER trusts the browser.
 //
 // Every provider call is mocked (MapMap geocode/route, Census, EIA). No API
 // key, network access or private origin value is required.
@@ -176,7 +176,7 @@ const routedEnv: QuoteVerificationEnv = {
 
 const zoneEnv: QuoteVerificationEnv = {};
 
-// ── Field mapping ────────────────────────────────────────────────────────────
+// â”€â”€ Field mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('mapReservationFields maps structured values and addon ids', () => {
   const draft = mapReservationFields(fields({ addon_ids: 'inside_oven, laundry ,' }));
@@ -192,7 +192,7 @@ test('isPricedReservation only matches priced reservation requests', () => {
   assert.equal(isPricedReservation(fields({ quoted_price: '255', request_type: 'residential_estimate' })), false);
 });
 
-// ── Server-side destination resolution ───────────────────────────────────────
+// â”€â”€ Server-side destination resolution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('the server geocodes the address instead of accepting client coordinates', async () => {
   const destination = await withFetch(providerStub(), () =>
@@ -256,7 +256,7 @@ test('the server composes street, city, state and ZIP for exact address lookup',
   );
 });
 
-// ── GPS destinations without a ZIP ───────────────────────────────────────────
+// â”€â”€ GPS destinations without a ZIP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('a confirmed GPS pin without a ZIP resolves from the customer pin, never a fabricated ZIP', async () => {
   const gpsFields = fields({
@@ -301,7 +301,7 @@ test('a GPS pin destination without a ZIP can only ever verify as preliminary', 
   assert.match(verification.note, /device pin/i);
 });
 
-// ── Match / mismatch verdicts ────────────────────────────────────────────────
+// â”€â”€ Match / mismatch verdicts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('a matching reservation with live travel, precise address and current config is fully verified', async () => {
   const now = Date.UTC(2026, 9, 1, 12, 0, 0);
@@ -365,7 +365,7 @@ test('a small variance within the stated tolerance is preliminary, never an exac
   assert.notEqual(verification.status, 'verified');
 });
 
-test('browser-submitted coordinates cannot redirect the route — and a divergent pin is flagged', async () => {
+test('browser-submitted coordinates cannot redirect the route â€” and a divergent pin is flagged', async () => {
   const tampered = fields({
     quoted_price: String(browserPrice()),
     // Coordinates the browser might try to inject (e.g. next door to the origin).
@@ -409,7 +409,7 @@ test('a reservation without a submitted price is unverifiable but still reports 
   assert.equal(verification.verifiedPrice, browserPrice());
 });
 
-// ── Offline / degradation paths ──────────────────────────────────────────────
+// â”€â”€ Offline / degradation paths â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('without TRAVEL_ORIGIN verification still recalculates, but never as verified', async () => {
   const quoted = browserPrice({}, false, false);
@@ -453,7 +453,7 @@ test('a total network outage still recomputes from the ZIP reference and stays h
   assert.notEqual(verification.status, 'verified');
 });
 
-// ── Integrity: uncertainty is preserved, never rounded down ─────────────────
+// â”€â”€ Integrity: uncertainty is preserved, never rounded down â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('a matching price routed only to the ZIP centre is preliminary, never verified', async () => {
   // The address cannot be geocoded (both provider and Census return nothing),
@@ -537,7 +537,7 @@ test("a fabricated price that differs by a cent beyond tolerance is a mismatch, 
   assert.equal(verification.status, 'mismatch');
 });
 
-// ── Pin integrity: a moved pin is a different destination ───────────────────
+// â”€â”€ Pin integrity: a moved pin is a different destination â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 test('a customer-moved pin is never verified even when price, route and config all match', async () => {
   const quoted = browserPrice();
@@ -708,4 +708,75 @@ test('the verified destination, not client state or ZIP fields, establishes tax 
   assert.equal(verification.travel.destinationSource, 'address_geocode');
   assert.equal(verification.travel.destinationZip, '32502');
   assert.equal(verification.travel.destinationState, 'FL');
+});
+
+test('server verification uses the same Google address authority the customer selected', async () => {
+  const googlePin = { lat: 30.624585, lng: -87.10901 };
+  const stub = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+    const href = String(url);
+    if (href.includes('/route/v1/')) {
+      return jsonResponse({ code: 'Ok', routes: [{ distance: 24140.2, duration: 1800.5 }] });
+    }
+    if (href.includes('maps.googleapis.com/maps/api/geocode/json')) {
+      return jsonResponse({
+        status: 'OK',
+        results: [
+          {
+            formatted_address: '5134 Hamilton Blvd, Pace, FL 32571, USA',
+            address_components: [
+              { long_name: '5134', short_name: '5134', types: ['street_number'] },
+              { long_name: 'Hamilton Boulevard', short_name: 'Hamilton Blvd', types: ['route'] },
+              { long_name: 'Pace', short_name: 'Pace', types: ['locality'] },
+              { long_name: 'Florida', short_name: 'FL', types: ['administrative_area_level_1'] },
+              { long_name: '32571', short_name: '32571', types: ['postal_code'] },
+            ],
+            geometry: { location: { lat: googlePin.lat, lng: googlePin.lng } },
+            types: ['street_address'],
+          },
+        ],
+      });
+    }
+    if (href.includes('api.mapmap.ai/geocode?')) {
+      return jsonResponse({
+        features: [
+          {
+            properties: { label: '5134 HAMILTON LN, PACE, FL, 32571' },
+            geometry: { coordinates: [-87.157765, 30.623105] },
+          },
+        ],
+      });
+    }
+    if (href.includes('geocoding.geo.census.gov')) {
+      return jsonResponse({
+        result: {
+          addressMatches: [
+            {
+              matchedAddress: '5134 HAMILTON LN, PACE, FL, 32571',
+              coordinates: { x: -87.157765, y: 30.623105 },
+            },
+          ],
+        },
+      });
+    }
+    return jsonResponse({ error: 'unexpected' }, 500);
+  };
+  const environment: QuoteVerificationEnv = {
+    ...routedEnv,
+    GOOGLE_MAPS_SERVER_API_KEY: 'synthetic-google-key',
+  };
+  const addressFields = fields({
+    service_address: '5134 hamilton br',
+    address_city: 'Pace',
+    address_state: 'FL',
+    zip: '32571',
+    pin_latitude: String(googlePin.lat),
+    pin_longitude: String(googlePin.lng),
+    quoted_price: String(browserPrice({ zip: '32571' })),
+  });
+  const verification = await withFetch(stub, () =>
+    verifyReservationQuote(addressFields, environment, undefined, pricing),
+  );
+  assert.equal(verification.travel.destinationSource, 'address_geocode');
+  assert.equal(verification.pinCheck, 'ok');
+  assert.equal(verification.status, 'verified');
 });

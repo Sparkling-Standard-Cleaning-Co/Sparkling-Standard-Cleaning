@@ -45,6 +45,7 @@ export const zipReference: Record<string, ZipReference> = {
   '32514': { city: 'Pensacola', state: 'FL', zone: 'core', lat: 30.53, lng: -87.22 },
   '32526': { city: 'Pensacola', state: 'FL', zone: 'core', lat: 30.49, lng: -87.32 },
   '32533': { city: 'Cantonment', state: 'FL', zone: 'core', lat: 30.61, lng: -87.34 },
+  '32534': { city: 'Pensacola', state: 'FL', zone: 'core', lat: 30.54, lng: -87.30 },
 
   // ── Surrounding: neighboring Pensacola-area communities ──────────────────
   '32530': { city: 'Bagdad', state: 'FL', zone: 'surrounding', lat: 30.61, lng: -87.03 },
