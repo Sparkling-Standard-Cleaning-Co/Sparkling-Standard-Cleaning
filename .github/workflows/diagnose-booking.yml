@@ -38,22 +38,22 @@ jobs:
         run: |
           npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
             "SELECT (SELECT COUNT(*) FROM booking_requests) AS booking_requests, (SELECT COUNT(*) FROM booking_requests WHERE status='pending') AS pending_requests, (SELECT COUNT(*) FROM booking_requests WHERE status='confirmed') AS confirmed_requests, (SELECT COUNT(*) FROM checkout_sessions) AS checkout_sessions, (SELECT COUNT(*) FROM checkout_sessions WHERE status='open') AS open_checkouts, (SELECT COUNT(*) FROM checkout_sessions WHERE status='failed') AS failed_checkouts, (SELECT COUNT(*) FROM appointment_resources) AS appointment_resources, (SELECT COUNT(*) FROM appointments) AS appointments;"
-      - name: Recent booking requests
+      - name: Recent booking requests with reasons
         run: |
           npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
-            "SELECT id,status,requested_date,start_at,end_at,quote_reference,created_at,updated_at FROM booking_requests ORDER BY created_at DESC LIMIT 15;"
+            "SELECT id,status,decline_reason,closed_reason,payment_status,quote_reference,requested_date,start_at,end_at,substr(payload_json,1,1600) AS payload,created_at,updated_at FROM booking_requests ORDER BY created_at DESC LIMIT 12;"
       - name: Recent checkout sessions
         run: |
           npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
-            "SELECT id,booking_hold_id,quote_reference,status,amount_cents,stripe_session_id,created_at,updated_at,expires_at FROM checkout_sessions ORDER BY created_at DESC LIMIT 15;"
-      - name: Recent failed checkout records
-        run: |
-          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
-            "SELECT id,status,booking_hold_id,quote_reference,amount_cents,created_at,updated_at FROM checkout_sessions WHERE status='failed' ORDER BY created_at DESC LIMIT 15;"
+            "SELECT id,booking_hold_id,quote_reference,status,amount_cents,stripe_session_id,created_at,updated_at,expires_at FROM checkout_sessions ORDER BY created_at DESC LIMIT 20;"
       - name: Recent communications failures related to booking
         run: |
           npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
             "SELECT id,event_key,recipient,status,error_code,related_type,related_id,created_at FROM notification_deliveries WHERE status <> 'sent' ORDER BY created_at DESC LIMIT 20;" || true
+      - name: Related operational alerts
+        run: |
+          npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
+            "SELECT alert_key,kind,status,title,first_seen_at,last_seen_at,resolution_note FROM operational_alerts WHERE kind LIKE '%booking%' OR alert_key LIKE '%booking%' ORDER BY updated_at DESC LIMIT 20;" || true
       - name: Payment and booking tables present
         run: |
           npx --yes wrangler@4 d1 execute DB --remote --config wrangler.diag.jsonc --json --command \
