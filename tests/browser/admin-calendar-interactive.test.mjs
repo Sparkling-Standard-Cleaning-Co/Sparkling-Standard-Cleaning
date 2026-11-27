@@ -173,11 +173,11 @@ test('the calendar keeps Morning and Afternoon sections, cycles appointments and
 
     assert.ok(await morning.locator('[data-week-appointment="appt_morning_1"]').isVisible(), 'earliest morning appointment is shown first');
     assert.ok(await morning.locator('[data-week-appointment="appt_morning_2"]').isHidden(), 'later appointment starts hidden');
-    const more = morning.locator('[data-week-cycle]');
-    assert.match((await more.textContent()) ?? '', /\+1 more/);
+    const more = morning.locator('[data-week-expand]');
+    assert.match((await more.textContent()) ?? '', /\+1/);
     await more.click();
     assert.ok(await morning.locator('[data-week-appointment="appt_morning_2"]').isVisible(), 'cycling reveals the next appointment');
-    assert.ok((await more.textContent())?.includes('Next'), 'cycle control reports position');
+    assert.equal(await more.getAttribute('aria-expanded'), 'true');
 
     assert.match(
       (await morning.locator('[data-week-appointment="appt_morning_2"]').textContent()) ?? '',
@@ -200,7 +200,7 @@ test('a recurring occurrence can be rescheduled for this appointment only', asyn
   try {
     const tuesday = page.locator('.admin-week-day').filter({ hasText: 'Nov 24' });
     const morning = tuesday.locator('.admin-week-section').filter({ hasText: 'Morning' });
-    await morning.locator('[data-week-cycle]').click();
+    await morning.locator('[data-week-expand]').click();
     await morning
       .locator('[data-week-appointment="appt_morning_2"]')
       .locator('[data-admin-appointment-action="reschedule"]')
@@ -232,7 +232,7 @@ test('a recurring future-series change reports the affected schedule', async () 
   try {
     const tuesday = page.locator('.admin-week-day').filter({ hasText: 'Nov 24' });
     const morning = tuesday.locator('.admin-week-section').filter({ hasText: 'Morning' });
-    await morning.locator('[data-week-cycle]').click();
+    await morning.locator('[data-week-expand]').click();
     await morning
       .locator('[data-week-appointment="appt_morning_2"]')
       .locator('[data-admin-appointment-action="reschedule"]')
@@ -306,12 +306,14 @@ test('the interactive calendar remains usable without page-level overflow at pho
   const { context, page } = await openAdmin();
   try {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator('.admin-week-grid').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('.admin-week-section').count(), 14);
+    await page.locator('.admin-week-mobile-days').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.admin-week-mobile-days button').count(), 7);
+    assert.equal(await page.locator('.admin-week-section').count(), 2);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     assert.ok(overflow <= 1, `calendar has no page-level horizontal overflow at 390px (got ${overflow})`);
+    await page.locator('.admin-week-mobile-days button').filter({ hasText: 'Nov 24' }).click();
     const reschedule = page.locator('[data-admin-appointment-action="reschedule"]').first();
     assert.ok(await reschedule.isVisible(), 'keyboard/touch reschedule control is available');
   } finally {

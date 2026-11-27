@@ -28,6 +28,7 @@ import {
   type CommercialScheduleEnv,
   type CommercialScheduleInput,
 } from '../../../src/lib/commercial/scheduling.ts';
+import { samePropertyAddress } from '../../../src/lib/address/address-key.ts';
 
 interface Env extends AdminDbEnv {
   RESEND_API_KEY?: string;
@@ -87,10 +88,50 @@ async function branchProperties(
   const where = branchId ? 'WHERE p.status = \'active\' AND p.branch_id = ?' : "WHERE p.status = 'active'";
   const result = await db
     .prepare(
-      `SELECT p.id, p.customer_id, p.label, p.line1, p.city, p.state, p.postal_code,
-              p.access_notes, p.parking_notes
+      `SELECT p.id, p.customer_id, p.label, p.line1, p.line2, p.city, p.state, p.postal_code,
+              p.access_notes, p.parking_notes, p.usage_type
        FROM properties p ${where}
        ORDER BY p.city, p.line1 LIMIT 500`,
+    )
+    .bind(...(branchId ? [branchId] : []))
+    .all<Record<string, unknown>>();
+  return result.results ?? [];
+}
+
+async function branchFacilities(
+  db: NonNullable<ReturnType<typeof adminDb>>,
+  branchId: string | null,
+): Promise<Array<Record<string, unknown>>> {
+  const branch = branchId ? ' AND p.branch_id = ?' : '';
+  const result = await db
+    .prepare(
+      `SELECT p.id, p.customer_id, p.label, p.line1, p.line2, p.city, p.state, p.postal_code,
+              p.access_notes, p.parking_notes, p.usage_type, p.created_at,
+              c.first_name, c.last_name, COALESCE(c.company_name,'') AS company_name,
+              (SELECT COUNT(*) FROM commercial_proposals cp WHERE cp.property_id = p.id) AS proposal_count,
+              (SELECT COUNT(*) FROM commercial_contracts cc WHERE cc.property_id = p.id) AS contract_count,
+              (SELECT COUNT(*) FROM property_contacts pc WHERE pc.property_id = p.id) AS contact_count,
+              (SELECT COUNT(*) FROM commercial_walkthroughs cw WHERE cw.property_id = p.id) AS walkthrough_count,
+              (SELECT COUNT(*) FROM appointments a WHERE a.property_id = p.id
+                 AND a.status IN ('pending','confirmed','in_progress','completed')) AS job_count
+       FROM properties p JOIN customers c ON c.id = p.customer_id
+       WHERE p.status = 'active' AND c.status = 'active'${branch}
+         AND (
+           p.usage_type = 'facility'
+           OR TRIM(COALESCE(c.company_name,'')) NOT IN ('','N/A','n/a','NA','na','None','none','-')
+           OR EXISTS (SELECT 1 FROM commercial_proposals cp WHERE cp.property_id = p.id)
+           OR EXISTS (SELECT 1 FROM commercial_contracts cc WHERE cc.property_id = p.id)
+           OR EXISTS (SELECT 1 FROM property_contacts pc WHERE pc.property_id = p.id)
+           OR EXISTS (SELECT 1 FROM commercial_walkthroughs cw WHERE cw.property_id = p.id)
+           OR EXISTS (SELECT 1 FROM commercial_contract_schedules cs WHERE cs.property_id = p.id)
+           OR EXISTS (
+             SELECT 1 FROM appointments a JOIN estimates e ON e.id = a.estimate_id
+             WHERE a.property_id = p.id
+               AND (e.service_code LIKE '%commercial%' OR e.service_code LIKE '%church%')
+           )
+         )
+       ORDER BY COALESCE(NULLIF(c.company_name,''), c.last_name, c.first_name), p.city, p.line1
+       LIMIT 500`,
     )
     .bind(...(branchId ? [branchId] : []))
     .all<Record<string, unknown>>();
@@ -181,13 +222,14 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       ]);
       return json({ ok: true, contacts, walkthroughs });
     }
-    const [proposals, contracts, customers, properties] = await Promise.all([
+    const [proposals, contracts, customers, properties, facilities] = await Promise.all([
       listCommercialProposals(db, actor),
       listCommercialContracts(db, actor),
       branchCustomers(db, scopeBranch),
       branchProperties(db, scopeBranch),
+      branchFacilities(db, scopeBranch),
     ]);
-    return json({ ok: true, proposals, contracts, customers, properties });
+    return json({ ok: true, proposals, contracts, customers, properties, facilities });
   } catch (error) {
     return json(
       { ok: false, error: error instanceof AdminAuthError ? error.code : 'commercial_load_failed' },
@@ -300,6 +342,104 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     }
     if (action === 'add_walkthrough') {
       return json({ ok: true, ...(await addWalkthrough(db, actor, body)) });
+    }
+    if (action === 'create_facility') {
+      const customerId = text(body.customerId, 100);
+      const line1 = text(body.line1, 300);
+      const line2 = text(body.line2, 60);
+      const city = text(body.city, 120);
+      const state = (text(body.state, 2) || 'FL').toUpperCase();
+      const postalCode = text(body.postalCode, 10);
+      if (!customerId || !line1) return json({ ok: false, error: 'facility_address_required' }, 400);
+      if (!['FL', 'AL'].includes(state)) return json({ ok: false, error: 'facility_state_invalid' }, 400);
+      if (postalCode && !/^\d{5}(?:-\d{4})?$/.test(postalCode)) {
+        return json({ ok: false, error: 'facility_postal_code_invalid' }, 400);
+      }
+      const customer = await db
+        .prepare("SELECT id, primary_branch_id FROM customers WHERE id = ? AND status = 'active' LIMIT 1")
+        .bind(customerId)
+        .first<{ id: string; primary_branch_id: string | null }>();
+      if (!customer) return json({ ok: false, error: 'customer_not_found' }, 404);
+      if (actor.role !== 'owner' && customer.primary_branch_id !== actor.branchId) {
+        return json({ ok: false, error: 'branch_scope_denied' }, 403);
+      }
+      const existing = await db
+        .prepare(
+          `SELECT id, label, line1, line2, city, state, postal_code FROM properties
+           WHERE customer_id = ? AND status = 'active' LIMIT 200`,
+        )
+        .bind(customerId)
+        .all<Record<string, unknown>>();
+      const match = (existing.results ?? []).find((row) =>
+        samePropertyAddress(
+          { line1: row.line1, line2: row.line2, postalCode: row.postal_code },
+          { line1, line2, postalCode },
+        ),
+      );
+      if (match) {
+        await db
+          .prepare("UPDATE properties SET usage_type = 'facility', updated_at = ? WHERE id = ?")
+          .bind(new Date().toISOString(), match.id)
+          .run();
+        return json({ ok: true, id: String(match.id), reused: true });
+      }
+      const id = `prop_${crypto.randomUUID()}`;
+      await db
+        .prepare(
+          `INSERT INTO properties
+           (id, customer_id, branch_id, label, line1, line2, city, state, postal_code,
+            access_notes, parking_notes, usage_type, is_primary, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'facility', 0, 'active')`,
+        )
+        .bind(
+          id,
+          customerId,
+          customer.primary_branch_id,
+          text(body.label, 120) || 'Facility',
+          line1,
+          line2,
+          city,
+          state,
+          postalCode,
+          text(body.accessNotes, 1000),
+          text(body.parkingNotes, 1000),
+        )
+        .run();
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'commercial.facility_created',
+        entityType: 'property',
+        entityId: id,
+        detail: `${customerId}:${line1.slice(0, 120)}`,
+      });
+      return json({ ok: true, id, reused: false });
+    }
+    if (action === 'set_property_usage') {
+      const propertyId = text(body.propertyId, 100);
+      const usage = text(body.usageType, 20);
+      if (!propertyId || !['residential', 'facility'].includes(usage)) {
+        return json({ ok: false, error: 'property_usage_invalid' }, 400);
+      }
+      const property = await db
+        .prepare('SELECT branch_id FROM properties WHERE id = ? LIMIT 1')
+        .bind(propertyId)
+        .first<{ branch_id: string | null }>();
+      if (!property) return json({ ok: false, error: 'property_not_found' }, 404);
+      if (actor.role !== 'owner' && property.branch_id !== actor.branchId) {
+        return json({ ok: false, error: 'branch_scope_denied' }, 403);
+      }
+      await db
+        .prepare('UPDATE properties SET usage_type = ?, updated_at = ? WHERE id = ?')
+        .bind(usage, new Date().toISOString(), propertyId)
+        .run();
+      await audit(db, {
+        actorUserId: actor.id,
+        action: 'commercial.property_usage_changed',
+        entityType: 'property',
+        entityId: propertyId,
+        detail: usage,
+      });
+      return json({ ok: true });
     }
     if (action === 'archive_proposal') {
       const id = text(body.id, 100);

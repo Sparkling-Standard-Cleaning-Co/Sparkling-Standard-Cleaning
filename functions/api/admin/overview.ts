@@ -50,6 +50,7 @@ interface AlertRecord {
   lastSeen: string | null;
   view: string;
   filter?: string;
+  branchId?: string | undefined;
   records: Array<{ label: string; detail: string; id?: string }>;
   canRecheck: boolean;
   acknowledgedAt?: string | null;
@@ -97,24 +98,41 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const tomorrowStart = zonedTimeToUtc(tomorrow, '00:00', bookingConfig.timeZone);
     const dayAfterTomorrow = new Date(Date.parse(`${tomorrow}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
     const dayAfterStart = zonedTimeToUtc(dayAfterTomorrow, '00:00', bookingConfig.timeZone);
-    const [customers, leads, requests, appointments, gifts, failedLeads, recent, failedCommitments, financialIssues, failedNotifications, failedPaymentEvents, failedWorkerRuns, todayJobs, tomorrowJobs, unassignedJobs, staffingPending, staffingRows, unsignedAgreements, outstandingInvoices, failedCommunications] = await Promise.all([
+    const [customers, leads, requests, appointments, gifts, failedLeads, recent, failedCommitments, financialIssues, failedNotifications, failedPaymentEvents, recentFailedWorkerRuns, todayJobs, tomorrowJobs, unassignedJobs, staffingPending, staffingRows, unsignedAgreements, outstandingInvoices, failedCommunications] = await Promise.all([
       count(db, "SELECT COUNT(*) AS count FROM customers WHERE status = 'active'" + customerScope.where, customerScope.bind),
-      count(db, "SELECT COUNT(*) AS count FROM leads WHERE status IN ('new','contacted')" + leadScope.where, leadScope.bind),
-      count(db, "SELECT COUNT(*) AS count FROM booking_requests WHERE status = 'pending'" + requestScope.where, requestScope.bind),
       count(
         db,
-        "SELECT COUNT(*) AS count FROM appointments WHERE status IN ('pending','confirmed') AND start_at >= ?" + appointmentScope.where,
+        `SELECT COUNT(*) AS count FROM leads
+         WHERE status IN ('new','contacted','quoted')
+           AND is_test = 0 AND is_duplicate = 0
+           AND request_type <> 'reservation_request'${leadScope.where}`,
+        leadScope.bind,
+      ),
+      count(
+        db,
+        `SELECT COUNT(*) AS count FROM booking_requests
+         WHERE status = 'pending' AND archived_at IS NULL AND closed_at IS NULL AND is_test = 0${requestScope.where}`,
+        requestScope.bind,
+      ),
+      count(
+        db,
+        "SELECT COUNT(*) AS count FROM appointments WHERE status IN ('pending','confirmed','in_progress') AND start_at >= ?" + appointmentScope.where,
         [now, ...appointmentScope.bind],
       ),
       count(db, "SELECT COUNT(*) AS count FROM gift_certificates WHERE status = 'active'" + giftScope.where, giftScope.bind),
-      count(db, "SELECT COUNT(*) AS count FROM leads WHERE delivery_status = 'failed'" + leadScope.where, leadScope.bind),
+      count(
+        db,
+        "SELECT COUNT(*) AS count FROM leads WHERE delivery_status = 'failed' AND is_test = 0 AND is_duplicate = 0" + leadScope.where,
+        leadScope.bind,
+      ),
       db
         .prepare(
           `SELECT l.id, l.request_type, l.status, l.source, l.quote_reference, l.created_at,
                   c.first_name, c.last_name,
                   (SELECT value FROM customer_contacts WHERE customer_id = c.id AND kind = 'email' LIMIT 1) AS email
            FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
-           WHERE 1 = 1${leadScope.where.replace('branch_id', 'l.branch_id')}
+           WHERE l.is_test = 0 AND l.is_duplicate = 0
+             AND l.status NOT IN ('archived','lost','converted')${leadScope.where.replace('branch_id', 'l.branch_id')}
            ORDER BY l.created_at DESC LIMIT 8`,
         )
         .bind(...leadScope.bind)
@@ -132,35 +150,52 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       ),
       count(
         db,
-        `SELECT COUNT(*) AS count FROM appointments
-         WHERE status IN ('pending','confirmed') AND start_at >= ? AND start_at < ?${appointmentScope.where}`,
+        `SELECT COUNT(*) AS count FROM appointments a
+         WHERE a.status IN ('pending','confirmed','in_progress','completed')
+           AND a.start_at >= ? AND a.start_at < ?
+           AND (a.booking_request_id IS NULL OR NOT EXISTS (
+             SELECT 1 FROM booking_requests br WHERE br.id = a.booking_request_id AND br.is_test = 1
+           ))${appointmentScope.where.replace('branch_id', 'a.branch_id')}`,
         [todayStart.toISOString(), tomorrowStart.toISOString(), ...appointmentScope.bind],
       ),
       count(
         db,
-        `SELECT COUNT(*) AS count FROM appointments
-         WHERE status IN ('pending','confirmed') AND start_at >= ? AND start_at < ?${appointmentScope.where}`,
+        `SELECT COUNT(*) AS count FROM appointments a
+         WHERE a.status IN ('pending','confirmed','in_progress')
+           AND a.start_at >= ? AND a.start_at < ?
+           AND (a.booking_request_id IS NULL OR NOT EXISTS (
+             SELECT 1 FROM booking_requests br WHERE br.id = a.booking_request_id AND br.is_test = 1
+           ))${appointmentScope.where.replace('branch_id', 'a.branch_id')}`,
         [tomorrowStart.toISOString(), dayAfterStart.toISOString(), ...appointmentScope.bind],
       ),
       count(
         db,
         `SELECT COUNT(*) AS count FROM appointments a
          WHERE a.status IN ('pending','confirmed') AND a.start_at >= ?
-           AND NOT EXISTS (SELECT 1 FROM appointment_resources r WHERE r.appointment_id = a.id)${appointmentScope.where.replace('branch_id', 'a.branch_id')}`,
+           AND NOT EXISTS (SELECT 1 FROM appointment_resources r WHERE r.appointment_id = a.id)
+           AND (a.booking_request_id IS NULL OR NOT EXISTS (
+             SELECT 1 FROM booking_requests br WHERE br.id = a.booking_request_id AND br.is_test = 1
+           ))${appointmentScope.where.replace('branch_id', 'a.branch_id')}`,
         [now, ...appointmentScope.bind],
       ),
       count(
         db,
         `SELECT COUNT(*) AS count FROM appointments a
-         WHERE a.staffing_pending = 1 AND a.status IN ('pending','confirmed') AND a.start_at >= ?${appointmentScope.where.replace('branch_id', 'a.branch_id')}`,
+         WHERE a.staffing_pending = 1 AND a.status IN ('pending','confirmed') AND a.start_at >= ?
+           AND (a.booking_request_id IS NULL OR NOT EXISTS (
+             SELECT 1 FROM booking_requests br WHERE br.id = a.booking_request_id AND br.is_test = 1
+           ))${appointmentScope.where.replace('branch_id', 'a.branch_id')}`,
         [now, ...appointmentScope.bind],
       ),
       db
         .prepare(
-          `SELECT a.id, a.reference, a.start_at, a.duration_minutes, a.crew_size, a.staffing_reason,
+          `SELECT a.id, a.reference, a.start_at, a.duration_minutes, a.crew_size, a.staffing_reason, a.branch_id,
                   c.first_name, c.last_name
            FROM appointments a LEFT JOIN customers c ON c.id = a.customer_id
-           WHERE a.staffing_pending = 1 AND a.status IN ('pending','confirmed') AND a.start_at >= ?${appointmentScope.where.replace('branch_id', 'a.branch_id')}
+           WHERE a.staffing_pending = 1 AND a.status IN ('pending','confirmed') AND a.start_at >= ?
+             AND (a.booking_request_id IS NULL OR NOT EXISTS (
+               SELECT 1 FROM booking_requests br WHERE br.id = a.booking_request_id AND br.is_test = 1
+             ))${appointmentScope.where.replace('branch_id', 'a.branch_id')}
            ORDER BY a.start_at LIMIT 20`,
         )
         .bind(now, ...appointmentScope.bind)
@@ -185,7 +220,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
          )`,
       ),
     ]);
-    const failedCheckouts = await count(
+    const failedCheckoutsHistory = await count(
       db,
       "SELECT COUNT(*) AS count FROM checkout_sessions WHERE status = 'failed'",
     );
@@ -193,6 +228,43 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       db,
       "SELECT COUNT(*) AS count FROM checkout_sessions WHERE status = 'open' AND created_at < datetime('now','-35 minutes')",
     );
+    const [completedCheckouts, paidRequests, successfulPayments] = await Promise.all([
+      db
+        .prepare("SELECT quote_reference, created_at FROM checkout_sessions WHERE status = 'completed'")
+        .all<{ quote_reference: string; created_at: string }>(),
+      db
+        .prepare(
+          `SELECT quote_reference, customer_id, paid_at FROM booking_requests
+           WHERE paid_at IS NOT NULL AND paid_at <> ''`,
+        )
+        .all<{ quote_reference: string; customer_id: string | null; paid_at: string }>(),
+      db
+        .prepare("SELECT customer_id, received_at FROM payments WHERE status = 'succeeded'")
+        .all<{ customer_id: string | null; received_at: string }>(),
+    ]);
+    const completedByQuote = new Map<string, number>();
+    for (const row of completedCheckouts.results ?? []) {
+      const at = Date.parse(String(row.created_at ?? '')) || 0;
+      const key = String(row.quote_reference ?? '');
+      if (key) completedByQuote.set(key, Math.max(completedByQuote.get(key) ?? 0, at));
+    }
+    const paidByQuote = new Map<string, { at: number; customerId: string }>();
+    const paidByCustomer = new Map<string, number>();
+    for (const row of paidRequests.results ?? []) {
+      const at = Date.parse(String(row.paid_at ?? '')) || 0;
+      const customerId = String(row.customer_id ?? '');
+      const quote = String(row.quote_reference ?? '');
+      if (quote) paidByQuote.set(quote, { at, customerId });
+      if (customerId) paidByCustomer.set(customerId, Math.max(paidByCustomer.get(customerId) ?? 0, at));
+    }
+    for (const row of successfulPayments.results ?? []) {
+      const customerId = String(row.customer_id ?? '');
+      if (!customerId) continue;
+      const at = Date.parse(String(row.received_at ?? '')) || 0;
+      paidByCustomer.set(customerId, Math.max(paidByCustomer.get(customerId) ?? 0, at));
+    }
+    let failedCheckouts = 0;
+    let failedWorkerRuns = 0;
     const failedWorkerRunsHistory = await count(
       db,
       "SELECT COUNT(*) AS count FROM recurring_worker_runs WHERE status = 'failed'",
@@ -211,6 +283,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       'finance.reconciliation',
       'communications.booking',
       'payments.events',
+      'leads.new',
       'leads.delivery',
       'security.owner_mfa',
       'jobs.unassigned',
@@ -231,10 +304,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     ] = await Promise.all([
       db
         .prepare(
-          `SELECT id, quote_reference, status, amount_cents, created_at, expires_at, stripe_session_id
-           FROM checkout_sessions
-           WHERE status = 'failed' OR (status = 'open' AND created_at < datetime('now','-35 minutes'))
-           ORDER BY created_at DESC LIMIT 200`,
+          `SELECT cs.id, cs.quote_reference, cs.status, cs.amount_cents, cs.created_at, cs.expires_at, cs.stripe_session_id,
+                  (SELECT br.customer_id FROM booking_requests br
+                    WHERE br.quote_reference = cs.quote_reference LIMIT 1) AS customer_id
+           FROM checkout_sessions cs
+           WHERE cs.status = 'failed' OR (cs.status = 'open' AND cs.created_at < datetime('now','-35 minutes'))
+           ORDER BY cs.created_at DESC LIMIT 200`,
         )
         .all<Record<string, unknown>>(),
       db
@@ -248,24 +323,24 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         .all<Record<string, unknown>>(),
       db
         .prepare(
-          `SELECT id, bundle_code, packet_name, signer_email, status, created_at
+          `SELECT id, bundle_code, packet_name, signer_email, status, created_at, branch_id
            FROM signing_requests WHERE status IN ('pending','partially_signed')
            ORDER BY created_at DESC LIMIT 50`,
         )
         .all<Record<string, unknown>>(),
       db
         .prepare(
-          `SELECT id, number, balance_cents, due_date, created_at, customer_id
+          `SELECT id, number, balance_cents, due_date, created_at, customer_id, branch_id
            FROM invoices WHERE balance_cents > 0 AND status IN ('open','partially_paid','overdue')
            ORDER BY created_at DESC LIMIT 50`,
         )
         .all<Record<string, unknown>>(),
       db
         .prepare(
-          `SELECT r.id, r.quote_reference, r.created_at, r.start_at, r.payment_status,
+          `SELECT r.id, r.quote_reference, r.created_at, r.start_at, r.payment_status, r.branch_id,
                   c.first_name, c.last_name
            FROM booking_requests r LEFT JOIN customers c ON c.id = r.customer_id
-           WHERE r.status = 'pending' AND r.archived_at IS NULL AND r.closed_at IS NULL
+           WHERE r.status = 'pending' AND r.archived_at IS NULL AND r.closed_at IS NULL AND r.is_test = 0
            ORDER BY r.created_at DESC LIMIT 50`,
         )
         .all<Record<string, unknown>>(),
@@ -287,13 +362,27 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         .all<Record<string, unknown>>(),
       db
         .prepare(
-          "SELECT id, delivery_status, created_at, quote_reference FROM leads WHERE delivery_status = 'failed' ORDER BY created_at DESC LIMIT 50",
+          "SELECT id, delivery_status, created_at, quote_reference, branch_id FROM leads WHERE delivery_status = 'failed' ORDER BY created_at DESC LIMIT 50",
         )
         .all<Record<string, unknown>>(),
     ]);
 
+    const activeCheckoutRows = (checkoutRows.results ?? []).filter((row) => {
+      if (String(row.status) !== 'failed') return false;
+      const failedAt = Date.parse(String(row.created_at ?? '')) || 0;
+      const quote = String(row.quote_reference ?? '');
+      // Only the same quote or the same customer can resolve a failed checkout.
+      // An unrelated customer's later success must never hide this failure.
+      if (quote && (completedByQuote.get(quote) ?? 0) > failedAt) return false;
+      const paidRequest = quote ? paidByQuote.get(quote) : undefined;
+      if (paidRequest && paidRequest.at > failedAt) return false;
+      const customerId = String(row.customer_id ?? paidRequest?.customerId ?? '');
+      if (customerId && (paidByCustomer.get(customerId) ?? 0) > failedAt) return false;
+      return true;
+    });
+    failedCheckouts = activeCheckoutRows.length;
     const checkoutCategories = new Map<string, number>();
-    for (const row of checkoutRows.results ?? []) {
+    for (const row of activeCheckoutRows) {
       const classification = classifyCheckout(row, nowMs);
       checkoutCategories.set(
         classification.category,
@@ -302,8 +391,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     }
     const checkoutRootCause = [...checkoutCategories.entries()]
       .map(([category, amount]) => `${amount} ${category.toLowerCase()}`)
-      .join('; ') || 'No checkout sessions are currently flagged.';
-    const checkoutRecords = (checkoutRows.results ?? []).slice(0, 8).map((row) => {
+      .join('; ') || 'No checkout failure has occurred since the last successful payment.';
+    const checkoutRecords = activeCheckoutRows.slice(0, 8).map((row) => {
       const classification = classifyCheckout(row, nowMs);
       return {
         label: String(row.quote_reference ?? row.id ?? 'Checkout session'),
@@ -312,21 +401,54 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     });
     const workerRootCauses = new Map<string, number>();
     let workerLatestDetail = '';
+    const failedPlanIds = new Set<string>();
     for (const row of workerRows.results ?? []) {
       const detail = String(row.detail_json ?? '');
       if (!workerLatestDetail) workerLatestDetail = detail;
       const cause = workerRootCause(detail);
       workerRootCauses.set(cause, (workerRootCauses.get(cause) ?? 0) + 1);
+      try {
+        const entries = JSON.parse(detail) as Array<Record<string, unknown>>;
+        for (const entry of entries) {
+          const planId = String(entry.planId ?? '').trim();
+          if (planId) failedPlanIds.add(planId);
+        }
+      } catch {
+        // A malformed historical detail must not hide a current plan issue.
+      }
     }
+    const unresolvedWorkerPlans: Array<{ id: string; branch_id: string | null; sync_status: string; sync_error: string }> = [];
+    if (failedPlanIds.size > 0) {
+      const placeholders = [...failedPlanIds].map(() => '?').join(',');
+      const planRows = await db
+        .prepare(
+          `SELECT id, branch_id, status, sync_status, sync_error FROM recurring_plans
+           WHERE id IN (${placeholders})`,
+        )
+        .bind(...failedPlanIds)
+        .all<{ id: string; branch_id: string | null; status: string; sync_status: string; sync_error: string }>();
+      for (const plan of planRows.results ?? []) {
+        if (plan.status !== 'active') continue;
+        if (actor.branchId && plan.branch_id !== actor.branchId) continue;
+        if (!plan.sync_status || ['fully_scheduled', 'synced'].includes(plan.sync_status)) continue;
+        unresolvedWorkerPlans.push(plan);
+      }
+    }
+    failedWorkerRuns = unresolvedWorkerPlans.length;
     const recurringRootCause = [...workerRootCauses.entries()]
       .map(([cause, amount]) => `${amount} run(s): ${cause}`)
       .join(' ') || 'No failed recurring worker runs are recorded.';
     const workerFirst = (workerRows.results ?? []).at(-1)?.started_at ?? null;
     const workerLast = (workerRows.results ?? [])[0]?.started_at ?? null;
-    const workerRecords = (workerRows.results ?? []).slice(0, 6).map((row) => ({
-      label: `Run ${String(row.run_key ?? '')}`,
-      detail: `${String(row.errors ?? 0)} error(s) · ${new Date(String(row.started_at)).toLocaleString('en-US', { timeZone: bookingConfig.timeZone })}`,
+    const workerRecords = unresolvedWorkerPlans.slice(0, 6).map((plan) => ({
+      label: `Recurring plan ${plan.id.slice(0, 12)}…`,
+      detail: `${plan.sync_status}${plan.sync_error ? ` · ${plan.sync_error.slice(0, 160)}` : ''}`,
     }));
+    const workerBranch =
+      unresolvedWorkerPlans.length > 0 &&
+      new Set(unresolvedWorkerPlans.map((plan) => plan.branch_id)).size === 1
+        ? unresolvedWorkerPlans[0]?.branch_id ?? undefined
+        : undefined;
 
     const alerts: AlertRecord[] = [];
     const addAlert = (input: Omit<AlertRecord, 'status'>): void => {
@@ -334,9 +456,12 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       const state = alertStates.get(input.key);
       if (alertResolutionSuppresses(state, input.lastSeen)) return;
       const previousClosed = state?.status === 'resolved' || state?.status === 'dismissed';
+      const reopenedAfterRead =
+        state?.status === 'acknowledged' &&
+        Boolean(state.acknowledged_at && input.lastSeen && String(input.lastSeen) > state.acknowledged_at);
       alerts.push({
         ...input,
-        status: previousClosed ? 'new' : state?.status ?? 'new',
+        status: previousClosed || reopenedAfterRead ? 'new' : state?.status ?? 'new',
         ...(state?.acknowledged_at ? { acknowledgedAt: state.acknowledged_at } : {}),
         ...(state?.resolved_at ? { resolvedAt: state.resolved_at } : {}),
         ...(state?.resolution_note ? { resolutionNote: state.resolution_note } : {}),
@@ -353,7 +478,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       title: 'Pending reservation requests',
       message: `${requests} pending reservation request(s) need a decision.`,
       explanation:
-        'These customers submitted a request but do not have a confirmed appointment. Some records may be internal tests or duplicates.',
+        'These customers submitted a request but do not have a confirmed appointment. Test records and archived requests are excluded.',
       rootCause:
         'Requests remain pending until the owner reviews scope, availability, payment and any required documents. No customer email is sent by opening this view.',
       recommendation:
@@ -363,6 +488,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       lastSeen: pendingLast,
       view: 'calendar',
       filter: 'pending',
+      branchId: stringOrNull((pendingRequestRows.results ?? [])[0]?.branch_id) ?? undefined,
       records: (pendingRequestRows.results ?? []).slice(0, 8).map((row) => ({
         label: String(row.quote_reference ?? row.id ?? 'Request'),
         detail: `${[row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unlinked customer'} · ${new Date(String(row.start_at ?? row.created_at)).toLocaleString('en-US', { timeZone: bookingConfig.timeZone })}`,
@@ -386,6 +512,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       firstSeen: stringOrNull((unsignedRows.results ?? []).at(-1)?.created_at),
       lastSeen: stringOrNull((unsignedRows.results ?? [])[0]?.created_at),
       view: 'documents',
+      branchId: stringOrNull((unsignedRows.results ?? [])[0]?.branch_id) ?? undefined,
       records: (unsignedRows.results ?? []).slice(0, 8).map((row) => ({
         label: String(row.packet_name || row.bundle_code || 'Signing request'),
         detail: `${String(row.signer_email || 'No signer email')} · ${String(row.status)} · ${new Date(String(row.created_at)).toLocaleString('en-US', { timeZone: bookingConfig.timeZone })}`,
@@ -409,6 +536,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       firstSeen: stringOrNull((invoiceRows.results ?? []).at(-1)?.created_at),
       lastSeen: stringOrNull((invoiceRows.results ?? [])[0]?.created_at),
       view: 'finance',
+      branchId: stringOrNull((invoiceRows.results ?? [])[0]?.branch_id) ?? undefined,
       records: (invoiceRows.results ?? []).slice(0, 8).map((row) => ({
         label: String(row.number ?? row.id ?? 'Invoice'),
         detail: `Balance $${(Number(row.balance_cents ?? 0) / 100).toFixed(2)}${row.due_date ? ` · due ${String(row.due_date)}` : ''}`,
@@ -420,17 +548,18 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       key: 'recurring.worker_failures',
       kind: 'recurring_worker',
       severity: 'high',
-      title: 'Recurring worker failures',
-      message: `${failedWorkerRuns} recurring worker run(s) failed.`,
+      title: 'Recurring plans needing synchronization',
+      message: `${failedWorkerRuns} active recurring plan(s) still need synchronization.`,
       explanation:
-        'These are daily recurring-plan synchronization runs. Some failures are historical; the plan and existing appointments are preserved.',
+        'A daily worker run failed, but a later successful retry or a fully scheduled plan is not treated as an active incident. Failed run history remains available in Recurring Plans.',
       rootCause: recurringRootCause || workerLatestDetail.slice(0, 400),
       recommendation:
-        'Open Recurring Plans, review active plans and conflicts, retry safe syncs, and reauthorize Google Calendar if authentication failed. Historical runs remain inspectable.',
+        'Open Recurring Plans and retry the affected plan. Reauthorize Google Calendar only if the latest retry also reports an authentication failure. Historical failures stay inspectable.',
       count: failedWorkerRuns,
       firstSeen: stringOrNull(workerFirst),
       lastSeen: stringOrNull(workerLast),
       view: 'recurring',
+      ...(workerBranch ? { branchId: workerBranch } : {}),
       records: workerRecords,
       canRecheck: true,
     });
@@ -439,15 +568,15 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       kind: 'checkout_failure',
       severity: 'medium',
       title: 'Checkout sessions needing review',
-      message: `${failedCheckouts} failed checkout session(s); ${abandonedCheckouts} abandoned session(s) are informational.`,
+      message: `${failedCheckouts} unresolved checkout failure(s); ${abandonedCheckouts} abandoned session(s) are informational.`,
       explanation:
-        'Only failed sessions are treated as an operational alert. Abandoned checkouts are ordinary customer behavior and are not a production outage.',
+        'A failed session remains unresolved until the same quote or the same customer later completes payment. An unrelated successful checkout never hides another customer’s failure.',
       rootCause: checkoutRootCause,
       recommendation:
-        'Open the filtered checkout list. Investigate failed setup/provider sessions; leave ordinary abandoned sessions as history. Never message customers automatically.',
+        'Open the filtered checkout list. Investigate current setup/provider failures; leave ordinary abandoned sessions and already-resolved failures as history. Never message customers automatically.',
       count: failedCheckouts,
-      firstSeen: stringOrNull((checkoutRows.results ?? []).at(-1)?.created_at),
-      lastSeen: stringOrNull((checkoutRows.results ?? [])[0]?.created_at),
+      firstSeen: stringOrNull(activeCheckoutRows.at(-1)?.created_at),
+      lastSeen: stringOrNull(activeCheckoutRows[0]?.created_at),
       view: 'finance',
       filter: 'checkout',
       records: checkoutRecords,
@@ -527,6 +656,30 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       canRecheck: true,
     });
     addAlert({
+      key: 'leads.new',
+      kind: 'new_inquiries',
+      severity: 'medium',
+      title: 'New legitimate customer inquiries',
+      message: `${leads} actionable sales inquir${leads === 1 ? 'y is' : 'ies are'} awaiting review.`,
+      explanation:
+        'Test records, duplicates, archived, lost, converted and reservation attempts are excluded. Pending reservations have their own workflow.',
+      rootCause: 'A customer submitted a non-reservation inquiry that has not been closed or converted.',
+      recommendation: 'Open Leads & Inquiries, review the inquiry, and contact the customer only through an owner-approved action.',
+      count: leads,
+      firstSeen: stringOrNull((recent.results ?? []).filter((row) => String(row.request_type ?? '') !== 'reservation_request').at(-1)?.created_at),
+      lastSeen: stringOrNull((recent.results ?? []).find((row) => String(row.request_type ?? '') !== 'reservation_request')?.created_at),
+      view: 'leads',
+      ...(actor.branchId ? { branchId: actor.branchId } : {}),
+      records: (recent.results ?? [])
+        .filter((row) => String(row.request_type ?? '') !== 'reservation_request')
+        .slice(0, 6)
+        .map((row) => ({
+          label: String(row.quote_reference ?? row.id ?? 'Inquiry'),
+          detail: `${[row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unlinked customer'}${row.email ? ` · ${row.email}` : ''}`,
+          ...(row.id ? { id: String(row.id) } : {}),
+        })),
+      canRecheck: true,
+    });    addAlert({
       key: 'leads.delivery',
       kind: 'lead_delivery',
       severity: 'medium',
@@ -539,6 +692,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       firstSeen: stringOrNull((failedLeadRows.results ?? []).at(-1)?.created_at),
       lastSeen: stringOrNull((failedLeadRows.results ?? [])[0]?.created_at),
       view: 'leads',
+      branchId: stringOrNull((failedLeadRows.results ?? [])[0]?.branch_id) ?? undefined,
       records: (failedLeadRows.results ?? []).slice(0, 6).map((row) => ({
         label: String(row.quote_reference ?? row.id ?? 'Lead'),
         detail: String(row.created_at ?? ''),
@@ -577,6 +731,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       firstSeen: stringOrNull((staffingRows.results ?? [])[0]?.start_at),
       lastSeen: stringOrNull((staffingRows.results ?? []).at(-1)?.start_at),
       view: 'jobs',
+      branchId: stringOrNull((staffingRows.results ?? [])[0]?.branch_id) ?? undefined,
       records: (staffingRows.results ?? []).slice(0, 8).map((row) => ({
         label: String(row.reference ?? row.id ?? 'Appointment'),
         detail: `${[row.first_name, row.last_name].filter(Boolean).join(' ') || 'Customer'} · ${new Date(String(row.start_at)).toLocaleString('en-US', { timeZone: bookingConfig.timeZone })} · crew ${String(row.crew_size ?? '?')} · ${String(row.staffing_reason ?? '')}`,
@@ -597,6 +752,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
       firstSeen: null,
       lastSeen: null,
       view: 'jobs',
+      ...(actor.branchId ? { branchId: actor.branchId } : {}),
       records: [],
       canRecheck: true,
     });
@@ -627,7 +783,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
         failedPaymentEvents,
         failedWorkerRuns,
         failedWorkerRunsHistory,
+        recentFailedWorkerRuns,
         abandonedCheckouts,
+        failedCheckoutsHistory,
         todayJobs,
         tomorrowJobs,
         unassignedJobs,
@@ -657,6 +815,24 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const actor = await requireActor(db, context.request, 'lead.write');
     requireCsrf(context.request, actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
+    if (String(body.action ?? '') === 'acknowledge_all') {
+      const alerts = Array.isArray(body.alerts) ? body.alerts.slice(0, 50) : [];
+      let updated = 0;
+      for (const entry of alerts) {
+        const alert = (entry ?? {}) as Record<string, unknown>;
+        const key = String(alert.key ?? '').trim();
+        if (!key) continue;
+        await applyAlertAction(db, actor, {
+          alertKey: key,
+          action: 'acknowledge',
+          note: '',
+          title: String(alert.title ?? ''),
+          kind: String(alert.kind ?? ''),
+        });
+        updated += 1;
+      }
+      return json({ ok: true, updated });
+    }
     const action = String(body.action ?? '').trim() as OperationalAlertAction;
     if (!['acknowledge', 'investigate', 'resolve', 'dismiss', 'reopen'].includes(action)) {
       return json({ ok: false, error: 'invalid_action' }, 400);

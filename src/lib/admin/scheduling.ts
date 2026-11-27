@@ -70,7 +70,8 @@ export async function listAppointments(
   const status = text(input.status, 20);
   const result = await db
     .prepare(
-      `SELECT a.*, c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
+      `SELECT a.*, c.first_name, c.last_name, c.company_name, p.line1, p.city, p.state, p.postal_code,
+              e.service_code, e.labor_hours, s.name AS service_name,
               (SELECT GROUP_CONCAT(tm.display_name, ', ') FROM appointment_resources ar
                JOIN team_members tm ON tm.id = ar.team_member_id WHERE ar.appointment_id = a.id) AS crew,
               (SELECT GROUP_CONCAT(ar.team_member_id) FROM appointment_resources ar
@@ -80,6 +81,8 @@ export async function listAppointments(
        FROM appointments a
        LEFT JOIN customers c ON c.id = a.customer_id
        LEFT JOIN properties p ON p.id = a.property_id
+       LEFT JOIN estimates e ON e.id = a.estimate_id
+       LEFT JOIN services s ON s.code = e.service_code
        WHERE a.start_at >= ? AND a.start_at <= ? AND (? = '' OR a.status = ?) ${branch.sql}
        ORDER BY a.start_at ASC LIMIT 300`,
     )
@@ -364,12 +367,16 @@ export async function listRecurring(
   const result = await db
     .prepare(
       `SELECT r.*, c.first_name, c.last_name, p.line1, p.city,
-              (SELECT GROUP_CONCAT(tm.display_name, ', ')
-                 FROM appointments a
-                 JOIN appointment_resources ar ON ar.appointment_id = a.id
-                 JOIN team_members tm ON tm.id = ar.team_member_id
-                WHERE a.recurring_plan_id = r.id AND a.start_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
-                  AND a.status IN ('pending','confirmed','in_progress')) AS assigned_names
+              (SELECT GROUP_CONCAT(name, ', ') FROM (
+                 SELECT DISTINCT tm.display_name AS name
+                   FROM appointments a
+                   JOIN appointment_resources ar ON ar.appointment_id = a.id
+                   JOIN team_members tm ON tm.id = ar.team_member_id
+                  WHERE a.recurring_plan_id = r.id
+                    AND a.start_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                    AND a.status IN ('pending','confirmed','in_progress')
+                  ORDER BY tm.display_name
+              )) AS assigned_names
        FROM recurring_plans r JOIN customers c ON c.id = r.customer_id
        JOIN properties p ON p.id = r.property_id
        WHERE 1 = 1 ${branch.sql} ORDER BY r.next_visit_date ASC LIMIT 200`,

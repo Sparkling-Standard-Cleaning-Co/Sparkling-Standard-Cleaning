@@ -37,6 +37,7 @@ import {
 import { writeLedgerJson } from '../payments/ledger.ts';
 import { syncRecurringPlan, occurrenceDate } from '../admin/recurring-schedule.ts';
 import { isUsableLatLng } from '../travel/server-routing.ts';
+import { findCustomerByContact, findCustomerProperty } from '../customers/identity.ts';
 
 function storedCoordinates(latValue: unknown, lngValue: unknown): { lat: number; lng: number } | null {
   if (typeof latValue !== 'string' && typeof latValue !== 'number') return null;
@@ -79,6 +80,7 @@ export interface CommitmentInput {
   propertyId?: string;
   customerName?: string;
   customerEmail?: string;
+  customerPhone?: string;
   serviceCode?: string;
   frequency?: string;
   ongoingPriceCents?: number;
@@ -161,12 +163,11 @@ async function ensureCustomerAndProperty(
   const fields = payload(requestRow?.payload_json);
   const email = (text(input.customerEmail, 200) || text(fields.email, 200)).toLowerCase();
   const name = text(input.customerName, 200) || text(fields.name, 200);
-  if (!customerId && email) {
-    const contact = await db
-      .prepare("SELECT customer_id FROM customer_contacts WHERE kind = 'email' AND normalized_value = ? LIMIT 1")
-      .bind(email)
-      .first<{ customer_id: string }>();
-    customerId = contact?.customer_id ?? '';
+  if (!customerId) {
+    customerId = await findCustomerByContact(db, {
+      email,
+      phone: text(input.customerPhone, 40) || text(fields.phone, 40),
+    });
   }
   if (!customerId && email) {
     const parts = name.split(/\s+/).filter(Boolean);
@@ -190,26 +191,29 @@ async function ensureCustomerAndProperty(
 
   const line1 = text(fields.service_address, 300) || text(holdLocation, 300);
   const zip = text(fields.zip, 12);
+  const unit = text(fields.address_unit ?? fields.addressUnit, 40);
   if (!propertyId && line1) {
-    const existing = await db
-      .prepare('SELECT id FROM properties WHERE customer_id = ? AND line1 = ? AND postal_code = ? LIMIT 1')
-      .bind(customerId, line1, zip)
-      .first<{ id: string }>();
+    const existing = await findCustomerProperty(db, customerId, {
+      line1,
+      line2: unit,
+      postalCode: zip,
+    });
     propertyId = existing?.id ?? `prop_${crypto.randomUUID()}`;
     if (!existing) {
       const coordinates = storedCoordinates(fields.pin_latitude, fields.pin_longitude);
       await db
         .prepare(
           `INSERT INTO properties
-           (id, customer_id, branch_id, label, line1, city, state, postal_code, latitude, longitude,
+           (id, customer_id, branch_id, label, line1, line2, city, state, postal_code, latitude, longitude,
             precision, is_primary, status)
-           VALUES (?, ?, ?, 'Service property', ?, ?, ?, ?, ?, ?, ?, 1, 'active')`,
+           VALUES (?, ?, ?, 'Service property', ?, ?, ?, ?, ?, ?, ?, ?, 1, 'active')`,
         )
         .bind(
           propertyId,
           customerId,
           branchId,
           line1,
+          unit,
           text(fields.address_city, 120),
           text(fields.address_state, 2) || 'FL',
           zip,

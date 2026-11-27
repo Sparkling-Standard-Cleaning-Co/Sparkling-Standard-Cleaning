@@ -110,7 +110,7 @@ import {
             <span class="admin-brand__mark">S</span>
             <span><span class="admin-brand__name">Sparkling<br />Standard</span><br /><span class="admin-brand__sub">Operations</span></span>
           </a>
-          <nav class="admin-nav" aria-label="Admin sections">
+          <nav class="admin-nav" id="admin-primary-nav" aria-label="Admin sections">
             <div class="admin-nav__group"><span class="admin-nav__label">Overview</span>
               <button type="button" data-admin-nav="overview">Overview</button>
             </div>
@@ -156,7 +156,10 @@ import {
 
         <div class="admin-workspace">
           <header class="admin-topbar">
-            <div>
+            <button class="admin-mobile-menu btn btn--ghost btn--small" type="button" data-admin-menu-toggle aria-controls="admin-primary-nav" aria-expanded="false">
+              <span aria-hidden="true">☰</span> Menu
+            </button>
+            <div class="admin-topbar__title">
               <h1 class="admin-title" data-admin-view-title>Overview</h1>
               <p class="admin-sub" data-admin-view-sub>Live cleaning-company operations.</p>
             </div>
@@ -169,15 +172,40 @@ import {
                 </select>
               </label>
               <span class="admin-status" data-admin-role></span>
+              <div class="admin-notification">
+                <button class="admin-bell" type="button" data-admin-bell aria-label="Notifications" aria-expanded="false" aria-controls="admin-notification-panel">
+                  <span aria-hidden="true">🔔</span>
+                  <span class="admin-bell__badge" data-admin-bell-count hidden>0</span>
+                </button>
+                <div class="admin-notification-panel" id="admin-notification-panel" data-admin-notification-panel hidden>
+                  <div class="admin-notification-panel__head">
+                    <div>
+                      <h2 class="admin-section-title">Notifications</h2>
+                      <p class="admin-muted" data-admin-notification-summary>No unread notifications.</p>
+                    </div>
+                    <button class="btn btn--ghost btn--small" type="button" data-admin-notification-close aria-label="Close notifications">Close</button>
+                  </div>
+                  <div class="admin-notification-panel__actions">
+                    <button class="btn btn--ghost btn--small" type="button" data-admin-notification-mark-all>Mark all as read</button>
+                  </div>
+                  <div data-admin-notification-list></div>
+                </div>
+              </div>
             </div>
           </header>
+          <div class="admin-mobile-backdrop" data-admin-mobile-backdrop hidden></div>
           <p class="admin-error" data-admin-app-error role="alert"></p>
 
           <section class="admin-view" data-admin-view="overview">
             <div class="admin-grid" data-admin-kpis></div>
             <div data-admin-alerts style="margin-top:1rem;"></div>
+            <details class="admin-card admin-detail-toggle" style="margin-top:1rem;" data-admin-overview-health>
+              <summary>Operational health and history</summary>
+              <div data-admin-health-kpis style="margin-top:.75rem;"></div>
+              <p class="admin-muted">Technical failures, abandoned checkouts and historical worker runs are available here and in Reports and Finance. They do not inflate the primary daily metrics.</p>
+            </details>
             <div class="admin-card" style="margin-top:1rem;">
-              <h2 class="admin-section-title">Recent inquiries</h2>
+              <h2 class="admin-section-title">Recent legitimate inquiries</h2>
               <div data-admin-recent></div>
             </div>
           </section>
@@ -199,7 +227,7 @@ import {
               <div class="admin-calendar-filters">
                 <label>Employee <select data-admin-week-employee><option value="">All employees</option></select></label>
                 <label>Service <select data-admin-week-service><option value="">All services</option></select></label>
-                <label>Status <select data-admin-week-status><option value="">Active appointments</option><option value="confirmed">Confirmed</option><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Canceled</option><option value="all">All statuses</option></select></label>
+                <label>Status <select data-admin-week-status><option value="">Active + completed</option><option value="confirmed">Confirmed</option><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Canceled</option><option value="all">All statuses</option></select></label>
                 <label>Branch <select data-admin-week-branch><option value="">All branches</option><option value="branch_pensacola">Pensacola</option><option value="branch_tampa">Tampa Bay</option></select></label>
               </div>
               <div data-admin-week-board></div>
@@ -259,7 +287,7 @@ import {
           <section class="admin-view" data-admin-view="leads" hidden>
             <div class="admin-card">
               <form class="admin-inline-form" data-admin-lead-filter>
-                <label>Status <select name="status"><option value="active" selected>Active (excludes archived, lost, converted)</option><option value="">All records</option><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="converted">Converted</option><option value="lost">Lost</option><option value="archived">Archived</option></select></label>
+                <label>Status <select name="status"><option value="active" selected>Active (excludes archived, lost, converted, test, duplicate)</option><option value="">All records</option><option value="new">New</option><option value="contacted">Contacted</option><option value="quoted">Quoted</option><option value="converted">Converted</option><option value="lost">Lost</option><option value="archived">Archived</option><option value="test">Test records</option><option value="duplicates">Duplicates</option></select></label>
                 <label>Search <input name="q" type="search" placeholder="Name, reference, address" /></label>
                 <label>Sort <select name="sort"><option value="created_at">Newest first</option><option value="status">Status</option><option value="request_type">Request type</option></select></label>
                 <label>Page size <select name="pageSize"><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
@@ -272,9 +300,21 @@ import {
                 <span class="admin-bulk-toolbar__spacer"></span>
                 <button class="btn btn--secondary btn--small" type="button" data-admin-action="lead-bulk" data-operation="archive">Archive</button>
                 <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-bulk" data-operation="restore">Restore</button>
-                <button class="btn btn--danger btn--small" type="button" data-admin-action="lead-bulk" data-operation="delete">Delete disposable</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-bulk" data-operation="mark_test">Mark as test</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-bulk" data-operation="mark_duplicate">Mark duplicate</button>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-bulk" data-operation="mark_converted">Mark converted</button>
+                <button class="btn btn--danger btn--small" type="button" data-admin-action="lead-bulk" data-operation="delete">Delete if safe</button>
               </div>
               <div data-admin-lead-bulk-result role="status" aria-live="polite"></div>
+              <details class="admin-detail-toggle" data-admin-test-preview-wrap>
+                <summary>Test-data cleanup preview</summary>
+                <p class="admin-muted">Preview suspected test submissions before classifying them. This never treats a familiar name as a test record and never deletes customer or financial history.</p>
+                <div class="admin-actions">
+                  <button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-test-preview">Preview suspected tests</button>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="lead-test-apply" hidden>Mark previewed records as test</button>
+                </div>
+                <div data-admin-test-preview-result role="status" aria-live="polite"></div>
+              </details>
               <div data-admin-leads style="margin-top:1rem;"></div>
               <div data-admin-leads-pagination style="margin-top:.75rem;"></div>
               <div class="admin-detail" data-admin-lead-detail style="margin-top:1rem;" hidden></div>
@@ -602,8 +642,16 @@ import {
                     <option value="12:30">12:30 PM</option><option value="12:45">12:45 PM</option><option value="13:00">1:00 PM</option><option value="13:15">1:15 PM</option><option value="13:30">1:30 PM</option><option value="13:45">1:45 PM</option><option value="14:00">2:00 PM</option><option value="14:15">2:15 PM</option><option value="14:30">2:30 PM</option>
                   </select>
                 </label>
-                <label>Ongoing cleaning duration (minutes) <input name="durationMinutes" type="number" min="30" max="600" step="15" required /></label>
-                <label>First deep-clean duration (minutes) <input name="firstDurationMinutes" type="number" min="30" max="600" step="15" /></label>
+                <fieldset class="admin-field--wide admin-duration-fieldset">
+                  <legend>Ongoing cleaning duration</legend>
+                  <label>Hours <input name="durationHours" type="number" min="0" max="10" step="1" value="3" required /></label>
+                  <label>Minutes <input name="durationMinutesPart" type="number" min="0" max="45" step="15" value="0" required /></label>
+                </fieldset>
+                <fieldset class="admin-field--wide admin-duration-fieldset">
+                  <legend>First deep-clean duration (optional)</legend>
+                  <label>Hours <input name="firstDurationHours" type="number" min="0" max="10" step="1" /></label>
+                  <label>Minutes <input name="firstDurationMinutesPart" type="number" min="0" max="45" step="15" /></label>
+                </fieldset>
                 <label>Crew size <select name="crewSize"><option value="1">One cleaner</option><option value="2">Two cleaners</option></select></label>
                 <label>Ongoing price per visit (USD) <input name="ongoingPrice" type="number" min="0" step="0.01" required /></label>
                 <button class="btn btn--primary" type="submit">Create Plan</button>
@@ -612,7 +660,28 @@ import {
           </section>
 
           <section class="admin-view" data-admin-view="jobs" hidden>
-            <div class="admin-card admin-dispatch">
+            <div class="admin-card">
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Jobs</h2>
+                  <p class="admin-muted">Actionable operations first. Completed and cancelled jobs remain in their historical views and Job Files.</p>
+                </div>
+                <button class="btn btn--ghost btn--small" type="button" data-admin-action="jobs-refresh">Refresh</button>
+              </div>
+              <nav class="admin-job-tabs" data-admin-job-tabs aria-label="Job views">
+                <button type="button" data-job-view="today">Today</button>
+                <button type="button" data-job-view="upcoming" aria-current="page">Upcoming</button>
+                <button type="button" data-job-view="unassigned">Unassigned</button>
+                <button type="button" data-job-view="in_progress">In progress</button>
+                <button type="button" data-job-view="completed">Completed</button>
+                <button type="button" data-job-view="cancelled">Cancelled</button>
+                <button type="button" data-job-view="all">All jobs</button>
+              </nav>
+              <p class="admin-muted" data-admin-jobs-summary></p>
+              <div data-admin-jobs></div>
+              <div data-admin-checklist style="margin-top:1rem;"></div>
+            </div>
+            <div class="admin-card admin-dispatch" style="margin-top:1rem;">
               <div class="admin-detail-head">
                 <div>
                   <h2 class="admin-section-title">Intelligent Dispatch</h2>
@@ -742,11 +811,6 @@ import {
                 <label class="admin-field--wide">Dispatch notes <textarea name="notes" rows="2"></textarea></label>
                 <button class="btn btn--secondary btn--small" type="submit">Save dispatch profile</button>
               </form>
-            </div>
-            <div class="admin-card" data-dispatch-section="board">
-              <h2 class="admin-section-title">Jobs</h2>
-              <div data-admin-jobs></div>
-              <div data-admin-checklist style="margin-top:1rem;"></div>
             </div>
             <div class="admin-card" style="margin-top:1rem;" data-dispatch-section="team">
               <h2 class="admin-section-title">Team</h2>
@@ -1772,63 +1836,89 @@ import {
 
           <section class="admin-view" data-admin-view="branches" hidden>
             <div class="admin-card">
-              <h2 class="admin-section-title">Branches &amp; Launch Control</h2>
-              <p class="admin-muted">
-                One legal entity, independent operating branches. Pensacola is live. Tampa Bay is
-                prelaunch and cannot publish public pricing or accept bookings until every launch
-                prerequisite is complete and the owner explicitly advances it.
-              </p>
-              <label>Branch
-                <select data-branch-select></select>
-              </label>
+              <div class="admin-detail-head">
+                <div>
+                  <h2 class="admin-section-title">Branches &amp; Launch Control</h2>
+                  <p class="admin-muted">One legal entity, independent operating branches. Pensacola is live. Tampa Bay remains prelaunch and cannot publish public pricing or accept bookings until every launch prerequisite is complete and the owner explicitly advances it.</p>
+                </div>
+                <button class="btn btn--ghost btn--small" type="button" data-branch-refresh>Refresh</button>
+              </div>
+              <div class="admin-branch-toolbar">
+                <label>Branch <select data-branch-select></select></label>
+              </div>
               <p class="admin-status-message" data-branch-status role="status" aria-live="polite"></p>
             </div>
-            <form class="admin-form admin-card" data-branch-form style="margin-top:1rem;max-width:none;">
-              <h2 class="admin-section-title">Branch setup</h2>
-              <div class="admin-grid">
-                <label>Lifecycle
-                  <select name="lifecycle" required>
-                    <option value="draft">Draft</option>
-                    <option value="setup">Setup</option>
-                    <option value="internally_testable">Internally testable</option>
-                    <option value="approved_to_launch">Approved to launch</option>
-                    <option value="live">Live</option>
-                    <option value="paused">Paused</option>
-                    <option value="retired">Retired</option>
-                  </select>
-                </label>
-                <label>Public name <input name="publicName" required maxlength="120" /></label>
-                <label>Public URL slug <input name="publicSlug" required maxlength="80" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
-                <label>Region label <input name="regionLabel" maxlength="200" /></label>
-                <label>Time zone <input name="timezone" maxlength="80" /></label>
-                <label>Public phone <input name="publicPhone" maxlength="40" /></label>
-                <label>Public email <input name="publicEmail" type="email" maxlength="200" /></label>
-                <label>Hours label <input name="hoursLabel" maxlength="200" /></label>
-                <label>Google Business Profile status
-                  <select name="gbpStatus">
-                    <option value="not_created">Not created</option>
-                    <option value="eligibility_review">Eligibility review</option>
-                    <option value="prepared">Prepared</option>
-                    <option value="submitted">Submitted</option>
-                    <option value="verified">Verified</option>
-                    <option value="paused">Paused</option>
-                  </select>
-                </label>
-                <label>Google Business Profile URL <input name="gbpUrl" type="url" maxlength="500" /></label>
-                <label>Google review link <input name="reviewUrl" type="url" maxlength="500" placeholder="https://g.page/r/.../review" /></label>
-                <label>Branch calendar ID <input name="calendarId" maxlength="300" autocomplete="off" placeholder="Server-side calendar ID" /></label>
-                <label>Calendar name <input name="calendarName" maxlength="200" placeholder="Sparkling Standard — Tampa Bookings" /></label>
-              </div>
-              <fieldset class="admin-field--wide">
-                <legend>Review requests</legend>
+            <form class="admin-form admin-card admin-branch-form" data-branch-form style="margin-top:1rem;max-width:none;">
+              <section class="admin-form-section">
+                <h3>Identity &amp; lifecycle</h3>
+                <p class="admin-muted">Internal identity is fixed. These fields control only the owner-approved public identity and launch state.</p>
+                <div class="admin-form admin-form--grid">
+                  <label>Lifecycle
+                    <select name="lifecycle" required>
+                      <option value="draft">Draft</option>
+                      <option value="setup">Setup</option>
+                      <option value="internally_testable">Internally testable</option>
+                      <option value="approved_to_launch">Approved to launch</option>
+                      <option value="live">Live</option>
+                      <option value="paused">Paused</option>
+                      <option value="retired">Retired</option>
+                    </select>
+                  </label>
+                  <label>Public name <input name="publicName" required maxlength="120" /></label>
+                  <label>Public URL slug <input name="publicSlug" required maxlength="80" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
+                  <label>Region label <input name="regionLabel" maxlength="200" /></label>
+                  <label>Time zone <input name="timezone" maxlength="80" /></label>
+                  <label>Hours label <input name="hoursLabel" maxlength="200" /></label>
+                </div>
+              </section>
+
+              <section class="admin-form-section">
+                <h3>Public contact &amp; profile</h3>
+                <div class="admin-form admin-form--grid">
+                  <label>Public phone <input name="publicPhone" maxlength="40" /></label>
+                  <label>Public email <input name="publicEmail" type="email" maxlength="200" /></label>
+                  <label>Google Business Profile status
+                    <select name="gbpStatus">
+                      <option value="not_created">Not created</option>
+                      <option value="eligibility_review">Eligibility review</option>
+                      <option value="prepared">Prepared</option>
+                      <option value="submitted">Submitted</option>
+                      <option value="verified">Verified</option>
+                      <option value="paused">Paused</option>
+                    </select>
+                  </label>
+                  <label>Google Business Profile URL <input name="gbpUrl" type="url" maxlength="500" /></label>
+                  <label class="admin-field--wide">Google review link <input name="reviewUrl" type="url" maxlength="500" placeholder="https://g.page/r/.../review" /></label>
+                </div>
+              </section>
+
+              <section class="admin-form-section">
+                <h3>Calendar binding</h3>
+                <p class="admin-muted">The saved branch calendar overrides the environment calendar for this branch only. Pensacola never borrows the Tampa calendar, and Tampa never borrows Pensacola's.</p>
+                <div class="admin-form admin-form--grid">
+                  <label>Branch calendar ID <input name="calendarId" maxlength="300" autocomplete="off" placeholder="Server-side calendar ID (optional)" /></label>
+                  <label>Calendar display name <input name="calendarName" maxlength="200" placeholder="Sparkling Standard — Pensacola Bookings" /></label>
+                </div>
+                <div data-branch-calendar-binding class="admin-branch-calendar"></div>
+                <div class="admin-actions">
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="branch-calendar-check">Check live calendar connection</button>
+                </div>
+                <p class="admin-status-message" data-branch-calendar-status role="status" aria-live="polite"></p>
+              </section>
+
+              <section class="admin-form-section">
+                <h3>Review requests</h3>
                 <p class="admin-muted">Requests are only considered after a verified completed service. Automation stays off until the owner enables it and the branch has an official review link.</p>
-                <label><input type="checkbox" name="reviewRequestsEnabled" /> Enable automated review requests for this branch</label>
-                <label>Delay after completion (hours) <input name="reviewRequestDelayHours" type="number" min="1" max="720" step="1" /></label>
-                <label>Maximum requests per customer <input name="reviewRequestMaxPerCustomer" type="number" min="1" max="12" step="1" /></label>
-              </fieldset>
-              <fieldset class="admin-field--wide">
-                <legend>Service availability</legend>
-                <div class="admin-grid">
+                <div class="admin-form admin-form--grid">
+                  <label class="admin-check"><input type="checkbox" name="reviewRequestsEnabled" /> Enable automated review requests for this branch</label>
+                  <label>Delay after completion (hours) <input name="reviewRequestDelayHours" type="number" min="1" max="720" step="1" /></label>
+                  <label>Maximum requests per customer <input name="reviewRequestMaxPerCustomer" type="number" min="1" max="12" step="1" /></label>
+                </div>
+              </section>
+
+              <section class="admin-form-section">
+                <h3>Service availability</h3>
+                <div class="admin-form admin-form--grid">
                   <label>Residential
                     <select name="serviceResidential">
                       <option value="disabled">Disabled</option>
@@ -1862,16 +1952,35 @@ import {
                     </select>
                   </label>
                 </div>
-              </fieldset>
-              <label>Service-area ZIPs (comma or line separated)
-                <textarea name="serviceAreaZips" rows="6" placeholder="32501, 32502, 32503"></textarea>
-              </label>
-              <fieldset class="admin-field--wide"><legend>Service states</legend>
-                <label><input type="checkbox" name="serviceStateFL" /> Florida</label>
-                <label><input type="checkbox" name="serviceStateAL" /> Alabama</label>
-              </fieldset>
-              <div class="admin-card" style="background:#fbf7f1;">
-                <h3>Operating origin</h3>
+              </section>
+
+              <section class="admin-form-section">
+                <h3>Service area</h3>
+                <p class="admin-muted">Only saved, owner-approved ZIP codes receive coverage. Direct Florida ZIPs are bookable; Alabama and other extended ZIPs are inquiries or special arrangements.</p>
+                <div class="admin-branch-area-summary" data-branch-area-summary></div>
+                <div class="admin-branch-zip-chips" data-branch-zip-chips></div>
+                <div class="admin-inline-form">
+                  <label>Add a ZIP code <input data-branch-zip-add inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="32502" /></label>
+                  <button class="btn btn--secondary btn--small" type="button" data-admin-action="branch-zip-add">Add ZIP</button>
+                </div>
+                <details class="admin-detail-toggle">
+                  <summary>Bulk edit the saved ZIP list</summary>
+                  <label class="admin-field--wide">Service-area ZIPs (comma or line separated)
+                    <textarea name="serviceAreaZips" rows="5" placeholder="32501, 32502, 32503"></textarea>
+                  </label>
+                </details>
+                <div class="admin-branch-area-inventory" data-branch-area-inventory></div>
+                <fieldset class="admin-field--wide admin-form-section__plain">
+                  <legend>Service states</legend>
+                  <div class="admin-check-grid">
+                    <label class="admin-check"><input type="checkbox" name="serviceStateFL" /> Florida</label>
+                    <label class="admin-check"><input type="checkbox" name="serviceStateAL" /> Alabama</label>
+                  </div>
+                </fieldset>
+              </section>
+
+              <section class="admin-form-section">
+                <h3>Operating origin &amp; travel</h3>
                 <p class="admin-muted">This private branch origin determines customer travel eligibility and dispatch planning. It is never published. Verify it with Google Places before activation.</p>
                 <input type="hidden" name="branchId" value="" data-admin-address-branch />
                 <div class="admin-field--wide admin-address-block" data-admin-address-block>
@@ -1889,18 +1998,24 @@ import {
                   <p class="admin-address-status" data-admin-address-status role="status" aria-live="polite"></p>
                 </div>
                 <label>Travel limit (one-way miles) <input name="travelLimitMiles" type="number" min="1" max="500" step="0.5" /></label>
-              </div>
+              </section>
+
               <div data-branch-readiness style="margin-bottom:1rem;"></div>
-              <label>Launch note <textarea name="launchNote" rows="4" maxlength="1000"></textarea></label>
-              <label>Change note <input name="note" maxlength="500" placeholder="Why this setup changed" /></label>
+
+              <section class="admin-form-section">
+                <h3>Release notes</h3>
+                <div class="admin-form">
+                  <label>Launch note <textarea name="launchNote" rows="3" maxlength="1000"></textarea></label>
+                  <label>Change note <input name="note" maxlength="500" placeholder="Why this setup changed" /></label>
+                </div>
+              </section>
+
               <div class="admin-actions">
                 <button class="btn btn--primary" type="submit">Save branch setup</button>
-                <button class="btn btn--ghost btn--small" type="button" data-branch-refresh>Refresh</button>
               </div>
               <p class="admin-status-message" data-branch-form-status role="status" aria-live="polite"></p>
             </form>
           </section>
-
           <section class="admin-view" data-admin-view="communications" hidden>
             <div class="admin-card">
               <h2 class="admin-section-title">Communications &amp; notifications</h2>

@@ -6,10 +6,15 @@ import {
   deleteDisposableLead,
   leadPageBounds,
   listLeads,
+  markLeadConverted,
+  markLeadDuplicate,
+  markLeadTest,
+  previewSuspectedTestLeads,
   restoreLead,
   retryLeadNotification,
   updateLead,
 } from '../../../src/lib/admin/crm.ts';
+import { summarizeLeadResults } from '../../../src/lib/admin/lead-classification.ts';
 
 interface Env extends AdminDbEnv {
   WEB3FORMS_ACCESS_KEY?: string;
@@ -38,6 +43,9 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
   try {
     const actor = await requireActor(db, context.request, 'lead.read');
     const url = new URL(context.request.url);
+    if (url.searchParams.get('view') === 'test_preview') {
+      return json({ ok: true, suspects: await previewSuspectedTestLeads(db, actor) });
+    }
     const id = (url.searchParams.get('id') ?? '').trim();
     if (id) {
       const scope = actor.role === 'owner' ? '' : actor.branchId ? ' AND l.branch_id = ?' : ' AND 1 = 0';
@@ -123,16 +131,29 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       await deleteDisposableLead(db, actor, leadId);
       return json({ ok: true });
     }
+    if (action === 'mark_test' || action === 'unmark_test') {
+      await markLeadTest(db, actor, leadId, action === 'mark_test');
+      return json({ ok: true });
+    }
+    if (action === 'mark_duplicate' || action === 'unmark_duplicate') {
+      await markLeadDuplicate(db, actor, leadId, action === 'mark_duplicate', String(body.duplicateOf ?? ''));
+      return json({ ok: true });
+    }
+    if (action === 'mark_converted') {
+      await markLeadConverted(db, actor, leadId);
+      return json({ ok: true });
+    }
     if (action === 'bulk') {
       const operation = String(body.operation ?? '');
       const ids = Array.isArray(body.leadIds)
         ? body.leadIds.filter((value): value is string => typeof value === 'string').slice(0, 200)
         : [];
-      if (!['archive', 'restore', 'delete'].includes(operation)) {
+      const operations = ['archive', 'restore', 'delete', 'mark_test', 'unmark_test', 'mark_duplicate', 'unmark_duplicate', 'mark_converted'];
+      if (!operations.includes(operation)) {
         return json({ ok: false, error: 'bulk_operation_invalid' }, 400);
       }
       if (ids.length === 0) return json({ ok: false, error: 'bulk_selection_required' }, 400);
-      if (operation === 'delete' && actor.role !== 'owner') {
+      if (['delete', 'mark_test', 'unmark_test', 'mark_duplicate', 'unmark_duplicate'].includes(operation) && actor.role !== 'owner') {
         return json({ ok: false, error: 'owner_required' }, 403);
       }
       if (body.confirm !== true) return json({ ok: false, error: 'bulk_confirmation_required' }, 400);
@@ -141,7 +162,12 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
         try {
           if (operation === 'archive') await archiveLead(db, actor, id);
           else if (operation === 'restore') await restoreLead(db, actor, id);
-          else await deleteDisposableLead(db, actor, id);
+          else if (operation === 'delete') await deleteDisposableLead(db, actor, id);
+          else if (operation === 'mark_test') await markLeadTest(db, actor, id, true);
+          else if (operation === 'unmark_test') await markLeadTest(db, actor, id, false);
+          else if (operation === 'mark_duplicate') await markLeadDuplicate(db, actor, id, true);
+          else if (operation === 'unmark_duplicate') await markLeadDuplicate(db, actor, id, false);
+          else await markLeadConverted(db, actor, id);
           results.push({ id, ok: true });
         } catch (error) {
           results.push({
@@ -151,11 +177,13 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           });
         }
       }
+      const summary = summarizeLeadResults(results);
       return json({
         ok: true,
         operation,
-        succeeded: results.filter((entry) => entry.ok).length,
-        failed: results.filter((entry) => !entry.ok).length,
+        ...summary,
+        succeeded: summary.completed,
+        failed: summary.skipped,
         results,
       });
     }

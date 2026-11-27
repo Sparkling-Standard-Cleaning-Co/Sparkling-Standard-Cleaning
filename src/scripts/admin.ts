@@ -60,6 +60,17 @@ const titleEl = document.querySelector<HTMLElement>('[data-admin-view-title]');
 const subEl = document.querySelector<HTMLElement>('[data-admin-view-sub]');
 const navButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-admin-nav]')];
 const views = [...document.querySelectorAll<HTMLElement>('[data-admin-view]')];
+const bell = document.querySelector<HTMLButtonElement>('[data-admin-bell]');
+const bellCount = document.querySelector<HTMLElement>('[data-admin-bell-count]');
+const notificationPanel = document.querySelector<HTMLElement>('[data-admin-notification-panel]');
+const notificationList = document.querySelector<HTMLElement>('[data-admin-notification-list]');
+const notificationSummary = document.querySelector<HTMLElement>('[data-admin-notification-summary]');
+const menuToggle = document.querySelector<HTMLButtonElement>('[data-admin-menu-toggle]');
+const sidebar = document.querySelector<HTMLElement>('.admin-sidebar');
+const mobileBackdrop = document.querySelector<HTMLElement>('[data-admin-mobile-backdrop]');
+let notificationAlerts: Array<Record<string, unknown>> = [];
+let notificationsLoaded = false;
+let mobileMenuOpen = false;
 
 let csrf = '';
 let actor: AdminActor | null = null;
@@ -419,6 +430,195 @@ function can(permission: string): boolean {
   return actor?.role === 'owner' || Boolean(actor?.permissions.includes(permission));
 }
 
+function alertBranchLabel(branchId: unknown): string {
+  if (String(branchId ?? '') === 'branch_pensacola') return 'Pensacola';
+  if (String(branchId ?? '') === 'branch_tampa') return 'Tampa Bay';
+  return 'All branches';
+}
+
+function isUnreadAlert(alert: Record<string, unknown>): boolean {
+  const status = String(alert.status ?? 'new');
+  if (status === 'new') return true;
+  const acknowledged = String(alert.acknowledgedAt ?? '');
+  const lastSeen = String(alert.lastSeen ?? '');
+  return status === 'acknowledged' && Boolean(acknowledged && lastSeen && lastSeen > acknowledged);
+}
+
+function updateNotificationBadge(): void {
+  const unread = notificationAlerts.filter(isUnreadAlert).length;
+  if (bellCount) {
+    bellCount.textContent = String(unread);
+    bellCount.hidden = unread === 0;
+  }
+  if (bell) bell.setAttribute('aria-label', unread ? `Notifications, ${unread} unread` : 'Notifications');
+  if (notificationSummary) {
+    notificationSummary.textContent = unread
+      ? `${unread} unread of ${notificationAlerts.length} actionable notification${notificationAlerts.length === 1 ? '' : 's'}.`
+      : notificationAlerts.length
+        ? `All ${notificationAlerts.length} actionable notification${notificationAlerts.length === 1 ? '' : 's'} read. Underlying records are unchanged.`
+        : 'No actionable notifications.';
+  }
+}
+
+function renderNotifications(): void {
+  updateNotificationBadge();
+  if (!notificationList) return;
+  if (!notificationAlerts.length) {
+    notificationList.innerHTML = '<p class="admin-muted">No actionable notifications. Operational records are still available in their sections.</p>';
+    return;
+  }
+  notificationList.innerHTML = notificationAlerts.map((alert, index) => {
+    const unread = isUnreadAlert(alert);
+    const timestamp = String(alert.lastSeen ?? alert.firstSeen ?? '');
+    return `<div class="admin-notification-item${unread ? ' is-unread' : ''}">
+      <button class="admin-notification-item__main" type="button" data-admin-notification-open="${index}">
+        <span class="admin-notification-item__title">${esc(alert.title ?? alert.message ?? 'Operational notification')}</span>
+        <span class="admin-notification-item__detail">${esc(alert.explanation ?? alert.message ?? '')}</span>
+        <span class="admin-notification-item__meta">${esc(timestamp ? dateTime(timestamp) : 'No timestamp')} · ${esc(alertBranchLabel(alert.branchId))} · ${esc(unread ? 'Unread' : titleCase(String(alert.status ?? 'read')))}</span>
+      </button>
+      <button class="btn btn--ghost btn--small" type="button" data-admin-notification-read="${index}" aria-label="Mark notification as read">Mark read</button>
+    </div>`;
+  }).join('');
+}
+
+function applyNotifications(alerts: Array<Record<string, unknown>>): void {
+  notificationAlerts = alerts;
+  notificationsLoaded = true;
+  renderNotifications();
+}
+
+async function loadNotifications(force = false): Promise<void> {
+  if (notificationsLoaded && !force) return;
+  const data = await api<{ alerts?: Array<Record<string, unknown>> }>('/api/admin/overview');
+  applyNotifications(data.alerts ?? []);
+}
+
+function closeNotificationPanel(): void {
+  if (notificationPanel) notificationPanel.hidden = true;
+  if (bell) bell.setAttribute('aria-expanded', 'false');
+}
+
+function toggleNotificationPanel(): void {
+  if (!notificationPanel) return;
+  const open = notificationPanel.hidden;
+  notificationPanel.hidden = !open;
+  if (bell) bell.setAttribute('aria-expanded', String(open));
+  if (open) {
+    void loadNotifications(true).catch((error) => setAppError(friendly(error)));
+    renderNotifications();
+  }
+}
+
+async function markNotificationRead(index: number): Promise<void> {
+  const alert = notificationAlerts[index];
+  if (!alert) return;
+  if (isUnreadAlert(alert)) {
+    try {
+      await api('/api/admin/overview', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'acknowledge',
+          alertKey: String(alert.key ?? ''),
+          title: String(alert.title ?? ''),
+          kind: String(alert.kind ?? ''),
+        }),
+      });
+      alert.status = 'acknowledged';
+      alert.acknowledgedAt = new Date().toISOString();
+    } catch (error) {
+      setAppError(friendly(error));
+    }
+  }
+  renderNotifications();
+}
+
+async function openNotification(index: number): Promise<void> {
+  const alert = notificationAlerts[index];
+  if (!alert) return;
+  await markNotificationRead(index);
+  closeNotificationPanel();
+  const view = String(alert.view ?? 'overview');
+  const key = String(alert.key ?? '');
+  const filter = String(alert.filter ?? '');
+  const firstRecord = Array.isArray(alert.records) ? (alert.records[0] as Record<string, unknown> | undefined) : undefined;
+  const recordId = String(firstRecord?.id ?? '');
+  await loadView(view);
+  if (key === 'requests.pending') {
+    await loadCalendar('pending');
+    return;
+  }
+  if (filter === 'checkout') {
+    const select = document.querySelector<HTMLSelectElement>('[data-admin-checkout-filter]');
+    if (select) {
+      select.value = 'failed';
+      checkoutSessionFilter = 'failed';
+      renderCheckoutSessions();
+    }
+    return;
+  }
+  if (key === 'documents.unsigned' && recordId) {
+    await openDocumentRequest(recordId).catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (key === 'finance.outstanding_invoices' && recordId) {
+    await openInvoice(recordId).catch((error) => setAppError(friendly(error)));
+    return;
+  }
+  if (recordId && ['requests.pending', 'staffing.pending', 'jobs.unassigned'].includes(key)) {
+    if (key === 'requests.pending') await openRequest(recordId).catch((error) => setAppError(friendly(error)));
+    else await openCalendarJob(recordId).catch((error) => setAppError(friendly(error)));
+  }
+}
+
+async function markAllNotificationsRead(): Promise<void> {
+  const unread = notificationAlerts.filter(isUnreadAlert);
+  if (unread.length === 0) return;
+  try {
+    await api('/api/admin/overview', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'acknowledge_all',
+        alerts: unread.map((alert) => ({
+          key: String(alert.key ?? ''),
+          title: String(alert.title ?? ''),
+          kind: String(alert.kind ?? ''),
+        })),
+      }),
+    });
+    const stamp = new Date().toISOString();
+    for (const alert of unread) {
+      alert.status = 'acknowledged';
+      alert.acknowledgedAt = stamp;
+    }
+    renderNotifications();
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
+function setMobileMenu(open: boolean): void {
+  mobileMenuOpen = open;
+  sidebar?.classList.toggle('is-open', open);
+  if (mobileBackdrop) mobileBackdrop.hidden = !open;
+  if (menuToggle) menuToggle.setAttribute('aria-expanded', String(open));
+  document.body.classList.toggle('admin-menu-open', open);
+}
+
+function decorateResponsiveTables(root: ParentNode = document): void {
+  for (const table of root.querySelectorAll<HTMLTableElement>('.admin-table:not([data-responsive-ready])')) {
+    const headers = [...table.querySelectorAll('thead th')].map((header) => header.textContent?.trim() ?? '');
+    for (const row of table.querySelectorAll('tbody tr')) {
+      [...row.querySelectorAll<HTMLTableCellElement>('td')].forEach((cell, index) => {
+        if (!cell.dataset.label) {
+          const label = headers[index] || (cell.querySelector('input[type="checkbox"]') ? 'Select' : 'Detail');
+          cell.dataset.label = label;
+        }
+      });
+    }
+    table.dataset.responsiveReady = 'true';
+  }
+}
+
 function showApp(nextActor: AdminActor): void {
   if (nextActor.role === 'cleaner') {
     // Cleaners use the dedicated mobile employee portal, not the owner console.
@@ -428,6 +628,8 @@ function showApp(nextActor: AdminActor): void {
   actor = nextActor;
   if (gate) gate.hidden = true;
   if (app) app.hidden = false;
+  setMobileMenu(false);
+  closeNotificationPanel();
   setError();
   setAppError();
   if (userEl) userEl.textContent = `${nextActor.name} · ${nextActor.role}`;
@@ -535,41 +737,48 @@ async function loadOverview(): Promise<void> {
   const kpis = document.querySelector<HTMLElement>('[data-admin-kpis]');
   if (kpis) {
     kpis.innerHTML = [
-      ['Today\'s jobs', counts.todayJobs ?? 0],
-      ['Tomorrow', counts.tomorrowJobs ?? 0],
-      ['Pending requests', counts.requests ?? 0],
-      ['Unassigned jobs', counts.unassignedJobs ?? 0],
-      ['Open leads', counts.leads ?? 0],
-      ['Unsigned agreements', counts.unsignedAgreements ?? 0],
-      ['Outstanding invoices', counts.outstandingInvoices ?? 0],
-      ['Failed communications', counts.failedCommunications ?? 0],
+      ['Today\'s jobs', counts.todayJobs ?? 0, 'Scheduled today, including completed'],
+      ['Tomorrow\'s jobs', counts.tomorrowJobs ?? 0, 'Scheduled tomorrow'],
+      ['Pending reservations', counts.requests ?? 0, 'Excludes test and archived'],
+      ['Unassigned jobs', counts.unassignedJobs ?? 0, 'Upcoming without crew'],
+      ['Open leads', counts.leads ?? 0, 'Actionable non-reservation inquiries'],
+      ['Outstanding invoices', counts.outstandingInvoices ?? 0, 'Open balance'],
+    ].map(([label, value, detail]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p><p class="admin-muted admin-kpi__detail">${esc(detail)}</p></div>`).join('');
+  }
+  const health = document.querySelector<HTMLElement>('[data-admin-health-kpis]');
+  if (health) {
+    health.innerHTML = [
       ['Customers', counts.customers ?? 0],
       ['Active gifts', counts.activeGifts ?? 0],
+      ['Agreements awaiting signature', counts.unsignedAgreements ?? 0],
+      ['Staffing issues', counts.staffingPending ?? 0],
+      ['Failed communications', counts.failedCommunications ?? 0],
+      ['Failed payment events', counts.failedPaymentEvents ?? 0],
       ['Booking recovery', counts.failedCommitments ?? 0],
-      ['Financial issues', counts.financialIssues ?? 0],
-      ['Active recurring failures', counts.failedWorkerRuns ?? 0],
+      ['Financial reconciliation', counts.financialIssues ?? 0],
+      ['Recurring plans needing sync', counts.failedWorkerRuns ?? 0],
       ['Historical recurring failures', counts.failedWorkerRunsHistory ?? 0],
-      ['Checkout failures', counts.failedCheckouts ?? 0],
+      ['Unresolved checkout failures', counts.failedCheckouts ?? 0],
+      ['Historical checkout failures', counts.failedCheckoutsHistory ?? 0],
       ['Abandoned checkouts', counts.abandonedCheckouts ?? 0],
-    ].map(([label, value]) => `<div class="admin-card admin-kpi"><p class="admin-kpi__label">${esc(label)}</p><p class="admin-kpi__value">${esc(value)}</p></div>`).join('');
+      ['Failed lead deliveries', counts.failedLeadDeliveries ?? 0],
+    ].map(([label, value]) => `<div class="admin-record"><p><strong>${esc(value)}</strong> <span class="admin-muted">${esc(label)}</span></p></div>`).join('');
   }
   const alerts = document.querySelector<HTMLElement>('[data-admin-alerts]');
   if (alerts) {
     const rows = data.alerts ?? [];
     const history = data.alertHistory ?? [];
     alerts.innerHTML = rows.length
-      ? `<div class="admin-card"><h2 class="admin-section-title">Operational alerts</h2><p class="admin-muted">Each alert explains what happened, why, and what to do next. Resolving or dismissing an alert never changes the underlying financial or operational record.</p>${rows
+      ? `<div class="admin-card"><h2 class="admin-section-title">Requires attention</h2><p class="admin-muted">Reading a notification does not resolve an unpaid invoice, failed booking or staffing conflict. Each action opens the affected record.</p><div class="admin-attention-list">${rows
           .map((alert) => {
             const key = String(alert.key ?? alert.kind ?? '');
             const severity = String(alert.severity ?? 'medium');
             const status = titleCase(String(alert.status ?? 'new'));
-            const records = Array.isArray(alert.records)
-              ? (alert.records as Array<Record<string, unknown>>)
-              : [];
-            return `<details class="admin-alert admin-alert--${esc(severity)}">
-              <summary><span class="admin-status">${esc(status)}</span> <strong>${esc(alert.title ?? alert.message ?? 'Operational alert')}</strong> <span class="admin-muted">${esc(alert.count ?? 0)} record(s)</span></summary>
+            const records = Array.isArray(alert.records) ? (alert.records as Array<Record<string, unknown>>) : [];
+            return `<details class="admin-alert admin-attention-item admin-alert--${esc(severity)}">
+              <summary><span class="admin-status">${esc(status)}</span> <strong>${esc(alert.title ?? alert.message ?? 'Operational alert')}</strong> <span class="admin-muted">${esc(alert.message ?? '')}</span></summary>
               <div class="admin-alert__body">
-                <p>${esc(alert.explanation ?? alert.message ?? '')}</p>
+                <p>${esc(alert.explanation ?? '')}</p>
                 <dl class="admin-definition">
                   <dt>First seen</dt><dd>${esc(alert.firstSeen ? dateTime(alert.firstSeen) : 'Not recorded')}</dd>
                   <dt>Most recent</dt><dd>${esc(alert.lastSeen ? dateTime(alert.lastSeen) : 'Not recorded')}</dd>
@@ -578,12 +787,12 @@ async function loadOverview(): Promise<void> {
                 </dl>
                 ${records.length ? `<h4>Affected records</h4><ul class="admin-alert__records">${records.map((record) => `<li><strong>${esc(record.label ?? '')}</strong> <span class="admin-muted">${esc(record.detail ?? '')}</span>${record.id ? ` <button class="btn btn--ghost btn--small" type="button" data-admin-action="${key === 'documents.unsigned' ? 'alert-document-open' : key === 'finance.outstanding_invoices' ? 'alert-invoice-open' : 'request-open'}" data-id="${esc(record.id)}">Open</button>` : ''}</li>`).join('')}</ul>` : ''}
                 <div class="admin-actions">
-                  <button class="btn btn--primary btn--small" type="button" data-admin-action="overview-open" data-view="${esc(alert.view ?? 'overview')}" data-filter="${esc(alert.filter ?? '')}">Open affected area</button>
+                  <button class="btn btn--primary btn--small" type="button" data-admin-action="overview-open" data-view="${esc(alert.view ?? 'overview')}" data-filter="${esc(alert.filter ?? '')}">Review area</button>
                   <button class="btn btn--ghost btn--small" type="button" data-admin-action="overview-recheck">Recheck now</button>
                   <button class="btn btn--ghost btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="acknowledge" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Acknowledge</button>
                   <button class="btn btn--ghost btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="investigate" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Investigating</button>
                   <button class="btn btn--secondary btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="resolve" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Resolve</button>
-                  ${actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="dismiss" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Dismiss as non-actionable</button>` : ''}
+                  ${actor?.role === 'owner' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="alert-action" data-key="${esc(key)}" data-alert-action="dismiss" data-kind="${esc(alert.kind ?? '')}" data-title="${esc(alert.title ?? '')}">Dismiss</button>` : ''}
                 </div>
                 <label class="admin-field--wide" style="display:block;margin-top:.5rem;">Resolution note (required when resolving)
                   <input data-alert-note="${esc(key)}" maxlength="1000" placeholder="What was wrong and what fixed it?" />
@@ -591,9 +800,8 @@ async function loadOverview(): Promise<void> {
                 ${alert.resolutionNote ? `<p class="admin-muted">Resolved: ${esc(alert.resolutionNote)}</p>` : ''}
               </div>
             </details>`;
-          })
-          .join('')}</div>`
-      : '<div class="admin-card"><h2 class="admin-section-title">Operational alerts</h2><p class="admin-muted">No operational exceptions are open.</p></div>';
+          })}</div></div>`
+      : '<div class="admin-card"><h2 class="admin-section-title">Requires attention</h2><p class="admin-muted">No operational exceptions need action.</p></div>';
     if (history.length) {
       alerts.insertAdjacentHTML(
         'beforeend',
@@ -605,15 +813,15 @@ async function loadOverview(): Promise<void> {
   if (recent) {
     renderTable(recent, ['Date', 'Type', 'Customer', 'Email', 'Status', 'Reference'], (data.recentLeads ?? []).map((lead) => [
       esc(dateTime(lead.created_at)),
-      esc(lead.request_type),
+      esc(titleCase(String(lead.request_type ?? '').replaceAll('_', ' '))),
       esc([lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Unlinked lead'),
       esc(lead.email),
-      `<span class="admin-status">${esc(lead.status)}</span>`,
+      `<span class="admin-status">${esc(titleCase(String(lead.status ?? '')))}</span>`,
       esc(lead.quote_reference),
-    ]), 'No inquiries have been persisted yet.');
+    ]), 'No legitimate inquiries are waiting.');
   }
+  applyNotifications(data.alerts ?? []);
 }
-
 function requestLocation(request: Record<string, unknown>): string {
   const joined = [request.line1, request.city].filter(Boolean).join(', ');
   if (joined) return joined;
@@ -626,6 +834,7 @@ function requestLocation(request: Record<string, unknown>): string {
 }
 
 let weekOffset = 0;
+let mobileDayKey = '';
 let weekAppointments: Array<Record<string, unknown>> = [];
 let weekEmployeeFilter = '';
 let weekServiceFilter = '';
@@ -839,23 +1048,47 @@ function weekSectionMarkup(
   const current = Math.min(weekCycleIndices.get(sectionKey) ?? 0, Math.max(0, jobs.length - 1));
   if (current !== (weekCycleIndices.get(sectionKey) ?? 0)) weekCycleIndices.set(sectionKey, current);
   const popover = jobs.length > 1
-    ? `<div class="admin-week-popover" aria-hidden="true">${jobs
-        .map((job) => `<p><strong>${esc(appointmentLocalTime(job.start_at, job.branch_id))}</strong> ${esc(
-          [job.first_name, job.last_name].filter(Boolean).join(' ') || 'Unlinked customer',
-        )} — ${esc(appointmentService(job))}${appointmentRecurring(job) ? ' · Recurring' : ''}</p>`)
+    ? `<div class="admin-week-popover">${jobs
+        .map((job, index) => `<button type="button" class="admin-week-popover__row" data-week-select="${esc(sectionKey)}" data-week-index="${index}">
+          <strong>${esc(appointmentLocalTime(job.start_at, job.branch_id))}</strong>
+          <span>${esc([job.first_name, job.last_name].filter(Boolean).join(' ') || 'Unlinked customer')} — ${esc(appointmentService(job))}${appointmentRecurring(job) ? ' · Recurring' : ''}</span>
+        </button>`)
         .join('')}</div>`
     : '';
   return `<div class="admin-week-section" data-week-drop="${esc(day)}">
     <div class="admin-week-section__head"><span>${esc(label)}</span><span class="admin-week-section__count">${jobs.length}</span></div>
     ${
       jobs.length
-        ? `<div class="admin-week-stack">${jobs.map((job, index) => appointmentCardMarkup(job, index, sectionKey)).join('')}${popover}</div>
-           ${jobs.length > 1 ? `<button class="admin-week-more" type="button" data-week-cycle="${esc(sectionKey)}">+${jobs.length - 1} more</button>` : ''}`
+        ? `<div class="admin-week-stack" data-count="${jobs.length}">${jobs.map((job, index) => appointmentCardMarkup(job, index, sectionKey)).join('')}${popover}</div>
+           ${jobs.length > 1 ? `<button class="admin-week-more" type="button" data-week-expand aria-expanded="false" aria-label="Show all ${jobs.length} appointments in this ${label.toLowerCase()} slot">+${jobs.length - 1}</button>` : ''}`
         : '<p class="admin-week-empty">No appointments</p>'
     }
   </div>`;
 }
 
+function renderWeekMobileDays(days: string[], byDay: Map<string, Array<Record<string, unknown>>>, today: string): string {
+  if (!mobileDayKey || !days.includes(mobileDayKey)) {
+    mobileDayKey = days.includes(today) ? today : days[0] ?? '';
+  }
+  const selector = `<div class="admin-week-mobile-days" role="tablist" aria-label="Choose a day">${days.map((day) => {
+    const jobs = byDay.get(day) ?? [];
+    const dayLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(new Date(`${day}T12:00:00Z`));
+    const dateLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }).format(new Date(`${day}T12:00:00Z`));
+    return `<button type="button" role="tab" data-week-mobile-day="${esc(day)}" aria-selected="${day === mobileDayKey}" class="${day === mobileDayKey ? 'is-selected' : ''}${day === today ? ' is-today' : ''}">
+      <span>${esc(dayLabel)}</span><strong>${esc(dateLabel)}</strong><span class="admin-week-mobile-days__count">${jobs.length}</span>
+    </button>`;
+  }).join('')}</div>`;
+  const jobs = (byDay.get(mobileDayKey) ?? []).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+  const morning = jobs.filter((appointment) => appointmentLocalHour(appointment.start_at, appointment.branch_id) < 12);
+  const afternoon = jobs.filter((appointment) => appointmentLocalHour(appointment.start_at, appointment.branch_id) >= 12);
+  return `${selector}<section class="admin-week-mobile-agenda${mobileDayKey === today ? ' is-today' : ''}">
+    <header><h3>${esc(jobDateLabel(mobileDayKey))}</h3><span class="admin-status">${jobs.length} appointment${jobs.length === 1 ? '' : 's'}</span></header>
+    <div class="admin-week-day__jobs">
+      ${weekSectionMarkup(mobileDayKey, 'Morning', morning)}
+      ${weekSectionMarkup(mobileDayKey, 'Afternoon', afternoon)}
+    </div>
+  </section>`;
+}
 function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
   const target = document.querySelector<HTMLElement>('[data-admin-week-board]');
   if (!target) return;
@@ -878,6 +1111,11 @@ function renderWeekBoard(appointments: Array<Record<string, unknown>>): void {
     label.textContent = `${weekDateLabel(days[0] ?? centralTodayKey())} – ${weekDateLabel(days[6] ?? centralTodayKey())} · ${zone}${weekOffset === 0 ? ' · Current week' : ''}`;
   }
   const today = centralTodayKey();
+  const mobile = window.matchMedia('(max-width: 48rem)').matches;
+  if (mobile) {
+    target.innerHTML = renderWeekMobileDays(days, byDay, today);
+    return;
+  }
   target.innerHTML = `<div class="admin-week-grid">${days.map((day) => {
     const jobs = (byDay.get(day) ?? []).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
     const morning = jobs.filter((appointment) => appointmentLocalHour(appointment.start_at, appointment.branch_id) < 12);
@@ -1354,22 +1592,43 @@ document.addEventListener('click', (event) => {
     closeCalendarDialog();
     return;
   }
-  const cycle = (event.target as HTMLElement).closest<HTMLElement>('[data-week-cycle]');
-  if (cycle) {
-    const key = cycle.dataset.weekCycle ?? '';
-    const section = cycle.closest('.admin-week-section');
+  const expand = (event.target as HTMLElement).closest<HTMLElement>('[data-week-expand]');
+  if (expand) {
+    const section = expand.closest<HTMLElement>('.admin-week-section');
     if (!section) return;
+    const open = !section.classList.contains('is-expanded');
+    section.classList.toggle('is-expanded', open);
+    expand.setAttribute('aria-expanded', String(open));
     const cards = [...section.querySelectorAll<HTMLElement>('[data-week-appointment]')];
-    if (cards.length < 2) return;
-    const next = ((weekCycleIndices.get(key) ?? 0) + 1) % cards.length;
-    weekCycleIndices.set(key, next);
-    cards.forEach((card, index) => {
-      card.hidden = index !== next;
-    });
-    cycle.textContent = next === 0 ? `+${cards.length - 1} more` : `Next · ${next + 1} of ${cards.length}`;
+    if (open) {
+      cards.forEach((card) => { card.hidden = false; });
+    } else {
+      const key = cards[0]?.dataset.weekSection ?? '';
+      const active = weekCycleIndices.get(key) ?? 0;
+      cards.forEach((card, index) => { card.hidden = index !== active; });
+    }
     return;
   }
-  const jobAction = (event.target as HTMLElement).closest<HTMLElement>('[data-calendar-job-action]');
+  const weekSelect = (event.target as HTMLElement).closest<HTMLElement>('[data-week-select]');
+  if (weekSelect) {
+    const key = weekSelect.dataset.weekSelect ?? '';
+    const index = Number(weekSelect.dataset.weekIndex ?? 0);
+    const section = weekSelect.closest<HTMLElement>('.admin-week-section');
+    weekCycleIndices.set(key, index);
+    section?.querySelectorAll<HTMLElement>('[data-week-appointment]').forEach((card, cardIndex) => {
+      card.hidden = cardIndex !== index;
+    });
+    section?.classList.remove('is-expanded');
+    section?.querySelector<HTMLElement>('[data-week-expand]')?.setAttribute('aria-expanded', 'false');
+    section?.querySelectorAll<HTMLElement>('[data-week-appointment]')[index]?.focus();
+    return;
+  }
+  const mobileDay = (event.target as HTMLElement).closest<HTMLElement>('[data-week-mobile-day]');
+  if (mobileDay) {
+    mobileDayKey = mobileDay.dataset.weekMobileDay ?? '';
+    renderWeekBoard(weekAppointments);
+    return;
+  }  const jobAction = (event.target as HTMLElement).closest<HTMLElement>('[data-calendar-job-action]');
   if (jobAction) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -1619,8 +1878,15 @@ function renderRequestRows(): void {
 
 async function loadCalendar(view = 'actionable', query = ''): Promise<void> {
   currentRequestView = view;
-  const data = await api<{ requests?: Array<Record<string, unknown>>; appointments?: Array<Record<string, unknown>> }>(
-    `/api/admin/requests?view=${encodeURIComponent(view)}&q=${encodeURIComponent(query)}`,
+  const days = weekDateKeys();
+  const weekFrom = `${addDateKey(days[0] ?? centralTodayKey(), -1)}T00:00:00.000Z`;
+  const weekTo = `${addDateKey(days[6] ?? centralTodayKey(), 1)}T23:59:59.999Z`;
+  const data = await api<{
+    requests?: Array<Record<string, unknown>>;
+    appointments?: Array<Record<string, unknown>>;
+    weekAppointments?: Array<Record<string, unknown>>;
+  }>(
+    `/api/admin/requests?view=${encodeURIComponent(view)}&q=${encodeURIComponent(query)}&weekFrom=${encodeURIComponent(weekFrom)}&weekTo=${encodeURIComponent(weekTo)}`,
   );
   loadedRequests = data.requests ?? [];
   for (const button of document.querySelectorAll<HTMLButtonElement>(
@@ -1629,8 +1895,8 @@ async function loadCalendar(view = 'actionable', query = ''): Promise<void> {
     button.hidden = actor?.role !== 'owner';
   }
   renderRequestRows();
-  renderWeekBoard(data.appointments ?? []);
   loadedAppointments = data.appointments ?? [];
+  renderWeekBoard(data.weekAppointments ?? data.appointments ?? []);
   appointmentPage = 0;
   renderUpcomingAppointments();
 }
@@ -1954,6 +2220,24 @@ function updateLeadBulkToolbar(): void {
   }
 }
 
+function leadClassificationLabel(lead: Record<string, unknown>): string {
+  if (Number(lead.is_test) === 1) return 'Test';
+  if (Number(lead.is_duplicate) === 1) return 'Duplicate';
+  return titleCase(String(lead.status ?? 'new'));
+}
+
+function leadReasonLabel(reason: string): string {
+  const labels: Record<string, string> = {
+    linked_customer_history_retained: 'Linked customer history was preserved; archive instead of deleting',
+    reservation_history_retained: 'Reservation history was preserved',
+    quoted_inquiry_history_retained: 'Quoted history was preserved',
+    owner_required: 'Owner authorization is required',
+    lead_not_found: 'Record no longer exists',
+    lead_not_archived: 'Record is not archived',
+  };
+  return labels[reason] ?? titleCase(reason.replaceAll('_', ' '));
+}
+
 function renderLeadRows(): void {
   const target = document.querySelector<HTMLElement>('[data-admin-leads]');
   if (!target) return;
@@ -1962,11 +2246,19 @@ function renderLeadRows(): void {
     updateLeadBulkToolbar();
     return;
   }
-  target.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th><input type="checkbox" data-lead-select-all aria-label="Select all visible inquiries" /></th><th>Date</th><th>Type</th><th>Customer</th><th>Reference</th><th>Delivery</th><th>Status</th><th>Actions</th></tr></thead><tbody>${loadedLeads
+  target.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead><tr><th><input type="checkbox" data-lead-select-all aria-label="Select all visible inquiries" /></th><th>Date</th><th>Type</th><th>Customer</th><th>Reference</th><th>Delivery</th><th>Classification</th><th>Actions</th></tr></thead><tbody>${loadedLeads
     .map((lead) => {
       const id = String(lead.id);
-      const customer = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Unlinked';
-      return `<tr><td><input type="checkbox" data-lead-select value="${esc(id)}" aria-label="Select inquiry ${esc(lead.quote_reference || id)}" /></td><td>${esc(dateTime(lead.created_at))}</td><td>${esc(titleCase(String(lead.request_type ?? '').replaceAll('_', ' ')))}</td><td>${esc(customer)}</td><td>${esc(lead.quote_reference)}</td><td>${esc(lead.delivery_status)}${lead.last_delivery_error ? ` · ${esc(lead.last_delivery_error)}` : ''}</td><td><span class="admin-status">${esc(titleCase(lead.status))}</span></td><td><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-open" data-id="${esc(id)}">Open</button>${can('lead.write') ? (lead.status === 'archived' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-restore" data-id="${esc(id)}">Restore</button>` : `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-archive" data-id="${esc(id)}">Archive</button>`) : ''}${actor?.role === 'owner' ? `<button class="btn btn--danger btn--small" type="button" data-admin-action="lead-delete" data-id="${esc(id)}">Delete</button>` : ''}</div></td></tr>`;
+      const customer = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || String(lead.company_name ?? '') || 'Unlinked';
+      const status = String(lead.status ?? '');
+      const actions = [
+        can('lead.write') ? (status === 'archived' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-restore" data-id="${esc(id)}">Restore</button>` : `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-archive" data-id="${esc(id)}">Archive</button>`) : '',
+        can('lead.write') ? (Number(lead.is_test) === 1 ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-unmark-test" data-id="${esc(id)}">Not a test</button>` : `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-mark-test" data-id="${esc(id)}">Mark as test</button>`) : '',
+        can('lead.write') ? (Number(lead.is_duplicate) === 1 ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-unmark-duplicate" data-id="${esc(id)}">Not a duplicate</button>` : `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-mark-duplicate" data-id="${esc(id)}">Mark duplicate</button>`) : '',
+        can('lead.write') && status !== 'converted' ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-mark-converted" data-id="${esc(id)}">Mark converted</button>` : '',
+        actor?.role === 'owner' ? `<button class="btn btn--danger btn--small" type="button" data-admin-action="lead-delete" data-id="${esc(id)}">Delete if safe</button>` : '',
+      ].filter(Boolean).join('');
+      return `<tr><td><input type="checkbox" data-lead-select value="${esc(id)}" aria-label="Select inquiry ${esc(lead.quote_reference || id)}" /></td><td>${esc(dateTime(lead.created_at))}</td><td>${esc(titleCase(String(lead.request_type ?? '').replaceAll('_', ' ')))}</td><td>${esc(customer)}</td><td>${esc(lead.quote_reference)}</td><td>${esc(lead.delivery_status)}${lead.last_delivery_error ? ` · ${esc(lead.last_delivery_error)}` : ''}</td><td><span class="admin-status">${esc(leadClassificationLabel(lead))}</span>${lead.archived_at ? `<p class="admin-muted">Archived ${esc(dateTime(lead.archived_at))}</p>` : ''}</td><td><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-open" data-id="${esc(id)}">Open</button><details class="admin-row-actions"><summary>More</summary><div class="admin-actions">${actions}</div></details></div></td></tr>`;
     })
     .join('')}</tbody></table></div>`;
   updateLeadBulkToolbar();
@@ -1983,8 +2275,8 @@ async function openLead(leadId: string): Promise<void> {
   const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.company_name || 'Unlinked inquiry';
   const property = [lead.line1, lead.city, lead.state, lead.postal_code].filter(Boolean).join(', ');
   target.hidden = false;
-  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(name)}</h2><div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-close">Close</button></div></div>
-    <dl class="admin-definition"><dt>Type</dt><dd>${esc(titleCase(String(lead.request_type ?? '').replaceAll('_', ' ')))}</dd><dt>Status</dt><dd>${esc(titleCase(lead.status))}</dd><dt>Reference</dt><dd>${esc(lead.quote_reference || '—')}</dd><dt>Delivery</dt><dd>${esc(lead.delivery_status)}${lead.last_delivery_error ? ` · ${esc(lead.last_delivery_error)}` : ''}</dd><dt>Created</dt><dd>${esc(dateTime(lead.created_at))}</dd><dt>Property</dt><dd>${esc(property || 'Not linked')}</dd><dt>Customer</dt><dd>${lead.customer_id ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(lead.customer_id)}">Open linked customer</button>` : 'Unlinked inquiry'}</dd></dl>
+  target.innerHTML = `<div class="admin-card"><div class="admin-detail-head"><h2 class="admin-section-title">${esc(name)}</h2><div class="admin-actions"><span class="admin-status">${esc(leadClassificationLabel(lead))}</span><button class="btn btn--ghost btn--small" type="button" data-admin-action="lead-close">Close</button></div></div>
+    <dl class="admin-definition"><dt>Type</dt><dd>${esc(titleCase(String(lead.request_type ?? '').replaceAll('_', ' ')))}</dd><dt>Status</dt><dd>${esc(titleCase(lead.status))}</dd><dt>Classification</dt><dd>${esc(leadClassificationLabel(lead))}</dd><dt>Reference</dt><dd>${esc(lead.quote_reference || '—')}</dd><dt>Delivery</dt><dd>${esc(lead.delivery_status)}${lead.last_delivery_error ? ` · ${esc(lead.last_delivery_error)}` : ''}</dd><dt>Created</dt><dd>${esc(dateTime(lead.created_at))}</dd><dt>Property</dt><dd>${esc(property || 'Not linked')}</dd><dt>Customer</dt><dd>${lead.customer_id ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(lead.customer_id)}">Open linked customer</button>` : 'Unlinked inquiry'}</dd></dl>
     <h3>Request details</h3><dl class="admin-definition">${leadDetails(payload)}</dl>
     <h3>History</h3>${(data.audit ?? []).length ? `<ul class="admin-result-list">${(data.audit ?? []).map((entry) => `<li>${esc(dateTime(entry.created_at))} — ${esc(titleCase(String(entry.action ?? '').replaceAll('_', ' ')))}${entry.success ? '' : ' (failed)'}</li>`).join('')}</ul>` : '<p class="admin-muted">No recorded history.</p>'}
   </div>`;
@@ -2012,33 +2304,83 @@ async function loadLeads(status = leadPage.status, query = leadPage.q): Promise<
   renderLeadRows();
 }
 
-async function leadBulkAction(operation: 'archive' | 'restore' | 'delete'): Promise<void> {
+type LeadBulkOperation = 'archive' | 'restore' | 'delete' | 'mark_test' | 'mark_duplicate' | 'mark_converted';
+
+async function leadBulkAction(operation: LeadBulkOperation): Promise<void> {
   const ids = [...selectedLeadIds];
   if (ids.length === 0) return;
+  const deleteAction = operation === 'delete';
+  const classification = ['mark_test', 'mark_duplicate', 'mark_converted'].includes(operation);
   const confirmed = await adminConfirm({
-    title: `${titleCase(operation)} ${ids.length} selected inquir${ids.length === 1 ? 'y' : 'ies'}?`,
-    body: `<p><strong>${ids.length} selected</strong></p><p>${operation === 'delete' ? 'Permanent deletion is limited to unlinked, non-reservation inquiries with no quote history. Linked customers, reservations and quoted history are protected and will be skipped.' : operation === 'restore' ? 'Archived inquiries return to the New queue.' : 'Archived inquiries leave the active queue. Historical delivery and request data are preserved.'}</p>`,
-    confirmLabel: `${titleCase(operation)} ${ids.length}`,
-    danger: operation === 'delete',
+    title: `${titleCase(operation.replaceAll('_', ' '))} ${ids.length} selected inquir${ids.length === 1 ? 'y' : 'ies'}?`,
+    body: `<p><strong>${ids.length} selected</strong></p><p>${deleteAction ? 'Only disposable or explicitly classified test inquiries are permanently removed. Customer, financial, agreement and completed-service history is never deleted.' : classification ? 'This classification removes the records from actionable counts and the active pipeline. It does not delete history.' : operation === 'restore' ? 'Archived inquiries return to their previous pipeline status.' : 'Archived inquiries leave the active queue. Historical delivery and request data are preserved.'}</p>`,
+    confirmLabel: `${titleCase(operation.replaceAll('_', ' '))} ${ids.length}`,
+    danger: deleteAction,
   });
   if (!confirmed) return;
-  const result = await api<{ succeeded?: number; failed?: number; results?: Array<{ id: string; ok: boolean; error?: string }> }>(
-    '/api/admin/leads',
-    {
-      method: 'POST',
-      body: JSON.stringify({ action: 'bulk', operation, leadIds: ids, confirm: true }),
-    },
-  );
-  const failures = (result.results ?? []).filter((entry) => !entry.ok);
+  const result = await api<{
+    succeeded?: number;
+    failed?: number;
+    reasons?: Array<{ reason: string; count: number }>;
+    results?: Array<{ id: string; ok: boolean; error?: string }>;
+  }>('/api/admin/leads', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'bulk', operation, leadIds: ids, confirm: true }),
+  });
   const target = document.querySelector<HTMLElement>('[data-admin-lead-bulk-result]');
   if (target) {
-    target.innerHTML = `<ul class="admin-result-list"><li><strong>${result.succeeded ?? 0} completed</strong> · ${result.failed ?? 0} skipped</li>${failures.slice(0, 20).map((entry) => `<li class="is-failed">${esc(entry.error ?? 'failed')}</li>`).join('')}</ul>`;
+    const reasons = result.reasons ?? [];
+    target.innerHTML = `<ul class="admin-result-list"><li><strong>${result.succeeded ?? 0} completed</strong> · ${result.failed ?? 0} skipped${reasons.length ? ` · ${reasons.map((entry) => `${entry.count} ${leadReasonLabel(entry.reason)}`).join('; ')}` : ''}</li></ul>`;
   }
   selectedLeadIds.clear();
-  if (failures.length) setAppError(`${result.succeeded ?? 0} updated, ${failures.length} skipped. See reasons above.`);
+  if ((result.failed ?? 0) > 0) setAppError(`${result.succeeded ?? 0} updated. ${result.failed} skipped for the documented retention reasons.`);
   else setSuccess(`${result.succeeded ?? 0} inquiry record(s) updated.`);
   await loadLeads();
 }
+
+let testPreviewIds: string[] = [];
+
+async function previewTestLeads(): Promise<void> {
+  const target = document.querySelector<HTMLElement>('[data-admin-test-preview-result]');
+  const apply = document.querySelector<HTMLButtonElement>('[data-admin-action="lead-test-apply"]');
+  if (target) target.textContent = 'Reviewing suspected test records…';
+  try {
+    const data = await api<{ suspects?: Array<Record<string, unknown>> }>('/api/admin/leads?view=test_preview');
+    const suspects = data.suspects ?? [];
+    testPreviewIds = suspects.map((entry) => String(entry.id));
+    if (apply) apply.hidden = suspects.length === 0;
+    if (!target) return;
+    target.innerHTML = suspects.length
+      ? `<p class="admin-muted">${suspects.length} suspected test record(s). Review the evidence before confirming.</p><div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Reference</th><th>Customer</th><th>Status</th><th>Evidence</th></tr></thead><tbody>${suspects.map((entry) => `<tr><td>${esc(entry.reference || entry.id)}</td><td>${esc(entry.customerName || 'Unlinked')}</td><td>${esc(titleCase(String(entry.status ?? '')))}</td><td>${esc((Array.isArray(entry.reasons) ? (entry.reasons as string[]) : []).join('; '))}</td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="admin-muted">No suspected test records were found. A familiar name alone is not treated as evidence.</p>';
+  } catch (error) {
+    if (target) target.textContent = friendly(error);
+  }
+}
+
+async function applyTestPreview(): Promise<void> {
+  if (testPreviewIds.length === 0) return;
+  const confirmed = await adminConfirm({
+    title: `Mark ${testPreviewIds.length} previewed record(s) as test?`,
+    body: '<p>This classification excludes them from actionable counts and the active sales pipeline. It does not delete customers, financial records, agreements or service history.</p>',
+    confirmLabel: 'Mark as test',
+  });
+  if (!confirmed) return;
+  try {
+    const result = await api<{ succeeded?: number; failed?: number; reasons?: Array<{ reason: string; count: number }> }>('/api/admin/leads', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'bulk', operation: 'mark_test', leadIds: testPreviewIds, confirm: true }),
+    });
+    setSuccess(`${result.succeeded ?? 0} inquiry record(s) classified as test. ${result.failed ?? 0} skipped.`);
+    testPreviewIds = [];
+    const apply = document.querySelector<HTMLButtonElement>('[data-admin-action="lead-test-apply"]');
+    if (apply) apply.hidden = true;
+    await loadLeads();
+  } catch (error) {
+    setAppError(friendly(error));
+  }
+}
+
 async function loadCustomerOptions(): Promise<void> {
   const data = await api<{ customers?: Array<Record<string, unknown>> }>('/api/admin/customers?status=active&limit=200');
   const options = (data.customers ?? []).map((customer) => {
@@ -2549,8 +2891,10 @@ async function createRecurringPlan(form: HTMLFormElement): Promise<void> {
         ongoingPrice: data.get('ongoingPrice'),
         window: data.get('window'),
         startTime: data.get('startTime'),
-        durationMinutes: data.get('durationMinutes'),
-        firstDurationMinutes: data.get('firstDurationMinutes'),
+        durationMinutes:
+          (Number(data.get('durationHours') ?? 0) || 0) * 60 + (Number(data.get('durationMinutesPart') ?? 0) || 0),
+        firstDurationMinutes:
+          (Number(data.get('firstDurationHours') ?? 0) || 0) * 60 + (Number(data.get('firstDurationMinutesPart') ?? 0) || 0) || undefined,
         crewSize: data.get('crewSize'),
       }),
     });
@@ -2577,6 +2921,96 @@ async function createRecurringPlan(form: HTMLFormElement): Promise<void> {
   }
 }
 
+function renderRecurringPlans(
+  plans: Array<Record<string, unknown>>,
+  workerRuns: Array<Record<string, unknown>>,
+  recurringEnabled: boolean,
+  allPlans: Array<Record<string, unknown>> = plans,
+): void {
+  const notice = document.querySelector<HTMLElement>('[data-admin-recurring-notice]');
+  const activeAttention = allPlans.filter(
+    (plan) => String(plan.status) === 'active' && !['fully_scheduled', 'synced'].includes(String(plan.sync_status ?? '')),
+  );
+  const failedRuns = workerRuns.filter((run) => String(run.status) === 'failed');
+  const latestFailed = failedRuns[0];
+  let latestFailureCause = '';
+  try {
+    const details = JSON.parse(String(latestFailed?.detail_json ?? '[]')) as Array<Record<string, unknown>>;
+    const reasons = new Set<string>();
+    for (const detail of details) {
+      for (const conflict of (detail.conflictDetails as Array<Record<string, unknown>>) ?? []) {
+        if (String(conflict.reason ?? '') === 'auth_failed') reasons.add('Google Calendar authentication failed');
+      }
+      for (const error of (detail.errors as string[]) ?? []) {
+        if (String(error).includes('auth_failed')) reasons.add('Google Calendar authentication failed');
+      }
+    }
+    latestFailureCause = [...reasons].join('; ');
+  } catch {
+    latestFailureCause = '';
+  }
+  if (notice) {
+    notice.innerHTML = !recurringEnabled
+      ? '<p class="admin-error" role="status">Recurring scheduling is temporarily disabled in this deployment. Existing plans and appointments are unchanged. Ask the owner to enable recurring scheduling.</p>'
+      : activeAttention.length
+        ? `<div class="admin-warning"><strong>${activeAttention.length} active plan(s) need synchronization.</strong> ${latestFailureCause ? `${esc(latestFailureCause)} is the recorded cause. ` : ''}Retry the affected plan. If the latest retry also reports an authentication failure, recheck the Google Calendar binding in Branches &amp; Launch.</div>`
+        : `<div class="admin-dispatch-good"><strong>All active recurring plans are fully scheduled.</strong> Earlier worker failures are preserved in the collapsible history below and are not shown as unresolved incidents.${latestFailed ? ' The most recent failure was resolved by a later successful retry or a fully scheduled plan.' : ''}</div>`;
+  }
+  const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
+  if (!target) return;
+  const writable = can('job.write') && recurringEnabled;
+  if (plans.length === 0) {
+    renderEmpty(target, recurringStatusFilter === 'cancelled' ? 'No canceled plans match this view.' : 'No recurring plans match this view.');
+    return;
+  }
+  target.innerHTML = `<div class="admin-plan-list">${plans.map((plan) => {
+    const id = String(plan.id ?? '');
+    const crew = [...new Set(String(plan.assigned_names ?? '').split(',').map((name) => name.trim()).filter(Boolean))];
+    const duration = Number(plan.duration_minutes ?? 0);
+    const crewSize = Number(plan.crew_size ?? 1) || 1;
+    const totalLaborMinutes = duration * crewSize;
+    const syncStatus = String(plan.sync_status ?? 'pending');
+    const syncLabel = ['fully_scheduled', 'synced'].includes(syncStatus)
+      ? 'Fully scheduled'
+      : ['failed', 'sync_failed'].includes(syncStatus)
+        ? 'Needs retry'
+        : syncStatus === 'partially_scheduled'
+          ? 'Partially scheduled'
+          : titleCase(syncStatus);
+    const syncClass = ['fully_scheduled', 'synced'].includes(syncStatus) ? 'admin-status--success' : 'admin-status--danger';
+    const startTime = String(plan.start_time ?? '');
+    const hours = Math.floor(duration / 60);
+    const minutes = duration % 60;
+    return `<article class="admin-plan-card">
+      <header><div><h3>${esc([plan.first_name, plan.last_name].filter(Boolean).join(' ') || 'Customer')}</h3><p class="admin-muted">${esc([plan.line1, plan.city].filter(Boolean).join(', ') || 'Property not linked')} · ${esc(titleCase(String(plan.frequency ?? '')))} ${esc(titleCase(String(plan.service_code ?? 'residential cleaning').replaceAll('_', ' ').replaceAll('-', ' ')))}</p></div><span class="admin-status">${esc(titleCase(String(plan.status ?? '')))}</span></header>
+      <div class="admin-plan-grid">
+        <div><span class="admin-plan-grid__label">Assigned crew</span><strong>${esc(crew.length ? crew.join(', ') : 'Unassigned')}</strong><span class="admin-muted">${crewSize} cleaner${crewSize === 1 ? '' : 's'}</span></div>
+        <div><span class="admin-plan-grid__label">Expected time on site</span><strong>${esc(durationLabel(duration))}</strong><span class="admin-muted">Per visit</span></div>
+        <div><span class="admin-plan-grid__label">Total labor hours</span><strong>${esc(durationLabel(totalLaborMinutes))}</strong><span class="admin-muted">${crewSize === 1 ? 'One cleaner' : `${crewSize} cleaners`}</span></div>
+        <div><span class="admin-plan-grid__label">Next appointment</span><strong>${esc(plan.next_visit_date ? dateTime(plan.next_visit_date) : 'Not scheduled')}</strong><span class="admin-muted">${esc(plan.window ? `${titleCase(String(plan.window))}${startTime ? ` · ${startTime}` : ''}` : 'No window')}</span></div>
+        <div><span class="admin-plan-grid__label">Scheduling status</span><strong>${esc(syncLabel)}</strong><span class="admin-muted">${esc(plan.sync_error ? recurringSyncDetail(plan.sync_error) : 'No scheduling conflicts')}</span></div>
+        <div><span class="admin-plan-grid__label">Calendar synchronization</span><strong><span class="admin-status ${syncClass}">${esc(syncLabel)}</span></strong><span class="admin-muted">${esc(plan.updated_at ? dateTime(plan.updated_at) : '')}</span></div>
+      </div>
+      <p class="admin-muted">Price per visit: <strong>${esc(money(plan.ongoing_price_cents))}</strong></p>
+      ${writable ? `<details class="admin-plan-card__controls"><summary>Edit schedule</summary>
+        <div class="admin-form admin-form--grid">
+          <label>Window <select data-recurring-window="${esc(id)}"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select></label>
+          <label>Start time <input type="time" step="900" min="07:00" max="14:30" value="${esc(startTime)}" data-recurring-start="${esc(id)}" /></label>
+          <fieldset class="admin-duration-fieldset"><legend>Ongoing duration</legend><label>Hours <input type="number" min="0" max="10" step="1" value="${esc(hours)}" data-recurring-hours="${esc(id)}" /></label><label>Minutes <select data-recurring-minutes="${esc(id)}">${[0, 15, 30, 45].map((value) => `<option value="${value}"${value === minutes ? ' selected' : ''}>${value}</option>`).join('')}</select></label></fieldset>
+          <label>Crew size <select data-recurring-crew="${esc(id)}"><option value="1"${crewSize === 1 ? ' selected' : ''}>One cleaner</option><option value="2"${crewSize === 2 ? ' selected' : ''}>Two cleaners</option></select></label>
+          <label>Plan status <select data-recurring-status="${esc(id)}">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select></label>
+          <div class="admin-field--wide admin-actions"><button class="btn btn--secondary btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(id)}">Save schedule</button></div>
+        </div>
+      </details>` : `<dl class="admin-definition"><dt>Window</dt><dd>${esc(plan.window ? `${titleCase(String(plan.window))}${startTime ? ` · ${startTime}` : ''}` : 'Not scheduled')}</dd><dt>Plan status</dt><dd>${esc(titleCase(String(plan.status ?? '')))}</dd></dl>`}
+      <div class="admin-actions admin-plan-card__actions">
+        <button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(id)}">View schedule</button>
+        ${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(id)}">Retry sync</button>` : ''}
+        <button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(plan.customer_id)}">Customer</button>
+      </div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
 async function loadRecurring(): Promise<void> {
   const data = await api<{ recurring?: Array<Record<string, unknown>>; recurringEnabled?: boolean; workerRuns?: Array<Record<string, unknown>> }>(
     '/api/admin/operations?view=recurring',
@@ -2591,46 +3025,16 @@ async function loadRecurring(): Promise<void> {
   }
   const createForm = document.querySelector<HTMLFormElement>('[data-admin-recurring-create]');
   if (createForm) createForm.hidden = !recurringEnabled;
+  const plans = (data.recurring ?? []).filter((plan) => {
+    const status = String(plan.status ?? '');
+    if (recurringStatusFilter === 'all') return true;
+    if (recurringStatusFilter === 'active-only') return status === 'active';
+    if (recurringStatusFilter === 'paused') return status === 'paused';
+    if (recurringStatusFilter === 'cancelled') return status === 'cancelled';
+    return status === 'active' || status === 'paused';
+  });
+  renderRecurringPlans(plans, data.workerRuns ?? [], recurringEnabled, data.recurring ?? []);
   const writable = can('job.write') && recurringEnabled;
-  const target = document.querySelector<HTMLElement>('[data-admin-recurring]');
-  if (target) {
-    const plans = (data.recurring ?? []).filter((plan) => {
-      const status = String(plan.status ?? '');
-      if (recurringStatusFilter === 'all') return true;
-      if (recurringStatusFilter === 'active-only') return status === 'active';
-      if (recurringStatusFilter === 'paused') return status === 'paused';
-      if (recurringStatusFilter === 'cancelled') return status === 'cancelled';
-      return status === 'active' || status === 'paused';
-    });
-    renderTable(target, ['Customer', 'Property', 'Service', 'Frequency', 'Window / start', 'Duration', 'Price', 'Next visit', 'Assigned', 'Sync', 'Status', 'Action'], plans.map((plan) => [
-      esc([plan.first_name, plan.last_name].filter(Boolean).join(' ') || 'Customer'),
-      esc([plan.line1, plan.city].filter(Boolean).join(', ') || 'Property not linked'),
-      esc(titleCase(String(plan.service_code ?? 'Residential cleaning').replaceAll('_', ' ').replaceAll('-', ' '))),
-      esc(titleCase(plan.frequency)),
-      writable
-        ? `<div class="admin-inline-form"><select class="admin-select" data-recurring-window="${esc(plan.id)}" aria-label="Preferred window"><option value="">Not scheduled</option><option value="morning"${plan.window === 'morning' ? ' selected' : ''}>Morning</option><option value="afternoon"${plan.window === 'afternoon' ? ' selected' : ''}>Afternoon</option></select><input class="input" type="time" step="900" min="07:00" max="14:30" value="${esc(plan.start_time ?? '')}" data-recurring-start="${esc(plan.id)}" aria-label="Preferred start time" /></div>`
-        : esc(plan.window ? `${titleCase(String(plan.window))}${plan.start_time ? ` · ${String(plan.start_time)}` : ''}` : 'Not scheduled'),
-      writable
-        ? `<span class="admin-duration"><input class="input" type="number" min="30" max="600" step="15" value="${esc(plan.duration_minutes ?? '')}" data-recurring-duration="${esc(plan.id)}" aria-label="Duration in minutes" /><span class="admin-duration__unit" aria-hidden="true">min</span></span>`
-        : esc(plan.duration_minutes ? durationLabel(plan.duration_minutes) : 'Not set'),
-      esc(money(plan.ongoing_price_cents)),
-      esc(plan.next_visit_date ? dateTime(plan.next_visit_date) : 'Not scheduled'),
-      esc(String(plan.assigned_names || 'Unassigned')),
-      `<span class="admin-status">${esc(
-        String(plan.sync_status) === 'failed'
-          ? 'Needs retry'
-          : String(plan.sync_status) === 'pending'
-            ? 'Pending sync'
-            : String(plan.sync_status) === 'synced'
-              ? 'Synced'
-              : titleCase(String(plan.sync_status ?? 'Pending')),
-      )}</span>${plan.sync_error ? `<p class="admin-muted">${esc(recurringSyncDetail(plan.sync_error))}</p>` : ''}`,
-      writable
-        ? `<select class="admin-select" data-recurring-status="${esc(plan.id)}" aria-label="Plan status">${['active', 'paused', 'cancelled', 'completed'].map((status) => `<option value="${status}"${status === plan.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select>`
-        : `<span class="admin-status">${esc(titleCase(plan.status))}</span>`,
-      `<div class="admin-actions">${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-save" data-id="${esc(plan.id)}">Save</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-occurrences" data-id="${esc(plan.id)}">View schedule</button>${writable ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="recurring-sync" data-id="${esc(plan.id)}">Retry sync</button>` : ''}<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(plan.customer_id)}">Customer</button></div>`,
-    ]), recurringStatusFilter === 'cancelled' ? 'No canceled plans match this view.' : 'No recurring plans match this view.');
-  }
   const runsTarget = document.querySelector<HTMLElement>('[data-admin-recurring-runs]');
   if (runsTarget) {
     const runs = data.workerRuns ?? [];
@@ -5016,21 +5420,128 @@ document.querySelector<HTMLFormElement>('[data-address-reviews-search]')?.addEve
   void loadAddressReviews().catch((error) => setAppError(friendly(error)));
 });
 
-async function loadJobs(): Promise<void> {
-  const data = await api<{ jobs?: Array<Record<string, unknown>>; team?: Array<Record<string, unknown>> }>('/api/admin/operations?view=jobs');
-  const team = data.team ?? [];
-  const target = document.querySelector<HTMLElement>('[data-admin-jobs]');
-  if (target) {
-    target.innerHTML = (data.jobs ?? []).map((job) => {
-      const crewIds = String(job.crew_ids ?? '').split(',').filter(Boolean);
-      const crewNames = String(job.crew ?? '').split(',').map((name) => name.trim()).filter(Boolean);
-      const crewDetail = crewIds.map((memberId, index) => {
-        const name = team.find((member) => member.id === memberId)?.display_name ?? crewNames[index] ?? memberId;
-        return `<span class="admin-muted">${esc(name)}</span>${can('job.write') ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="job-unassign" data-id="${esc(job.id)}" data-member="${esc(memberId)}">Remove</button>` : ''}`;
-      }).join(' ');
-      return `<div class="admin-record admin-job"><div><strong>${esc(dateTime(job.start_at))}</strong> — ${esc(job.reference)} — ${esc([job.first_name, job.last_name].filter(Boolean).join(' '))}<p class="admin-muted">${esc([job.line1, job.city].filter(Boolean).join(', '))}${crewDetail ? ` — ${crewDetail}` : ''}</p></div><div class="admin-actions">${can('job.write') ? `<select class="admin-select" data-job-status="${esc(job.id)}">${['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].map((status) => `<option value="${status}"${status === job.status ? ' selected' : ''}>${esc(titleCase(status))}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-save" data-id="${esc(job.id)}">Save</button><select class="admin-select" data-job-team="${esc(job.id)}"><option value="">Assign cleaner</option>${team.map((member) => `<option value="${esc(member.id)}">${esc(member.display_name)}</option>`).join('')}</select><button class="btn btn--ghost btn--small" type="button" data-admin-action="job-assign" data-id="${esc(job.id)}">Add</button>` : `<span class="admin-status">${esc(titleCase(job.status))}</span>`}<button class="btn btn--secondary btn--small" type="button" data-admin-action="job-checklist" data-id="${esc(job.id)}">Checklist</button></div></div>`;
-    }).join('') || '<div class="admin-empty">No jobs are recorded yet.</div>';
+let jobView = 'upcoming';
+let loadedJobs: Array<Record<string, unknown>> = [];
+
+function jobDateLabel(key: string): string {
+  if (!key) return 'Date not recorded';
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(`${key}T12:00:00Z`));
+}
+
+function jobServiceLabel(job: Record<string, unknown>): string {
+  const service = String(job.service_name ?? '').trim();
+  if (service) return service;
+  const code = String(job.service_code ?? '').trim();
+  if (code) return titleCase(code.replaceAll('_', ' ').replaceAll('-', ' '));
+  return 'Cleaning service';
+}
+
+function jobSecondaryReference(job: Record<string, unknown>): string {
+  const reference = String(job.reference ?? '');
+  if (/^RECURRING-/i.test(reference)) {
+    const planId = String(job.recurring_plan_id ?? '');
+    return `Recurring plan${planId ? ` …${planId.slice(-8)}` : ''}`;
   }
+  return reference || 'No reference';
+}
+
+function renderJobs(): void {
+  const target = document.querySelector<HTMLElement>('[data-admin-jobs]');
+  if (!target) return;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-job-view]')) {
+    if (button.dataset.jobView === jobView) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  const today = centralTodayKey();
+  const rows = loadedJobs.filter((job) => {
+    const status = String(job.status ?? '');
+    const date = appointmentDateKey(job.start_at, job.branch_id);
+    const upcoming = Boolean(date && date >= today);
+    if (jobView === 'today') return date === today && !['cancelled', 'no_show'].includes(status);
+    if (jobView === 'upcoming') return upcoming && ['pending', 'confirmed', 'in_progress'].includes(status);
+    if (jobView === 'unassigned') return upcoming && ['pending', 'confirmed'].includes(status) && !String(job.crew_ids ?? '').trim();
+    if (jobView === 'in_progress') return status === 'in_progress';
+    if (jobView === 'completed') return status === 'completed';
+    if (jobView === 'cancelled') return ['cancelled', 'no_show'].includes(status);
+    return true;
+  }).sort((a, b) => String(a.start_at).localeCompare(String(b.start_at)));
+  const summary = document.querySelector<HTMLElement>('[data-admin-jobs-summary]');
+  if (summary) {
+    const viewLabel = titleCase(jobView.replaceAll('_', ' '));
+    summary.textContent = `${viewLabel} · ${rows.length} job${rows.length === 1 ? '' : 's'} · ${new Set(rows.map((job) => appointmentDateKey(job.start_at, job.branch_id))).size} service date(s)`;
+  }
+  if (rows.length === 0) {
+    renderEmpty(target, jobView === 'unassigned' ? 'No upcoming jobs are waiting for a crew.' : 'No jobs match this view.');
+    return;
+  }
+  const groups = new Map<string, Array<Record<string, unknown>>>();
+  for (const job of rows) {
+    const key = appointmentDateKey(job.start_at, job.branch_id);
+    const list = groups.get(key) ?? [];
+    list.push(job);
+    groups.set(key, list);
+  }
+  const team = loadedJobs.length ? (window as unknown as { __ssAdminTeam?: Array<Record<string, unknown>> }).__ssAdminTeam ?? [] : [];
+  target.innerHTML = [...groups.entries()].map(([date, jobs]) => `<section class="admin-job-day">
+    <header><h3>${esc(jobDateLabel(date))}</h3><span class="admin-status">${jobs.length} job${jobs.length === 1 ? '' : 's'}</span></header>
+    <div class="admin-job-list">${jobs.map((job) => {
+      const id = String(job.id ?? '');
+      const status = String(job.status ?? 'pending');
+      const customer = [job.first_name, job.last_name].filter(Boolean).join(' ') || 'Unlinked customer';
+      const property = [job.line1, job.city, job.state, job.postal_code].filter(Boolean).join(', ') || 'Property not linked';
+      const crewNames = [...new Set(String(job.crew ?? '').split(',').map((name) => name.trim()).filter(Boolean))];
+      const crewIds = String(job.crew_ids ?? '').split(',').filter(Boolean);
+      const crewMarkup = crewIds.length
+        ? crewIds.map((memberId, index) => {
+            const name = team.find((member) => member.id === memberId)?.display_name ?? crewNames[index] ?? 'Assigned cleaner';
+            return `<span class="admin-crew-chip">${esc(String(name))}${can('job.write') ? ` <button type="button" data-admin-action="job-unassign" data-id="${esc(id)}" data-member="${esc(memberId)}" aria-label="Remove ${esc(String(name))}">×</button>` : ''}</span>`;
+          }).join('')
+        : '<span class="admin-status admin-status--danger">Unassigned</span>';
+      const duration = durationLabel(job.duration_minutes);
+      const actions = can('job.write')
+        ? `<div class="admin-job-actions">
+            <label>Status <select class="admin-select" data-job-status="${esc(id)}">${['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].map((value) => `<option value="${value}"${value === status ? ' selected' : ''}>${esc(titleCase(value))}</option>`).join('')}</select></label>
+            <button class="btn btn--ghost btn--small" type="button" data-admin-action="job-save" data-id="${esc(id)}">Update status</button>
+            <label>Assign cleaner <select class="admin-select" data-job-team="${esc(id)}"><option value="">Choose a cleaner</option>${team.map((member) => `<option value="${esc(member.id)}">${esc(member.display_name)}</option>`).join('')}</select></label>
+            <button class="btn btn--ghost btn--small" type="button" data-admin-action="job-assign" data-id="${esc(id)}">Assign</button>
+          </div>`
+        : '';
+      return `<article class="admin-job-card ${appointmentStatusClass(status)}">
+        <header><p class="admin-job-card__time">${esc(appointmentTimeRange(job))}</p><span class="admin-status">${esc(titleCase(status.replaceAll('_', ' ')))}</span></header>
+        <h4>${esc(customer)}</h4>
+        <p class="admin-job-card__service">${esc(jobServiceLabel(job))} · ${esc(duration)} · ${Number(job.crew_size ?? 1)} cleaner(s)</p>
+        <p class="admin-job-card__property">${esc(property)}</p>
+        <p class="admin-job-card__crew">Crew: ${crewMarkup}</p>
+        <div class="admin-actions admin-job-card__primary-actions">
+          <button class="btn btn--secondary btn--small" type="button" data-admin-action="job-open" data-id="${esc(id)}">Job File</button>
+          <button class="btn btn--ghost btn--small" type="button" data-admin-action="job-checklist" data-id="${esc(id)}">Checklist</button>
+          ${job.customer_id ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="customer-open" data-id="${esc(job.customer_id)}">Customer</button>` : ''}
+          ${job.booking_request_id ? `<button class="btn btn--ghost btn--small" type="button" data-admin-action="request-open" data-id="${esc(job.booking_request_id)}">Request</button>` : ''}
+        </div>
+        ${actions ? `<details class="admin-job-card__secondary"><summary>Assignment &amp; status controls</summary>${actions}</details>` : ''}
+        <details class="admin-job-card__secondary"><summary>Internal details</summary><dl class="admin-definition"><dt>Reference</dt><dd>${esc(jobSecondaryReference(job))}</dd><dt>Source</dt><dd>${esc(titleCase(String(job.source ?? 'Not recorded')))}</dd><dt>Calendar event</dt><dd>${esc(job.calendar_event_id ? 'Linked' : 'Not linked')}</dd></dl></details>
+      </article>`;
+    }).join('')}</div>
+  </section>`).join('');
+}
+
+async function loadJobs(): Promise<void> {
+  const from = addDateKey(centralTodayKey(), -1825);
+  const to = addDateKey(centralTodayKey(), 365);
+  const data = await api<{ jobs?: Array<Record<string, unknown>>; team?: Array<Record<string, unknown>> }>(
+    `/api/admin/operations?view=jobs&from=${encodeURIComponent(`${from}T00:00:00.000Z`)}&to=${encodeURIComponent(`${to}T23:59:59.999Z`)}`,
+  );
+  const team = data.team ?? [];
+  (window as unknown as { __ssAdminTeam?: Array<Record<string, unknown>> }).__ssAdminTeam = team;
+  loadedJobs = data.jobs ?? [];
+  if (!['today', 'upcoming', 'unassigned', 'in_progress', 'completed', 'cancelled', 'all'].includes(jobView)) jobView = 'upcoming';
+  renderJobs();
   await loadDispatch().catch((error) => setAppError(friendly(error)));
   const teamTarget = document.querySelector<HTMLElement>('[data-admin-team]');
   if (teamTarget) {
@@ -5049,7 +5560,6 @@ async function loadJobs(): Promise<void> {
     }), 'No team members are recorded yet.');
   }
 }
-
 async function openChecklist(appointmentId: string): Promise<void> {
   const target = document.querySelector<HTMLElement>('[data-admin-checklist]');
   if (!target) return;
@@ -5843,7 +6353,6 @@ function serializeCommunicationEditor(root: HTMLElement): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
-
 function insertCommunicationVariable(variable: string): void {
   const editor = document.querySelector<HTMLElement>('[data-communications-body]');
   if (!editor || !variable) return;
@@ -8006,6 +8515,8 @@ async function loadView(view: string): Promise<void> {
   } catch (error) {
     setAppError(friendly(error));
   }
+  decorateResponsiveTables();
+  if (window.matchMedia('(max-width: 48rem)').matches) setMobileMenu(false);
 }
 
 async function action(path: string, body: Record<string, unknown>): Promise<void> {
@@ -8240,7 +8751,50 @@ document.querySelector<HTMLButtonElement>('[data-admin-logout]')?.addEventListen
   finally { csrf = ''; actor = null; setSuccess(); showGate('login'); }
 });
 
-for (const button of navButtons) button.addEventListener('click', () => void loadView(button.dataset.adminNav ?? 'overview'));
+for (const button of navButtons) button.addEventListener('click', () => {
+  setMobileMenu(false);
+  void loadView(button.dataset.adminNav ?? 'overview');
+});
+
+menuToggle?.addEventListener('click', () => setMobileMenu(!mobileMenuOpen));
+mobileBackdrop?.addEventListener('click', () => setMobileMenu(false));
+bell?.addEventListener('click', () => toggleNotificationPanel());
+document.querySelector<HTMLButtonElement>('[data-admin-notification-close]')?.addEventListener('click', () => closeNotificationPanel());
+document.querySelector<HTMLButtonElement>('[data-admin-notification-mark-all]')?.addEventListener('click', () => {
+  void markAllNotificationsRead();
+});
+document.addEventListener('click', (event) => {
+  const target = event.target as HTMLElement;
+  const open = target.closest<HTMLElement>('[data-admin-notification-open]');
+  if (open) {
+    void openNotification(Number(open.dataset.adminNotificationOpen ?? 0));
+    return;
+  }
+  const read = target.closest<HTMLElement>('[data-admin-notification-read]');
+  if (read) {
+    void markNotificationRead(Number(read.dataset.adminNotificationRead ?? 0));
+    return;
+  }
+  if (notificationPanel && !notificationPanel.hidden && !target.closest('.admin-notification')) {
+    closeNotificationPanel();
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeNotificationPanel();
+    setMobileMenu(false);
+  }
+});
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-job-view]')) {
+  button.addEventListener('click', () => {
+    jobView = button.dataset.jobView ?? 'upcoming';
+    renderJobs();
+  });
+}
+const mobileQuery = window.matchMedia('(max-width: 48rem)');
+mobileQuery.addEventListener('change', () => {
+  if (weekAppointments.length) renderWeekBoard(weekAppointments);
+});
 
 manualField<HTMLSelectElement>('customerId')?.addEventListener('change', (event) => {
   const customerId = (event.target as HTMLSelectElement).value;
@@ -9430,26 +9984,55 @@ document.addEventListener('click', (event) => {
     const detail = document.querySelector<HTMLElement>('[data-admin-lead-detail]');
     if (detail) { detail.hidden = true; detail.innerHTML = ''; }
   }
-  if (actionName === 'lead-archive' || actionName === 'lead-restore' || actionName === 'lead-delete') {
-    const operation = actionName === 'lead-archive' ? 'archive' : actionName === 'lead-restore' ? 'restore' : 'delete';
+  if (
+    actionName === 'lead-archive' ||
+    actionName === 'lead-restore' ||
+    actionName === 'lead-delete' ||
+    actionName === 'lead-mark-test' ||
+    actionName === 'lead-unmark-test' ||
+    actionName === 'lead-mark-duplicate' ||
+    actionName === 'lead-unmark-duplicate' ||
+    actionName === 'lead-mark-converted'
+  ) {
+    const singular: Record<string, string> = {
+      'lead-archive': 'archive',
+      'lead-restore': 'restore',
+      'lead-delete': 'delete',
+      'lead-mark-test': 'mark_test',
+      'lead-unmark-test': 'unmark_test',
+      'lead-mark-duplicate': 'mark_duplicate',
+      'lead-unmark-duplicate': 'unmark_duplicate',
+      'lead-mark-converted': 'mark_converted',
+    };
+    const operation = singular[actionName] ?? 'archive';
     void (async () => {
+      const deleteAction = operation === 'delete';
+      const classification = ['mark_test', 'unmark_test', 'mark_duplicate', 'unmark_duplicate', 'mark_converted'].includes(operation);
       const confirmed = await adminConfirm({
-        title: operation === 'delete' ? 'Permanently delete this disposable inquiry?' : operation === 'restore' ? 'Restore this archived inquiry?' : 'Archive this inquiry?',
-        body: `<p>${operation === 'delete' ? 'Permanent deletion is limited to unlinked inquiries with no reservation or quote history. This cannot be undone.' : operation === 'restore' ? 'The inquiry returns to the New queue.' : 'The inquiry leaves the active queue. Historical data is preserved.'}</p>`,
-        confirmLabel: titleCase(operation),
-        danger: operation === 'delete',
+        title: `${titleCase(operation.replaceAll('_', ' '))} this inquiry?`,
+        body: `<p>${deleteAction ? 'Only a disposable or explicitly classified test inquiry is permanently removed. Customer, financial, agreement and completed-service history is never deleted.' : classification ? 'This changes the pipeline classification only. Customer and operational history is preserved.' : operation === 'restore' ? 'The inquiry returns to its previous pipeline status.' : 'The inquiry leaves the active queue. Historical data is preserved.'}</p>`,
+        confirmLabel: titleCase(operation.replaceAll('_', ' ')),
+        danger: deleteAction,
       });
       if (!confirmed) return;
       try {
-        await api('/api/admin/leads', { method: 'POST', body: JSON.stringify({ action: operation, leadId: id }) });
-        setSuccess(`Inquiry ${operation === 'delete' ? 'deleted' : operation === 'restore' ? 'restored' : 'archived'}.`);
+        const body = classification
+          ? { action: operation, leadId: id, isTest: !operation.startsWith('un'), isDuplicate: !operation.startsWith('un') }
+          : { action: operation, leadId: id };
+        await api('/api/admin/leads', { method: 'POST', body: JSON.stringify(body) });
+        setSuccess(`Inquiry ${titleCase(operation.replaceAll('_', ' ')).toLowerCase()}.`);
         await loadLeads();
       } catch (error) {
         setAppError(friendly(error));
       }
     })();
   }
-  if (actionName === 'lead-select-visible') {
+  if (actionName === 'lead-test-preview') {
+    void previewTestLeads();
+  }
+  if (actionName === 'lead-test-apply') {
+    void applyTestPreview();
+  }  if (actionName === 'lead-select-visible') {
     for (const lead of loadedLeads) selectedLeadIds.add(String(lead.id));
     renderLeadRows();
   }
@@ -9458,14 +10041,29 @@ document.addEventListener('click', (event) => {
     renderLeadRows();
   }
   if (actionName === 'lead-bulk') {
-    void leadBulkAction((target.dataset.operation ?? 'archive') as 'archive' | 'restore' | 'delete');
+    void leadBulkAction((target.dataset.operation ?? 'archive') as LeadBulkOperation);
   }
   if (actionName === 'recurring-save') {
     const select = document.querySelector<HTMLSelectElement>(`[data-recurring-status="${CSS.escape(id)}"]`);
     const start = document.querySelector<HTMLInputElement>(`[data-recurring-start="${CSS.escape(id)}"]`);
-    const duration = document.querySelector<HTMLInputElement>(`[data-recurring-duration="${CSS.escape(id)}"]`);
+    const hoursInput = document.querySelector<HTMLInputElement>(`[data-recurring-hours="${CSS.escape(id)}"]`);
+    const minutesInput = document.querySelector<HTMLSelectElement>(`[data-recurring-minutes="${CSS.escape(id)}"]`);
+    const crew = document.querySelector<HTMLSelectElement>(`[data-recurring-crew="${CSS.escape(id)}"]`);
     const window = document.querySelector<HTMLSelectElement>(`[data-recurring-window="${CSS.escape(id)}"]`);
-    void action('/api/admin/operations', { action: 'update_recurring', planId: id, status: select?.value ?? '', window: window?.value ?? '', startTime: start?.value ?? '', durationMinutes: duration?.value ?? '' });
+    const durationMinutes = (Number(hoursInput?.value ?? 0) || 0) * 60 + (Number(minutesInput?.value ?? 0) || 0);
+    if (durationMinutes < 30) {
+      setAppError('Enter a cleaning duration of at least 30 minutes.');
+      return;
+    }
+    void action('/api/admin/operations', {
+      action: 'update_recurring',
+      planId: id,
+      status: select?.value ?? '',
+      window: window?.value ?? '',
+      startTime: start?.value ?? '',
+      durationMinutes,
+      crewSize: crew?.value ?? '1',
+    });
   }
   if (actionName === 'recurring-occurrences') {
     void loadRecurringOccurrences(id).catch((error) => setAppError(friendly(error)));
@@ -9511,7 +10109,9 @@ document.addEventListener('click', (event) => {
       isBookable: bookable?.checked ?? true,
     });
   }
-  if (actionName === 'job-save') {
+  if (actionName === 'jobs-refresh') {
+    void loadJobs().catch((error) => setAppError(friendly(error)));
+  }  if (actionName === 'job-save') {
     const select = document.querySelector<HTMLSelectElement>(`[data-job-status="${CSS.escape(id)}"]`);
     void action('/api/admin/operations', { action: 'job_status', appointmentId: id, status: select?.value ?? '' });
   }
@@ -9967,15 +10567,15 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'calendar-prev-week') {
     weekOffset -= 1;
-    renderWeekBoard(weekAppointments);
+    void loadCalendar(currentRequestView).catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'calendar-next-week') {
     weekOffset += 1;
-    renderWeekBoard(weekAppointments);
+    void loadCalendar(currentRequestView).catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'calendar-today') {
     weekOffset = 0;
-    renderWeekBoard(weekAppointments);
+    void loadCalendar(currentRequestView).catch((error) => setAppError(friendly(error)));
   }
   if (actionName === 'appointment-open') {
     const requestId = target.dataset.request ?? '';
@@ -10265,6 +10865,9 @@ document.addEventListener('click', (event) => {
     .then(() => openCommercialProposalFromCustomer(id))
     .catch((error) => setAppError(friendly(error)));
 });
+
+const responsiveTableObserver = new MutationObserver(() => decorateResponsiveTables());
+responsiveTableObserver.observe(document.body, { childList: true, subtree: true });
 
 void loadAuth();
 let documentEditorId = '';

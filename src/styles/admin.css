@@ -1160,3 +1160,259 @@
   outline: 2px solid #9d4f5c;
   outline-offset: 1px;
 }
+
+/* ── Administrative usability corrections ───────────────────────────────── */
+
+.admin-topbar { position: relative; }
+.admin-topbar__title { flex: 1 1 auto; min-width: 0; }
+.admin-mobile-menu { display: none; }
+.admin-kpi__detail { margin: .3rem 0 0; }
+
+/* Notification bell and compact center */
+.admin-notification { position: relative; }
+.admin-bell {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid #d9c8b6;
+  border-radius: 999px;
+  background: #fffdfa;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.admin-bell:hover, .admin-bell:focus-visible { border-color: #9a5b61; outline: 2px solid #9a5b61; outline-offset: 2px; }
+.admin-bell__badge {
+  position: absolute;
+  top: -.25rem;
+  right: -.25rem;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 .3rem;
+  border-radius: 999px;
+  background: #a52638;
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+.admin-notification-panel {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + .55rem);
+  right: 0;
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: min(34rem, 72vh);
+  overflow: auto;
+  border: 1px solid #d8c8b7;
+  border-radius: .75rem;
+  background: #fffdfa;
+  box-shadow: 0 18px 48px rgba(48, 36, 41, .22);
+  padding: .8rem;
+}
+.admin-notification-panel__head { display: flex; justify-content: space-between; gap: .6rem; align-items: start; }
+.admin-notification-panel__actions { display: flex; justify-content: flex-end; margin: .35rem 0 .5rem; }
+.admin-notification-item { display: grid; gap: .25rem; border-top: 1px solid #eadfd3; padding: .6rem 0; }
+.admin-notification-item__main { display: grid; gap: .15rem; text-align: left; border: 0; background: transparent; padding: .2rem; border-radius: .45rem; cursor: pointer; font: inherit; }
+.admin-notification-item__main:hover, .admin-notification-item__main:focus-visible { background: #fbf6f0; outline: 2px solid #9a5b61; outline-offset: 1px; }
+.admin-notification-item.is-unread .admin-notification-item__title { color: #6d1f2d; }
+.admin-notification-item__title { font-weight: 800; font-size: .88rem; }
+.admin-notification-item__detail { font-size: .78rem; line-height: 1.4; color: #6b5a52; }
+.admin-notification-item__meta { font-size: .7rem; color: #8c7a70; }
+
+/* Attention list */
+.admin-attention-list { display: grid; gap: .55rem; }
+.admin-attention-item { display: grid; gap: .5rem; border: 1px solid #e5d8c8; border-left: 4px solid #b7791f; border-radius: .65rem; padding: .7rem .8rem; background: #fffdfa; }
+.admin-attention-item__title { margin: 0; font-weight: 800; }
+
+/* Jobs */
+.admin-job-tabs { display: flex; flex-wrap: wrap; gap: .35rem; margin: .65rem 0; padding: .35rem; border: 1px solid #e5d8c8; border-radius: .65rem; background: #fbf6f0; }
+.admin-job-tabs button { flex: 1 1 auto; min-height: 2.4rem; border: 1px solid transparent; border-radius: .45rem; background: transparent; color: #6f5a52; font: inherit; font-size: .8rem; font-weight: 700; padding: .35rem .55rem; cursor: pointer; }
+.admin-job-tabs button[aria-current="page"] { background: #9a5b61; color: #fff; }
+.admin-job-tabs button:focus-visible { outline: 3px solid #9a5b61; outline-offset: 2px; }
+.admin-job-day { margin-top: .95rem; }
+.admin-job-day > header { display: flex; justify-content: space-between; align-items: center; gap: .5rem; border-bottom: 1px solid #e5d8c8; padding-bottom: .35rem; margin-bottom: .55rem; }
+.admin-job-day h3 { margin: 0; font-size: 1rem; color: #5f2d35; }
+.admin-job-list { display: grid; gap: .55rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+.admin-job-card { display: grid; gap: .25rem; border: 1px solid #e5d8c8; border-left: 4px solid #9a5b61; border-radius: .65rem; padding: .7rem .8rem; background: #fff; min-width: 0; }
+.admin-job-card.is-confirmed { border-left-color: #2f6a45; }
+.admin-job-card.is-pending { border-left-color: #b7791f; }
+.admin-job-card.is-progress { border-left-color: #2b6cb0; }
+.admin-job-card.is-completed { border-left-color: #718096; }
+.admin-job-card.is-cancelled { border-left-color: #9b2f38; background: #fdf8f7; }
+.admin-job-card > header { display: flex; justify-content: space-between; gap: .5rem; align-items: baseline; }
+.admin-job-card h4 { margin: .1rem 0; font-size: .98rem; }
+.admin-job-card__time { margin: 0; font-size: .76rem; font-weight: 800; color: #6d343c; }
+.admin-job-card__service, .admin-job-card__property, .admin-job-card__crew { margin: 0; font-size: .82rem; line-height: 1.4; color: #5f534d; overflow-wrap: anywhere; }
+.admin-job-card__primary-actions { margin-top: .35rem; }
+.admin-job-card__secondary { margin-top: .35rem; font-size: .8rem; }
+.admin-job-card__secondary > summary { cursor: pointer; font-weight: 700; color: #6d343c; }
+.admin-job-actions { display: flex; flex-wrap: wrap; gap: .45rem; align-items: end; }
+.admin-job-actions label { display: grid; gap: .2rem; font-size: .74rem; font-weight: 700; color: #6b5c54; }
+.admin-crew-chip { display: inline-flex; align-items: center; gap: .25rem; padding: .15rem .4rem; border-radius: 999px; background: #f3e8d8; color: #5f2d35; font-size: .74rem; font-weight: 700; }
+.admin-crew-chip button { border: 0; background: transparent; color: #9b2f38; cursor: pointer; font-size: .9rem; line-height: 1; }
+
+/* Recurring plan cards */
+.admin-plan-list { display: grid; gap: .75rem; }
+.admin-plan-card { display: grid; gap: .55rem; border: 1px solid #e5d8c8; border-radius: .75rem; padding: .85rem; background: #fffdfa; }
+.admin-plan-card > header { display: flex; justify-content: space-between; gap: .6rem; align-items: start; }
+.admin-plan-card h3 { margin: 0; font-size: 1.02rem; }
+.admin-plan-card > header p { margin: .15rem 0 0; }
+.admin-plan-grid { display: grid; gap: .55rem; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); }
+.admin-plan-grid > div { border: 1px solid #f0e5da; border-radius: .55rem; padding: .5rem .6rem; background: #fff; display: grid; gap: .1rem; min-width: 0; }
+.admin-plan-grid__label { font-size: .67rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #8c7a70; }
+.admin-plan-card__controls { margin-top: .25rem; }
+.admin-plan-card__controls > summary { cursor: pointer; font-weight: 700; color: #6d343c; }
+.admin-plan-card__actions { margin-top: .25rem; }
+.admin-duration-fieldset { display: flex; flex-wrap: wrap; gap: .55rem; align-items: end; }
+.admin-duration-fieldset legend { font-weight: 700; color: #6d343c; padding: 0 .35rem; }
+.admin-duration-fieldset label { min-width: 5.5rem; }
+
+/* Lead row actions and cleanup */
+.admin-row-actions > summary { cursor: pointer; color: #6d343c; font-weight: 700; font-size: .8rem; }
+.admin-row-actions .admin-actions { margin-top: .35rem; }
+
+/* Commercial facilities and quality */
+.admin-facility-account { border: 1px solid #e5d8c8; border-radius: .65rem; background: #fff; margin-top: .55rem; }
+.admin-facility-account > summary { cursor: pointer; padding: .6rem .7rem; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.admin-facility-account__body { padding: 0 .7rem .7rem; display: grid; gap: .45rem; }
+.admin-facility-row { border: 1px solid #f0e5da; border-radius: .55rem; padding: .5rem .6rem; background: #fffdfa; }
+.admin-facility-row > summary { cursor: pointer; display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.admin-facility-row__badges { display: flex; flex-wrap: wrap; gap: .25rem; }
+.admin-facility-row__body { margin-top: .5rem; }
+.admin-quality-group { border-top: 1px solid #eadfd3; padding-top: .7rem; margin-top: .7rem; }
+.admin-quality-group h4 { margin: 0 0 .2rem; }
+.admin-quality-actions { flex-wrap: wrap; }
+.admin-quality-actions select { max-width: 14rem; }
+
+/* Branch settings */
+.admin-branch-toolbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin-top: .75rem; }
+.admin-branch-toolbar label { display: grid; gap: .25rem; font-size: .8rem; font-weight: 700; }
+.admin-branch-form { display: grid; gap: .85rem; }
+.admin-form-section { border-top: 1px solid #eadfd3; padding-top: .85rem; }
+.admin-form-section:first-of-type { border-top: 0; padding-top: 0; }
+.admin-form-section h3 { margin: 0 0 .25rem; font-size: 1.02rem; color: #5f2d35; }
+.admin-form-section__plain { border: 0; padding: 0; margin: 0; }
+.admin-check-grid { display: grid; gap: .4rem .8rem; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
+.admin-branch-area-summary { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+.admin-branch-zip-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+.admin-zip-chip { display: inline-flex; align-items: center; gap: .25rem; padding: .2rem .35rem .2rem .55rem; border-radius: 999px; background: #f4e9de; color: #5f2d35; font-size: .78rem; font-weight: 700; }
+.admin-zip-chip button { border: 0; background: transparent; color: #9b2f38; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 .15rem; }
+.admin-area-group { border-top: 1px solid #eadfd3; padding: .55rem 0; }
+.admin-area-group:first-child { border-top: 0; }
+.admin-area-group h4 { margin: 0 0 .15rem; display: flex; gap: .4rem; align-items: center; }
+.admin-area-zips { margin: .3rem 0 0; padding-left: 1.1rem; font-size: .8rem; column-width: 16rem; }
+.admin-area-zips li { margin: .12rem 0; break-inside: avoid; }
+.admin-branch-calendar { margin: .6rem 0 .35rem; padding: .65rem .75rem; border: 1px solid #e5d8c8; border-radius: .6rem; background: #fbf7f1; }
+
+/* Calendar stack and mobile agenda */
+.admin-week-stack { position: relative; display: grid; gap: .4rem; padding-bottom: .15rem; }
+.admin-week-stack[data-count="2"]::before,
+.admin-week-stack[data-count="3"]::before,
+.admin-week-stack[data-count="4"]::before {
+  content: '';
+  position: absolute;
+  left: .55rem;
+  right: .2rem;
+  bottom: -.22rem;
+  height: 1.2rem;
+  border: 1px solid #e0d3c6;
+  border-radius: .45rem;
+  background: #f8f0e6;
+  z-index: 0;
+  pointer-events: none;
+}
+.admin-week-stack[data-count="3"]::after,
+.admin-week-stack[data-count="4"]::after {
+  content: '';
+  position: absolute;
+  left: 1.05rem;
+  right: .45rem;
+  bottom: -.45rem;
+  height: 1.2rem;
+  border: 1px solid #e0d3c6;
+  border-radius: .45rem;
+  background: #f3e8da;
+  z-index: 0;
+  pointer-events: none;
+}
+.admin-week-stack .admin-appointment-card { position: relative; z-index: 1; }
+.admin-week-section.is-expanded .admin-week-popover { display: block; }\n.admin-week-section.is-expanded .admin-week-stack::before,\n.admin-week-section.is-expanded .admin-week-stack::after { display: none; }
+.admin-week-popover__row { display: grid; gap: .1rem; width: 100%; text-align: left; border: 0; border-top: 1px solid #f0e5da; background: transparent; padding: .35rem .2rem; font: inherit; color: #5f534d; cursor: pointer; }
+.admin-week-popover__row:first-child { border-top: 0; }
+.admin-week-popover__row:hover, .admin-week-popover__row:focus-visible { background: #fbf6f0; outline: 2px solid #9a5b61; outline-offset: 1px; }
+.admin-week-popover__row strong { font-size: .72rem; color: #6d343c; }
+.admin-week-popover__row span { font-size: .72rem; }
+.admin-week-mobile-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .25rem; margin: .55rem 0; }
+.admin-week-mobile-days button { display: grid; gap: .05rem; place-items: center; min-height: 3.35rem; min-width: 0; border: 1px solid #e0d3c6; border-radius: .5rem; background: #fffdfa; color: #6b5a52; font: inherit; font-size: .68rem; padding: .2rem; cursor: pointer; }
+.admin-week-mobile-days button strong { font-size: .78rem; color: #2c2421; }
+.admin-week-mobile-days button.is-selected { border-color: #9a5b61; background: #f6e6e8; box-shadow: 0 0 0 2px rgba(154, 91, 97, .14); }
+.admin-week-mobile-days button.is-today strong { color: #8f1d2c; }
+.admin-week-mobile-days__count { font-size: .62rem; color: #8c7a70; }
+.admin-week-mobile-agenda { border: 1px solid #e5d8c8; border-radius: .7rem; background: #fbf7f1; overflow: hidden; }
+.admin-week-mobile-agenda > header { display: flex; justify-content: space-between; gap: .5rem; align-items: center; padding: .55rem .65rem; background: #f4e9de; }
+.admin-week-mobile-agenda h3 { margin: 0; font-size: .92rem; color: #5f2d35; }
+
+/* Dialogs and mobile tables */
+.admin-error, .admin-status-message { overflow-wrap: anywhere; }
+
+@media (max-width: 48rem) {
+  .admin-topbar { align-items: center; gap: .55rem; }
+  .admin-topbar__title { order: 2; flex: 1 1 auto; }
+  .admin-topbar__actions { order: 3; flex: 0 0 auto; align-items: center; }
+  .admin-mobile-menu { display: inline-flex; order: 1; min-height: 2.75rem; }
+  .admin-shell { display: block; }
+  .admin-sidebar {
+    position: fixed;
+    z-index: 95;
+    inset: 0 auto 0 0;
+    width: min(20rem, 86vw);
+    max-width: none;
+    height: 100dvh;
+    overflow-y: auto;
+    padding: 1rem .85rem 2rem;
+    display: block;
+    transform: translateX(-105%);
+    transition: transform .2s ease;
+    box-shadow: 0 0 40px rgba(20, 12, 12, .35);
+  }
+  .admin-sidebar.is-open { transform: translateX(0); visibility: visible; }
+  .admin-sidebar .admin-brand { margin-bottom: 1rem; }
+  .admin-nav { display: grid; grid-template-columns: 1fr; gap: .15rem; overflow: visible; }
+  .admin-nav__group { display: grid; gap: .1rem; padding: .35rem 0 .45rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .admin-nav__label { display: block; }
+  .admin-nav button { min-height: 2.75rem; min-width: 0; width: 100%; text-align: left; font-size: .86rem; background: transparent; white-space: normal; }
+  .admin-sidebar__meta { display: block; order: initial; margin-top: 1rem; }
+  .admin-sidebar__meta p { display: block; }
+  .admin-mobile-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(30, 22, 22, .48); }
+  .admin-mobile-backdrop[hidden] { display: none; }
+  .admin-workspace { padding: .85rem .65rem 4.5rem; }
+  .admin-notification-panel { position: fixed; top: 4.4rem; right: .65rem; left: .65rem; width: auto; max-height: 70vh; }
+  .admin-form--grid { grid-template-columns: 1fr !important; }
+  .admin-job-list { grid-template-columns: 1fr; }
+  .admin-job-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-plan-grid { grid-template-columns: 1fr; }
+  .admin-week-mobile-days { gap: .2rem; }
+  .admin-week-mobile-days button { min-height: 3.1rem; }
+  .admin-dialog { width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); overflow: auto; }
+  [data-admin-calendar-dialog]:not(:empty) { padding: .35rem; }
+  [data-admin-calendar-dialog]:not(:empty) .admin-calendar-dialog-card { width: calc(100vw - .7rem); margin: .35rem auto; max-height: calc(100dvh - .7rem); overflow-y: auto; padding: .75rem; }
+  .admin-table-scroll { max-height: none; overflow: visible; }
+  .admin-table { min-width: 0 !important; width: 100%; border-collapse: separate; border-spacing: 0; }
+  .admin-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .admin-table tbody, .admin-table tr, .admin-table td { display: block; width: 100%; }
+  .admin-table tbody tr { border: 1px solid #e5d8c8; border-radius: .6rem; background: #fffdfa; margin: .55rem 0; padding: .25rem .35rem; }
+  .admin-table td { border: 0; padding: .35rem .3rem; display: grid; grid-template-columns: minmax(6rem, .42fr) minmax(0, 1fr); gap: .45rem; align-items: start; }
+  .admin-table td::before { content: attr(data-label); font-size: .64rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #8c7a70; padding-top: .1rem; }
+  .admin-table td:empty { display: none; }
+  .admin-table td .admin-actions { justify-content: flex-start; }
+  .admin-table tr:has(td[data-label="Select"]) { position: relative; }
+  .admin-table td[data-label="Select"] { grid-template-columns: 1fr; }
+  .admin-table td[data-label="Select"]::before { display: none; }
+  .admin-table td[data-label="Select"] input { width: 1.35rem; height: 1.35rem; }
+  .admin-address-grid { grid-template-columns: 1fr; }
+  .admin-branch-form .admin-form { max-width: none; }
+  .admin-area-zips { column-width: auto; }
+}

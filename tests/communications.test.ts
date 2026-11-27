@@ -69,6 +69,7 @@ function migratedDb(): TestD1 {
     '0005_admin_accounts_and_operations.sql',
     '0008_invoice_payment_links.sql',
     '0044_communications.sql',
+    '0070_admin_usability_data_organization.sql',
   ]) {
     db.raw.exec(fs.readFileSync(path.join('migrations', file), 'utf8'));
   }

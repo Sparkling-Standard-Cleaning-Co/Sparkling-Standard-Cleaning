@@ -1,9 +1,10 @@
-﻿import type { D1Database } from './d1.ts';
+import type { D1Database } from './d1.ts';
 import { hashToken } from './auth.ts';
 import { zonedTimeToUtc } from '../booking/time.ts';
 import { bookingConfig } from '../../config/booking.ts';
 import { isUsableLatLng } from '../travel/server-routing.ts';
 import { resolveServiceBranchStrict } from '../branches/registry.ts';
+import { findCustomerByContact, findCustomerProperty } from '../customers/identity.ts';
 
 function storedCoordinates(latValue: unknown, lngValue: unknown): { lat: number; lng: number } | null {
   if (typeof latValue !== 'string' && typeof latValue !== 'number') return null;
@@ -78,21 +79,7 @@ export async function persistLeadSubmission(
     };
   }
 
-  let customerId = '';
-  if (email) {
-    const contact = await db
-      .prepare("SELECT customer_id FROM customer_contacts WHERE kind = 'email' AND normalized_value = ? LIMIT 1")
-      .bind(email)
-      .first<{ customer_id: string }>();
-    customerId = contact?.customer_id ?? '';
-  }
-  if (!customerId && phone) {
-    const contact = await db
-      .prepare("SELECT customer_id FROM customer_contacts WHERE kind = 'phone' AND normalized_value = ? LIMIT 1")
-      .bind(phone)
-      .first<{ customer_id: string }>();
-    customerId = contact?.customer_id ?? '';
-  }
+  let customerId = await findCustomerByContact(db, { email, phone });
 
   const nameParts = splitName(name);
   if (!customerId) {
@@ -131,14 +118,11 @@ export async function persistLeadSubmission(
   let propertyId: string | null = null;
   const line1 = (fields.service_address ?? '').trim();
   if (line1) {
-    const existingProperty = await db
-      .prepare(
-        `SELECT id FROM properties
-         WHERE customer_id = ? AND line1 = ? AND postal_code = ?
-         LIMIT 1`,
-      )
-      .bind(customerId, line1, fields.zip ?? '')
-      .first<{ id: string }>();
+    const existingProperty = await findCustomerProperty(db, customerId, {
+      line1,
+      line2: fields.address_unit ?? '',
+      postalCode: fields.zip ?? '',
+    });
     propertyId = existingProperty?.id ?? `prop_${crypto.randomUUID()}`;
     if (!existingProperty) {
       const coordinates = storedCoordinates(fields.pin_latitude, fields.pin_longitude);

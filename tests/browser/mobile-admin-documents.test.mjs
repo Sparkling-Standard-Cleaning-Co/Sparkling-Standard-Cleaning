@@ -139,6 +139,7 @@ async function openAdmin(width, height = 844) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await page.goto(BASE + '/admin/', { waitUntil: 'load' });
+  await page.locator('[data-admin-menu-toggle]').click();
   await page.locator('[data-admin-nav="documents"]').click();
   await page.waitForSelector('[data-admin-view="documents"]:not([hidden])');
   await page.locator('[data-document-overview] .document-overview-card').first().waitFor({ state: 'visible' });

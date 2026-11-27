@@ -5,6 +5,7 @@ import { hasPropertyInput, normalizePropertyInput, type NormalizedProperty } fro
 import { defaultActiveBranch } from './branches.ts';
 import { resolveServiceBranchStrict } from '../branches/registry.ts';
 import { buildLeadNotification } from '../forms/lead-notification.ts';
+import { suspectTestReasons } from './lead-classification.ts';
 
 function now(): string {
   return new Date().toISOString();
@@ -784,17 +785,27 @@ function leadFilters(actor: AdminActor, input: LeadListInput): { sql: string; bi
   const status = text(input.status, 30);
   const q = text(input.q, 120);
   const branch = scope(actor, 'l.branch_id');
-  const statusSql =
-    status === 'active'
-      ? "l.status NOT IN ('archived','lost','converted')"
-      : "(? = '' OR l.status = ?)";
-  const statusBind: unknown[] = status === 'active' ? [] : [status, status];
+  let statusSql = "(? = '' OR l.status = ?)";
+  let statusBind: unknown[] = [status, status];
+  if (status === 'active') {
+    statusSql = "l.status NOT IN ('archived','lost','converted') AND l.is_test = 0 AND l.is_duplicate = 0";
+    statusBind = [];
+  } else if (status === 'test') {
+    statusSql = 'l.is_test = 1';
+    statusBind = [];
+  } else if (status === 'duplicates') {
+    statusSql = 'l.is_duplicate = 1';
+    statusBind = [];
+  } else if (status === 'archived') {
+    statusSql = "l.status = 'archived'";
+    statusBind = [];
+  }
   return {
     sql: `WHERE ${statusSql}
          AND (? = '' OR l.quote_reference LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ?
-              OR p.line1 LIKE ? OR l.payload_json LIKE ?)
+              OR c.company_name LIKE ? OR p.line1 LIKE ? OR l.payload_json LIKE ?)
          ${branch.sql}`,
-    bind: [...statusBind, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind],
+    bind: [...statusBind, q, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, ...branch.bind],
   };
 }
 
@@ -816,8 +827,9 @@ export async function listLeads(
     .prepare(
       `SELECT l.id, l.request_type, l.status, l.source, l.quote_reference, l.delivery_status,
               l.delivery_attempts, l.last_delivery_error, l.outstanding_requirement,
-              l.payload_json, l.created_at, l.updated_at,
-              c.first_name, c.last_name, c.id AS customer_id,
+              l.payload_json, l.created_at, l.updated_at, l.is_test, l.is_duplicate,
+              l.duplicate_of_lead_id, l.previous_status, l.archived_at,
+              c.first_name, c.last_name, c.company_name, c.id AS customer_id,
               p.line1, p.city, p.state, p.postal_code
        FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
        LEFT JOIN properties p ON p.id = l.property_id
@@ -878,7 +890,8 @@ export async function leadArchiveEligibility(
 ): Promise<{ ok: boolean; error?: string; row?: Record<string, unknown> }> {
   const row = await db
     .prepare(
-      `SELECT l.id, l.request_type, l.status, l.customer_id, l.quote_reference
+      `SELECT l.id, l.request_type, l.status, l.customer_id, l.quote_reference,
+              l.is_test, l.is_duplicate, l.previous_status
        FROM leads l WHERE l.id = ? ${scope(actor, 'l.branch_id').sql} LIMIT 1`,
     )
     .bind(leadId, ...scope(actor, 'l.branch_id').bind)
@@ -888,9 +901,13 @@ export async function leadArchiveEligibility(
     return String(row.status) === 'archived' ? { ok: true, row } : { ok: false, error: 'lead_not_archived', row };
   }
   if (operation === 'archive') {
-    return String(row.status) === 'archived' ? { ok: true, row } : { ok: true, row };
+    return { ok: true, row };
   }
   if (actor.role !== 'owner') return { ok: false, error: 'owner_required', row };
+  // Deleting the inquiry row never deletes the customer, appointment, invoice,
+  // agreement or payment history. An explicitly classified test inquiry is
+  // therefore safe to remove from the sales pipeline.
+  if (Number(row.is_test) === 1) return { ok: true, row };
   if (row.customer_id) return { ok: false, error: 'linked_customer_history_retained', row };
   if (String(row.request_type) === 'reservation_request') {
     return { ok: false, error: 'reservation_history_retained', row };
@@ -910,8 +927,11 @@ export async function archiveLead(
   if (!result.ok) throw new AdminAuthError(404, result.error ?? 'lead_not_found');
   if (String(result.row?.status) !== 'archived') {
     await db
-      .prepare("UPDATE leads SET status = 'archived', updated_at = ? WHERE id = ?")
-      .bind(now(), leadId)
+      .prepare(
+        `UPDATE leads SET previous_status = ?, status = 'archived', archived_at = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(String(result.row?.status ?? 'new'), now(), now(), leadId)
       .run();
   }
   await audit(db, { actorUserId: actor.id, action: 'lead.archived', entityType: 'lead', entityId: leadId });
@@ -924,11 +944,65 @@ export async function restoreLead(
 ): Promise<void> {
   const result = await leadArchiveEligibility(db, actor, leadId, 'restore');
   if (!result.ok) throw new AdminAuthError(409, result.error ?? 'lead_not_archived');
+  const previous = String(result.row?.previous_status ?? '').trim();
+  const restoreStatus = ['new', 'contacted', 'quoted', 'converted', 'lost'].includes(previous) ? previous : 'new';
   await db
-    .prepare("UPDATE leads SET status = 'new', updated_at = ? WHERE id = ?")
-    .bind(now(), leadId)
+    .prepare('UPDATE leads SET status = ?, previous_status = NULL, archived_at = NULL, updated_at = ? WHERE id = ?')
+    .bind(restoreStatus, now(), leadId)
     .run();
   await audit(db, { actorUserId: actor.id, action: 'lead.restored', entityType: 'lead', entityId: leadId });
+}
+
+export async function markLeadTest(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+  isTest: boolean,
+): Promise<void> {
+  const result = await leadArchiveEligibility(db, actor, leadId, 'archive');
+  if (!result.ok) throw new AdminAuthError(404, result.error ?? 'lead_not_found');
+  await db
+    .prepare(
+      `UPDATE leads SET is_test = ?, test_marked_at = ?, test_marked_by_admin_user_id = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(isTest ? 1 : 0, isTest ? now() : null, isTest ? actor.id : null, now(), leadId)
+    .run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: isTest ? 'lead.marked_test' : 'lead.unmarked_test',
+    entityType: 'lead',
+    entityId: leadId,
+  });
+}
+
+export async function markLeadDuplicate(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+  isDuplicate: boolean,
+  duplicateOf = '',
+): Promise<void> {
+  const result = await leadArchiveEligibility(db, actor, leadId, 'archive');
+  if (!result.ok) throw new AdminAuthError(404, result.error ?? 'lead_not_found');
+  await db
+    .prepare('UPDATE leads SET is_duplicate = ?, duplicate_of_lead_id = ?, updated_at = ? WHERE id = ?')
+    .bind(isDuplicate ? 1 : 0, isDuplicate ? text(duplicateOf, 120) || null : null, now(), leadId)
+    .run();
+  await audit(db, {
+    actorUserId: actor.id,
+    action: isDuplicate ? 'lead.marked_duplicate' : 'lead.unmarked_duplicate',
+    entityType: 'lead',
+    entityId: leadId,
+  });
+}
+
+export async function markLeadConverted(
+  db: D1Database,
+  actor: AdminActor,
+  leadId: string,
+): Promise<void> {
+  await updateLead(db, actor, leadId, { status: 'converted' });
 }
 
 export async function deleteDisposableLead(
@@ -944,8 +1018,66 @@ export async function deleteDisposableLead(
     action: 'lead.disposable_deleted',
     entityType: 'lead',
     entityId: leadId,
-    detail: 'No customer, reservation or quote history was linked.',
+    detail: Number(result.row?.is_test) === 1
+      ? 'Explicitly classified test inquiry removed; customer and operational history preserved.'
+      : 'No customer, reservation or quote history was linked.',
   });
+}
+
+export interface SuspectedTestLead {
+  id: string;
+  reference: string;
+  requestType: string;
+  status: string;
+  createdAt: string;
+  customerName: string;
+  reasons: string[];
+}
+
+export async function previewSuspectedTestLeads(
+  db: D1Database,
+  actor: AdminActor,
+): Promise<SuspectedTestLead[]> {
+  const branch = scope(actor, 'l.branch_id');
+  const rows = await db
+    .prepare(
+      `SELECT l.id, l.request_type, l.status, l.quote_reference, l.created_at,
+              l.source, l.payload_json, c.first_name, c.last_name, c.company_name,
+              (SELECT value FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.kind = 'email' LIMIT 1) AS email,
+              (SELECT value FROM customer_contacts cc WHERE cc.customer_id = c.id AND cc.kind = 'phone' LIMIT 1) AS phone
+       FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
+       WHERE l.is_test = 0${branch.sql}
+       ORDER BY l.created_at DESC LIMIT 300`,
+    )
+    .bind(...branch.bind)
+    .all<Record<string, unknown>>();
+  const suspects: SuspectedTestLead[] = [];
+  for (const row of rows.results ?? []) {
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = JSON.parse(String(row.payload_json ?? '{}')) as Record<string, unknown>;
+    } catch {
+      payload = {};
+    }
+    const reasons = suspectTestReasons({
+      name: [row.first_name, row.last_name].filter(Boolean).join(' ') || row.company_name,
+      email: row.email,
+      phone: row.phone,
+      source: row.source,
+      payload,
+    });
+    if (reasons.length === 0) continue;
+    suspects.push({
+      id: String(row.id),
+      reference: String(row.quote_reference ?? ''),
+      requestType: String(row.request_type ?? ''),
+      status: String(row.status ?? ''),
+      createdAt: String(row.created_at ?? ''),
+      customerName: [row.first_name, row.last_name].filter(Boolean).join(' ') || String(row.company_name ?? ''),
+      reasons,
+    });
+  }
+  return suspects;
 }
 
 export async function retryLeadNotification(

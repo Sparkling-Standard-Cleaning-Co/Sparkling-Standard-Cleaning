@@ -1,4 +1,4 @@
-﻿import { test, before, after } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -95,7 +95,7 @@ async function openAdmin() {
       body: JSON.stringify({ ok: true, counts: { customers: 1, leads: 1, requests: 1, todayJobs: 0, tomorrowJobs: 0, unassignedJobs: 1 }, recentLeads: [] }),
     });
   });
-  await page.route('**/api/admin/operations?view=jobs', async (route) => {
+  await page.route('**/api/admin/operations**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

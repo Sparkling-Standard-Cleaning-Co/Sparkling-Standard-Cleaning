@@ -1209,6 +1209,7 @@ async function fulfillGiftOnlyOrder(
     const confirmed = await autoConfirmPaidBooking(env, input.holdId, input.candidate.reference, {
       customerName: fields.name ?? snapshot?.customerName ?? '',
       customerEmail: fields.email ?? input.email,
+      customerPhone: fields.phone ?? '',
       serviceCode: fields.service_type ?? input.candidate.serviceType,
       frequency: fields.ongoing_frequency ?? fields.frequency ?? '',
       ongoingPriceCents: Math.round(Number(fields.ongoing_price_per_visit || 0) * 100),

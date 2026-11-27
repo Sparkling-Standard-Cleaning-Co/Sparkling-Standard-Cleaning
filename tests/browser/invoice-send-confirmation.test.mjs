@@ -111,6 +111,7 @@ test('invoice sending uses a branded confirmation, not an email-code prompt, and
   });
   try {
     await page.goto(BASE + '/admin/', { waitUntil: 'load' });
+    await page.locator('[data-admin-menu-toggle]').click();
     await page.getByRole('button', { name: 'Invoices & Payments' }).click();
     await page.locator('[data-admin-invoices]').getByText(invoice.number).waitFor({ state: 'visible' });
     await page.locator('[data-admin-invoices] [data-admin-action="invoice-open"]').click();

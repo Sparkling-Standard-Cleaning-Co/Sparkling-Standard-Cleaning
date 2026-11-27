@@ -263,12 +263,14 @@ test('alerts, calendar, bulk requests and customer views are actionable', async 
     assert.ok(customerQueries.includes('deleted'));
 
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('[data-admin-menu-toggle]').click();
     await page.locator('[data-admin-nav="calendar"]').click();
-    await page.locator('.admin-week-grid').waitFor({ state: 'visible' });
+    await page.locator('.admin-week-mobile-days').waitFor({ state: 'visible' });
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     assert.ok(overflow <= 1, `admin calendar has no page-level horizontal overflow at 390px (got ${overflow})`);
+    await page.locator('[data-admin-menu-toggle]').click();
     await page.locator('[data-admin-nav="overview"]').click();
     await page.locator('[data-admin-alerts]').waitFor({ state: 'visible' });
     const overviewOverflow = await page.evaluate(

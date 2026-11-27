@@ -271,6 +271,7 @@ test('the property editor remains usable at phone width without horizontal overf
 
     await page.goto(BASE + '/admin/', { waitUntil: 'load' });
     await page.locator('[data-admin-app]').waitFor({ state: 'visible' });
+    await page.locator('[data-admin-menu-toggle]').click();
     await page.locator('[data-admin-nav="customers"]').click();
     await page.locator('[data-admin-action="customer-open"]').first().click();
     await page.locator('form[data-form="property-add"]').waitFor({ state: 'attached' });

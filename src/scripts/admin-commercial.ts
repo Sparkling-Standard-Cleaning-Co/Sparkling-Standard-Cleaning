@@ -27,6 +27,9 @@ interface CommercialScope {
 interface CommercialState {
   customers: Array<Record<string, unknown>>;
   properties: Array<Record<string, unknown>>;
+  facilities: Array<Record<string, unknown>>;
+  qualityGroups: Array<Record<string, unknown>>;
+  qualityLoaded: boolean;
   proposals: Array<Record<string, unknown>>;
   contracts: Array<Record<string, unknown>>;
   editingId: string;
@@ -91,6 +94,9 @@ let commercialScheduleState: CommercialScheduleContext | null = null;
 let commercialState: CommercialState = {
   customers: [],
   properties: [],
+  facilities: [],
+  qualityGroups: [],
+  qualityLoaded: false,
   proposals: [],
   contracts: [],
   editingId: '',
@@ -159,6 +165,7 @@ export async function loadCommercial(): Promise<void> {
   const data = await commercialApi<{
     customers?: Array<Record<string, unknown>>;
     properties?: Array<Record<string, unknown>>;
+    facilities?: Array<Record<string, unknown>>;
     proposals?: Array<Record<string, unknown>>;
     contracts?: Array<Record<string, unknown>>;
   }>('/api/admin/commercial');
@@ -166,6 +173,7 @@ export async function loadCommercial(): Promise<void> {
     ...commercialState,
     customers: data.customers ?? [],
     properties: data.properties ?? [],
+    facilities: data.facilities ?? data.properties ?? [],
     proposals: data.proposals ?? [],
     contracts: data.contracts ?? [],
     editingId: '',
@@ -252,16 +260,63 @@ function renderCommercial(): void {
         `<option value="${escUi(customer.id)}">${escUi(commercialCustomerLabel(customer))}</option>`,
     )
     .join('');
-  const propertyCards = commercialState.properties
-    .map((property) => {
-      const customer = commercialState.customers.find(
-        (entry) => entry.id === property.customer_id,
-      );
-      return `<div class="admin-record">
-        <p><strong>${escUi(commercialPropertyLabel(property))}</strong></p>
-        <p class="admin-muted">${escUi(customer ? commercialCustomerLabel(customer) : 'Unlinked customer')} · ${escUi(property.access_notes || 'No access instructions recorded')}</p>
-        <button class="btn btn--ghost btn--small" type="button" data-commercial-action="property" data-id="${escUi(property.id)}">Contacts & walkthroughs</button>
-      </div>`;
+  const facilityMarkupById = new Map<string, string>();
+  for (const facility of commercialState.facilities) {
+    const customer = commercialState.customers.find((entry) => entry.id === facility.customer_id);
+    const label = commercialPropertyLabel(facility);
+    const search = [label, customer ? commercialCustomerLabel(customer) : ''].join(' ').toLowerCase();
+    const proposalCount = Number(facility.proposal_count ?? 0);
+    const contractCount = Number(facility.contract_count ?? 0);
+    const contactCount = Number(facility.contact_count ?? 0);
+    const walkthroughCount = Number(facility.walkthrough_count ?? 0);
+    const jobCount = Number(facility.job_count ?? 0);
+    const badges = [
+      `${proposalCount} proposal${proposalCount === 1 ? '' : 's'}`,
+      `${contractCount} contract${contractCount === 1 ? '' : 's'}`,
+      `${contactCount} contact${contactCount === 1 ? '' : 's'}`,
+      `${walkthroughCount} walkthrough${walkthroughCount === 1 ? '' : 's'}`,
+      `${jobCount} job${jobCount === 1 ? '' : 's'}`,
+    ];
+    facilityMarkupById.set(String(facility.id), `<details class="admin-facility-row" data-facility-search="${escUi(search)}" data-facility-customer="${escUi(facility.customer_id)}">
+        <summary>
+          <span><strong>${escUi(label)}</strong><br /><span class="admin-muted">${escUi(String(facility.label || 'Facility'))}</span></span>
+          <span class="admin-facility-row__badges">${badges.map((badge) => `<span class="admin-status">${escUi(badge)}</span>`).join('')}</span>
+        </summary>
+        <div class="admin-facility-row__body">
+          <dl class="admin-definition">
+            <dt>Account</dt><dd>${escUi(customer ? commercialCustomerLabel(customer) : 'Unlinked customer')}</dd>
+            <dt>Access</dt><dd>${escUi(facility.access_notes || 'No access instructions recorded')}</dd>
+            <dt>Parking</dt><dd>${escUi(facility.parking_notes || 'No parking notes recorded')}</dd>
+            <dt>Usage</dt><dd>${escUi(String(facility.usage_type || 'residential'))}</dd>
+          </dl>
+          <div class="admin-actions">
+            <button class="btn btn--ghost btn--small" type="button" data-commercial-action="property" data-id="${escUi(facility.id)}">Contacts &amp; walkthroughs</button>
+            <button class="btn btn--secondary btn--small" type="button" data-commercial-action="new-for-facility" data-id="${escUi(facility.id)}" data-customer="${escUi(facility.customer_id)}">New proposal</button>
+            <button class="btn btn--ghost btn--small" type="button" data-commercial-action="set-residential" data-id="${escUi(facility.id)}">Remove from facility view</button>
+          </div>
+        </div>
+      </details>`);
+  }
+  const facilityGroups = new Map<string, { customer: Record<string, unknown> | undefined; facilities: Array<Record<string, unknown>> }>();
+  for (const facility of commercialState.facilities) {
+    const customerId = String(facility.customer_id ?? '');
+    const group = facilityGroups.get(customerId) ?? {
+      customer: commercialState.customers.find((entry) => entry.id === customerId),
+      facilities: [],
+    };
+    group.facilities.push(facility);
+    facilityGroups.set(customerId, group);
+  }
+  const facilityMarkup = [...facilityGroups.values()]
+    .map((group) => {
+      const customer = group.customer;
+      const rows = group.facilities
+        .map((facility) => facilityMarkupById.get(String(facility.id)) ?? '')
+        .join('');
+      return `<details class="admin-facility-account" data-facility-account data-facility-search="${escUi([customer ? commercialCustomerLabel(customer) : '', ...group.facilities.map((facility) => commercialPropertyLabel(facility))].join(' ').toLowerCase())}">
+        <summary><strong>${escUi(customer ? commercialCustomerLabel(customer) : 'Unlinked customer')}</strong> <span class="admin-status">${group.facilities.length} facilit${group.facilities.length === 1 ? 'y' : 'ies'}</span></summary>
+        <div class="admin-facility-account__body">${rows}</div>
+      </details>`;
     })
     .join('');
   target.innerHTML = `
@@ -282,16 +337,35 @@ function renderCommercial(): void {
       }
     </div>
     <div class="admin-card" style="margin-top:1rem;">
-      <h3>Facilities and account contacts</h3>
-      <p class="admin-muted">Billing and facility contacts, access instructions and walkthrough records. Customers can have multiple facilities.</p>
-      <label>Choose a customer to begin a proposal <select data-commercial-customer-filter><option value="">All customers</option>${accountOptions}</select></label>
-      <div class="admin-actions"><button class="btn btn--primary btn--small" type="button" data-commercial-action="new-for-customer">New proposal for selected customer</button></div>
-      <div class="admin-history" style="margin-top:.75rem;">${propertyCards || '<p class="admin-muted">No active facilities.</p>'}</div>
+      <h3>Facility accounts</h3>
+      <p class="admin-muted">Only commercial, church and facility-based accounts appear here. Residential service properties are managed on each customer file. Each account can hold multiple facilities, contacts, walkthroughs, proposals and contracts.</p>
+      <label>Find an account or facility <input type="search" data-commercial-facility-search placeholder="Customer, facility, address" /></label>
+      <div class="admin-history" style="margin-top:.75rem;">${facilityMarkup || '<p class="admin-muted">No commercial or church facilities are recorded yet.</p>'}</div>
       <div data-commercial-property-panel style="margin-top:1rem;"></div>
+      <details class="admin-detail-toggle" style="margin-top:1rem;">
+        <summary>Add a facility to an existing commercial customer</summary>
+        <form class="admin-form admin-form--grid" data-commercial-facility-form style="max-width:none;">
+          <label>Customer <select name="customerId" required><option value="">Choose a customer</option>${accountOptions}</select></label>
+          <label>Facility name <input name="label" maxlength="120" placeholder="HQ, Warehouse, Church campus" /></label>
+          <label class="admin-field--wide">Street address <input name="line1" maxlength="300" required /></label>
+          <label>Unit / suite <input name="line2" maxlength="60" /></label>
+          <label>City <input name="city" maxlength="120" /></label>
+          <label>State <select name="state"><option value="FL">Florida</option><option value="AL">Alabama</option></select></label>
+          <label>ZIP <input name="postalCode" maxlength="10" /></label>
+          <label class="admin-field--wide">Access instructions <textarea name="accessNotes" rows="2" maxlength="1000"></textarea></label>
+          <label class="admin-field--wide">Parking notes <textarea name="parkingNotes" rows="2" maxlength="1000"></textarea></label>
+          <div class="admin-field--wide admin-actions"><button class="btn btn--secondary btn--small" type="submit">Add facility</button></div>
+        </form>
+      </details>
+      <details class="admin-detail-toggle" data-commercial-quality-wrap>
+        <summary>Property data quality review</summary>
+        <p class="admin-muted">Review normalized duplicate addresses, unlinked test records and safe consolidation. Nothing is merged or archived automatically.</p>
+        <div class="admin-actions"><button class="btn btn--ghost btn--small" type="button" data-commercial-action="quality-load">Review duplicate properties</button></div>
+        <div data-commercial-quality style="margin-top:.75rem;"></div>
+      </details>
     </div>
     <div data-commercial-schedule-panel style="margin-top:1rem;"></div>
-    <div data-commercial-editor style="margin-top:1rem;"></div>`;
-  if (commercialState.editingId) void renderCommercialEditor();
+    <div data-commercial-editor style="margin-top:1rem;"></div>`;  if (commercialState.editingId) void renderCommercialEditor();
 }
 
 function commercialScopeFromProposal(proposal: Record<string, unknown>): CommercialScope {
@@ -770,6 +844,68 @@ function commercialIndexFrom(target: HTMLElement | null, container: Element | nu
   return siblings.indexOf(target);
 }
 
+function renderCommercialQuality(groups: Array<Record<string, unknown>>): void {
+  const target = document.querySelector<HTMLElement>('[data-commercial-quality]');
+  if (!target) return;
+  if (!groups.length) {
+    target.innerHTML = '<p class="admin-muted">No normalized duplicate property records were found.</p>';
+    return;
+  }
+  target.innerHTML = `<p class="admin-muted">${groups.length} duplicate group(s). Different customers and different units are never merged automatically.</p>${groups.map((group) => {
+    const rows = (group.rows as Array<Record<string, unknown>>) ?? [];
+    const sameCustomer = group.sameCustomer === true;
+    const display = [group.street, group.unit ? `Unit ${String(group.unit)}` : '', group.locality].filter(Boolean).join(' · ');
+    const rowMarkup = rows.map((row) => {
+      const customer = String(row.customer_name || row.company_name || 'Unlinked customer');
+      const status = String(row.customer_status || '');
+      const active = ['active_appointments', 'active_recurring_plans', 'contract_schedules'].some((key) => Number(row[key] ?? 0) > 0);
+      const targets = rows.filter((candidate) => candidate.id !== row.id);
+      const targetOptions = targets.map((candidate) => `<option value="${escUi(candidate.id)}">${escUi([candidate.label, candidate.line1].filter(Boolean).join(' — '))}</option>`).join('');
+      const links = [
+        Number(row.appointments ?? 0) ? `${Number(row.appointments)} job(s)` : '',
+        Number(row.recurring_plans ?? 0) ? `${Number(row.recurring_plans)} plan(s)` : '',
+        Number(row.invoices ?? 0) ? `${Number(row.invoices)} invoice(s)` : '',
+        Number(row.leads ?? 0) ? `${Number(row.leads)} inquiry(ies)` : '',
+        Number(row.proposals ?? 0) ? `${Number(row.proposals)} proposal(s)` : '',
+      ].filter(Boolean).join(' · ') || 'No operational links';
+      const actions = [
+        sameCustomer && targets.length
+          ? `<select data-quality-target="${escUi(row.id)}" aria-label="Merge target">${targetOptions}</select><button class="btn btn--secondary btn--small" type="button" data-commercial-action="quality-merge" data-id="${escUi(row.id)}">Merge into selected</button>`
+          : '',
+        active
+          ? '<span class="admin-muted">Active obligations prevent archiving.</span>'
+          : `<button class="btn btn--ghost btn--small" type="button" data-commercial-action="quality-archive" data-id="${escUi(row.id)}">Archive duplicate</button>`,
+      ].filter(Boolean).join('');
+      const testFlag = /checkout diagnostic|your name here|test customer/i.test(`${customer} ${String(row.label ?? '')}`)
+        ? ' <span class="admin-status">Possible test</span>'
+        : '';
+      return `<tr>
+        <td>${escUi([row.label, row.line1, row.line2, row.city, row.state, row.postal_code].filter(Boolean).join(', '))}<br /><span class="admin-muted">${escUi(String(row.id)).slice(0, 18)}…</span></td>
+        <td>${escUi(customer)}${testFlag}<br /><span class="admin-status">${escUi(String(row.status))}</span> <span class="admin-status">${escUi(String(row.usage_type || 'residential'))}</span><br /><span class="admin-muted">Customer ${escUi(status)}</span></td>
+        <td>${escUi(links)}</td>
+        <td><div class="admin-actions admin-quality-actions">${actions || '<span class="admin-muted">No safe action.</span>'}</div></td>
+      </tr>`;
+    }).join('');
+    return `<div class="admin-quality-group">
+      <h4>${escUi(display || 'Duplicate address')}</h4>
+      ${sameCustomer ? '<p class="admin-muted">Same customer and same unit: safe to consolidate the selected record.</p>' : '<p class="admin-muted">Different customer associations. The records are not merged; archive only an unused test duplicate.</p>'}
+      <div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Property</th><th>Customer</th><th>Linked history</th><th>Safe action</th></tr></thead><tbody>${rowMarkup}</tbody></table></div>
+    </div>`;
+  }).join('')}`;
+}
+
+async function loadCommercialQuality(): Promise<void> {
+  commercialSetStatus('Reviewing duplicate property records…');
+  try {
+    const data = await commercialApi<{ groups?: Array<Record<string, unknown>>; scanned?: number }>('/api/admin/data-quality');
+    commercialState.qualityGroups = data.groups ?? [];
+    commercialState.qualityLoaded = true;
+    renderCommercialQuality(commercialState.qualityGroups);
+    commercialSetStatus(`${data.scanned ?? 0} property record(s) reviewed.`, 'success');
+  } catch (error) {
+    commercialSetStatus(friendlyUi(error), 'error');
+  }
+}
 document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-commercial-action]');
   const action = target?.dataset.commercialAction ?? '';
@@ -779,6 +915,72 @@ document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventL
     work.catch((error) => commercialSetStatus(friendlyUi(error), 'error'));
   };
   if (action === 'refresh') run(loadCommercial());
+  if (action === 'quality-load') run(loadCommercialQuality());
+  if (action === 'quality-archive') {
+    void adminConfirm({
+      title: 'Archive this duplicate property?',
+      body: '<p>The property leaves the active list. Its historical links are preserved, and any active future jobs or recurring plans block this action.</p>',
+      confirmLabel: 'Archive duplicate',
+      danger: true,
+    }).then((ok) => {
+      if (!ok) return;
+      run(
+        commercialApi('/api/admin/data-quality', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'archive_property', propertyId: id }),
+        }).then(() => {
+          commercialSetStatus('Duplicate property archived. History was preserved.', 'success');
+          return Promise.all([loadCommercial(), loadCommercialQuality()]);
+        }),
+      );
+    });
+  }
+  if (action === 'quality-merge') {
+    const targetSelect = document.querySelector<HTMLSelectElement>(`[data-quality-target="${CSS.escape(id)}"]`);
+    const targetId = targetSelect?.value ?? '';
+    if (!targetId) {
+      commercialSetStatus('Choose the property to keep before merging.', 'error');
+      return;
+    }
+    void adminConfirm({
+      title: 'Consolidate these duplicate properties?',
+      body: '<p>All leads, estimates, requests, appointments, plans, invoices, agreements, contacts and commercial records move to the selected property. The duplicate is archived, never deleted.</p>',
+      confirmLabel: 'Consolidate records',
+    }).then((ok) => {
+      if (!ok) return;
+      run(
+        commercialApi('/api/admin/data-quality', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'merge_property', sourcePropertyId: id, targetPropertyId: targetId }),
+        }).then(() => {
+          commercialSetStatus('Duplicate consolidated with its history preserved.', 'success');
+          return Promise.all([loadCommercial(), loadCommercialQuality()]);
+        }),
+      );
+    });
+  }
+  if (action === 'set-residential') {
+    void adminConfirm({
+      title: 'Remove this property from the facility view?',
+      body: '<p>The property record and all of its history remain. It will be managed on the customer file as a residential property.</p>',
+      confirmLabel: 'Remove from facility view',
+    }).then((ok) => {
+      if (!ok) return;
+      run(
+        commercialPost({ action: 'set_property_usage', propertyId: id, usageType: 'residential' }).then(() => {
+          commercialSetStatus('Property returned to the residential customer file.', 'success');
+          return loadCommercial();
+        }),
+      );
+    });
+  }
+  if (action === 'new-for-facility') {
+    const customerId = target?.dataset.customer ?? '';
+    commercialState.editingId = '';
+    commercialState.editingProposal = { customer_id: customerId, property_id: id };
+    commercialState.scope = emptyCommercialScope();
+    void renderCommercialEditor();
+  }
   if (action === 'new') {
     commercialState.editingId = '';
     commercialState.editingProposal = null;
@@ -964,8 +1166,40 @@ document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventL
   if (property) property.innerHTML = commercialPropOptions('', select.value);
 });
 
+document.querySelector<HTMLInputElement>('[data-commercial-facility-search]')?.addEventListener('input', (event) => {
+  const term = (event.target as HTMLInputElement).value.trim().toLowerCase();
+  for (const account of document.querySelectorAll<HTMLElement>('[data-facility-account]')) {
+    const matches = !term || (account.dataset.facilitySearch ?? '').includes(term);
+    account.hidden = !matches;
+  }
+});
 document.querySelector<HTMLElement>('[data-admin-view="commercial"]')?.addEventListener('submit', (event) => {
   const form = event.target as HTMLFormElement;
+  if (form.matches('[data-commercial-facility-form]')) {
+    event.preventDefault();
+    const data = new FormData(form);
+    commercialPost({
+      action: 'create_facility',
+      customerId: data.get('customerId'),
+      label: data.get('label'),
+      line1: data.get('line1'),
+      line2: data.get('line2'),
+      city: data.get('city'),
+      state: data.get('state'),
+      postalCode: data.get('postalCode'),
+      accessNotes: data.get('accessNotes'),
+      parkingNotes: data.get('parkingNotes'),
+    })
+      .then((result) => {
+        commercialSetStatus(
+          result.reused ? 'Existing facility reused; no duplicate property was created.' : 'Facility added.',
+          'success',
+        );
+        return loadCommercial();
+      })
+      .catch((error) => commercialSetStatus(friendlyUi(error), 'error'));
+    return;
+  }
   if (form.matches('[data-commercial-contact-form]')) {
     event.preventDefault();
     const data = new FormData(form);

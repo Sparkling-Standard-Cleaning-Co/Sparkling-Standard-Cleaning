@@ -1,4 +1,4 @@
-﻿import { test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,6 +9,7 @@ import { createOpsSession, enrollOwner, readOpsActor } from '../src/lib/admin/op
 import { createCustomer } from '../src/lib/admin/crm.ts';
 import { createInvoice } from '../src/lib/admin/billing.ts';
 import { onRequestPost as financePost } from '../functions/api/admin/finance.ts';
+import { onRequestPost as storagePost } from '../functions/api/admin/storage.ts';
 
 class SqlStatement implements D1PreparedStatement {
   private values: unknown[] = [];
@@ -108,4 +109,35 @@ test('sensitive invoice creation still requires a fresh step-up code', async () 
   } as never);
   assert.equal(response.status, 403);
   assert.equal(((await response.json()) as { error?: string }).error, 'mfa_step_up_required');
+});
+
+test('routine individual photo deletion does not require a fresh MFA code', async () => {
+  const db = migratedDb();
+  const owner = await enrollOwner(db, {
+    email: 'routine-photo@example.test',
+    name: 'Routine Photo Owner',
+    password: 'SyntheticOwner!2026',
+  });
+  db.raw.prepare('UPDATE admin_users SET mfa_enabled = 1 WHERE id = ?').run(owner.id);
+  const session = await createOpsSession(db, owner.id, new Request('https://example.test/api/admin/overview'));
+  db.raw.prepare("INSERT INTO leads (id, branch_id, request_type, status, quote_reference, payload_json) VALUES ('lead_photo','branch_pensacola','reservation_request','new','quote-test-1','{}')").run();
+  const deleted: string[][] = [];
+  const bucket = {
+    delete: async (keys: string[]) => { deleted.push(keys); },
+  };
+  const key = 'leads/2026/11/quote-test-1/bathroom-0123456789abcdef0123456789abcdef.jpg';
+  const response = await storagePost({
+    request: new Request('https://example.test/api/admin/storage', {
+      method: 'POST',
+      headers: {
+        Cookie: `ss_ops=${session.token}`,
+        'X-CSRF-Token': session.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'photo_delete', key }),
+    }),
+    env: { DB: db, PHOTOS_BUCKET: bucket },
+  } as never);
+  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+  assert.deepEqual(deleted[0], [key, `${key}.meta.json`]);
 });

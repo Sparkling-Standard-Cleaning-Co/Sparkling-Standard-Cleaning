@@ -347,6 +347,7 @@ test('an owner can create a customer inline, then book, send agreements and prep
 test('the manual booking form stays usable at phone width without horizontal overflow', async () => {  const { context, page } = await openAdmin();
   try {
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('[data-admin-menu-toggle]').click();
     await page.getByRole('button', { name: 'New Booking' }).click();
     await page.waitForFunction(() => {
       const select = document.querySelector('[data-manual-customer]');
@@ -421,7 +422,7 @@ test('an unresolved recurring sync is shown as a readable conflict with its date
       }
     });
     await page.getByRole('button', { name: 'Recurring Plans' }).click();
-    await page.waitForSelector('[data-admin-recurring] table');
+    await page.waitForSelector('[data-admin-recurring] .admin-plan-card');
     const text = (await page.textContent('[data-admin-recurring]')) ?? '';
     assert.match(text, /Conflict/);
     assert.match(text, /2026-11-10: Travel route could not be established/i);

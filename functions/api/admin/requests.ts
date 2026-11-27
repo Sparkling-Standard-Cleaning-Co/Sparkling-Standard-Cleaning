@@ -442,6 +442,8 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const appointmentTo =
       text(url.searchParams.get('to'), 30) ||
       new Date(now.getTime() + 61 * 86_400_000).toISOString().slice(0, 10) + 'T23:59:59.999Z';
+    const weekFrom = text(url.searchParams.get('weekFrom'), 30) || appointmentFrom;
+    const weekTo = text(url.searchParams.get('weekTo'), 30) || appointmentTo;
     const leadScope = scoped(actor, 'l.branch_id');
     const view = text(url.searchParams.get('view') ?? 'actionable', 20) || 'actionable';
     const query = text(url.searchParams.get('q'), 100);
@@ -474,7 +476,7 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
     const isTestSelect = (bookingColumns.results ?? []).some((row) => row.name === 'is_test')
       ? 'r.is_test'
       : '0 AS is_test';
-    const [requests, appointments, reservationLeads] = await Promise.all([
+    const [requests, appointments, weekAppointments, reservationLeads] = await Promise.all([
       db.prepare(
         `SELECT r.id, r.customer_id, r.status, r.quote_reference, r.requested_date, r.start_at, r.end_at,
                 r.duration_minutes, r.payload_json, r.created_at, r.closed_at, r.closed_reason, r.decline_reason,
@@ -516,13 +518,36 @@ export async function onRequestGet(context: { request: Request; env: Env }): Pro
          ORDER BY a.start_at ASC LIMIT 400`,
       ).bind(appointmentFrom, appointmentTo, ...appointmentScope.bind).all(),
       db.prepare(
+        `SELECT a.id, a.status, a.start_at, a.end_at, a.reference, a.crew_size, a.source,
+                a.staffing_pending, a.staffing_reason,
+                a.duration_minutes, a.notes, a.customer_id, a.property_id, a.booking_request_id,
+                a.branch_id, a.recurring_plan_id, c.first_name, c.last_name, p.line1, p.city, p.state, p.postal_code,
+                br.payload_json AS request_payload, br.quote_reference,
+                (SELECT o.id FROM recurring_occurrences o
+                  WHERE o.appointment_id = a.id AND o.status = 'scheduled'
+                  ORDER BY o.occurrence_date LIMIT 1) AS recurring_occurrence_id,
+                (SELECT o.occurrence_date FROM recurring_occurrences o
+                  WHERE o.appointment_id = a.id AND o.status = 'scheduled'
+                  ORDER BY o.occurrence_date LIMIT 1) AS recurring_occurrence_date,
+                (SELECT GROUP_CONCAT(tm.display_name, ', ')
+                   FROM appointment_resources ar
+                   JOIN team_members tm ON tm.id = ar.team_member_id
+                  WHERE ar.appointment_id = a.id) AS assigned_names
+         FROM appointments a
+         LEFT JOIN customers c ON c.id = a.customer_id
+         LEFT JOIN properties p ON p.id = a.property_id
+         LEFT JOIN booking_requests br ON br.id = a.booking_request_id
+         WHERE a.start_at >= ? AND a.start_at <= ? ${appointmentScope.sql}
+         ORDER BY a.start_at ASC LIMIT 400`,
+      ).bind(weekFrom, weekTo, ...appointmentScope.bind).all(),
+      db.prepare(
         `SELECT l.id, l.status, l.quote_reference, l.created_at, c.first_name, c.last_name
          FROM leads l LEFT JOIN customers c ON c.id = l.customer_id
          WHERE l.request_type = 'reservation_request' ${leadScope.sql}
          ORDER BY l.created_at DESC LIMIT 100`,
       ).bind(...leadScope.bind).all(),
     ]);
-    return json({ ok: true, requests: requests.results ?? [], appointments: appointments.results ?? [], reservationLeads: reservationLeads.results ?? [] });
+    return json({ ok: true, requests: requests.results ?? [], appointments: appointments.results ?? [], weekAppointments: weekAppointments.results ?? [], reservationLeads: reservationLeads.results ?? [] });
   } catch (error) {
     const code = error instanceof AdminAuthError ? error.code : 'requests_failed';
     const status = error instanceof AdminAuthError ? error.status : 500;

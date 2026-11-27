@@ -492,9 +492,14 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
     const actor = await requireActor(db, context.request);
     if (actor.role !== 'owner') return json({ ok: false, error: 'owner_required' }, 403);
     requireCsrf(context.request, actor);
-    requireStepUp(actor);
     const body = (await context.request.json().catch(() => ({}))) as Record<string, unknown>;
     const action = String(body.action ?? '');
+    // A single photo deletion is a routine owner action inside an authenticated
+    // session. Bulk cleanup, exports and retention/legal-hold changes remain
+    // step-up protected.
+    if (['photo_cleanup', 'save_retention_policy', 'create_legal_hold', 'release_legal_hold'].includes(action)) {
+      requireStepUp(actor);
+    }
     if (action === 'photo_delete') {
       const key = text(body.key, 300);
       if (!isPhotoKey(key)) return json({ ok: false, error: 'photo_key_invalid' }, 400);

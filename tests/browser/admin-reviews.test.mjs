@@ -90,6 +90,7 @@ test('Google Reviews is usable at phone width and shows the owner controls', asy
     });
   });
   await page.goto(BASE + '/admin/', { waitUntil: 'networkidle' });
+  await page.locator('[data-admin-menu-toggle]').click();
   await page.locator('[data-admin-nav="reviews"]').click();
   await page.locator('[data-admin-view="reviews"]').waitFor({ state: 'visible' });
   await page.getByText('Google review requests').waitFor();

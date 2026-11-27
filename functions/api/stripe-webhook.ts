@@ -800,6 +800,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
           const confirmed = await autoConfirmPaidBooking(env, holdId, quoteReference, {
             customerName: fields.name ?? '',
             customerEmail: fields.email ?? customerEmail ?? '',
+            customerPhone: fields.phone ?? '',
             serviceCode: fields.service_type ?? metadata.service_type ?? 'residential-cleaning',
             frequency: fields.ongoing_frequency ?? fields.frequency ?? '',
             ongoingPriceCents: Math.round(Number(fields.ongoing_price_per_visit || 0) * 100),
