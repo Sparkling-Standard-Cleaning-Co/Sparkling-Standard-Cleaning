@@ -165,8 +165,8 @@ export async function listPropertyQualityGroups(
   const groups = merged
     .filter((entry) => entry.rows.length > 1)
     .sort((a, b) => {
-      const aTest = a.rows.some((row) => /checkout diagnostic|your name here|test customer/i.test(`${row.customer_name} ${row.label}`));
-      const bTest = b.rows.some((row) => /checkout diagnostic|your name here|test customer/i.test(`${row.customer_name} ${row.label}`));
+      const aTest = a.rows.some((row) => /checkout diagnostic|your name here|placeholder customer|test record/i.test(`${row.customer_name} ${row.label}`));
+      const bTest = b.rows.some((row) => /checkout diagnostic|your name here|placeholder customer|test record/i.test(`${row.customer_name} ${row.label}`));
       if (aTest !== bTest) return aTest ? -1 : 1;
       return b.rows.length - a.rows.length;
     });

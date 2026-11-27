@@ -876,7 +876,7 @@ function renderCommercialQuality(groups: Array<Record<string, unknown>>): void {
           ? '<span class="admin-muted">Active obligations prevent archiving.</span>'
           : `<button class="btn btn--ghost btn--small" type="button" data-commercial-action="quality-archive" data-id="${escUi(row.id)}">Archive duplicate</button>`,
       ].filter(Boolean).join('');
-      const testFlag = /checkout diagnostic|your name here|test customer/i.test(`${customer} ${String(row.label ?? '')}`)
+      const testFlag = /checkout diagnostic|your name here|placeholder customer|test record/i.test(`${customer} ${String(row.label ?? '')}`)
         ? ' <span class="admin-status">Possible test</span>'
         : '';
       return `<tr>
