@@ -34,7 +34,15 @@ import {
           <label>Preferred branch
             <select class="select" name="branch_preference" required>
               <option value="">Choose one</option>
-              {CAREER_BRANCHES.map((option) => <option value={option.value}>{option.label}</option>)}
+              {CAREER_BRANCHES.map((option) => (
+                <option
+                  value={option.value}
+                  data-careers-tampa-public={option.value === 'pensacola' ? undefined : ''}
+                  hidden={option.value === 'pensacola' ? undefined : true}
+                >
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
           <label>Position of interest
@@ -201,6 +209,7 @@ import {
           application_fields_invalid: 'Complete every required application question.',
           application_acknowledgements_required: 'Complete the privacy, contact and accuracy acknowledgments.',
           duplicate_application: `An application for this role was already submitted recently. Reference ${String(body.reference ?? '')}.`,
+          branch_unavailable: 'That branch is not accepting public applications yet. Choose Pensacola.',
           start_date_invalid: 'Enter a valid earliest start date.',
           weekly_hours_invalid: 'Enter weekly hours between 0 and 80.',
         };

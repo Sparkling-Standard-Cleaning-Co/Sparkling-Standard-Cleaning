@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyTampaVisibility, isProductionPublicHost, isTampaPublicPath, tampaEnabledFromRow } from '../src/lib/branches/public-visibility.ts';
+import {
+  applyCareersBranchVisibility,
+  applyTampaVisibility,
+  isCareersPublicPath,
+  isProductionPublicHost,
+  isTampaPublicPath,
+  tampaEnabledFromRow,
+} from '../src/lib/branches/public-visibility.ts';
 
 const html = '<h2><span data-tampa-public>Two</span><span data-tampa-off hidden>One operating region</span></h2><div class="grid"><div class="card">Pensacola</div><div class="card" data-tampa-public><p>Tampa</p></div></div>';
 
@@ -8,6 +15,12 @@ test('Tampa public paths are recognized with and without a trailing slash', () =
   assert.equal(isTampaPublicPath('/locations/tampa-bay/'), true);
   assert.equal(isTampaPublicPath('/locations/tampa-bay'), true);
   assert.equal(isTampaPublicPath('/locations/pensacola/'), false);
+});
+
+test('Careers public paths are recognized with and without a trailing slash', () => {
+  assert.equal(isCareersPublicPath('/careers/'), true);
+  assert.equal(isCareersPublicPath('/careers'), true);
+  assert.equal(isCareersPublicPath('/careers/thanks/'), false);
 });
 
 test('only the canonical public hosts receive the visibility switch', () => {
@@ -66,4 +79,29 @@ test('service-area page switches to both regions and multi-branch metadata when 
   assert.match(output, /Serving Northwest Florida and Tampa Bay/);
   assert.match(output, /approved Tampa Bay communities/);
   assert.doesNotMatch(output, /Serving Pensacola, Cantonment, and beyond/);
+});
+
+const careersHtml = `<html><head><title>Cleaning Careers | Sparkling Standard</title><meta name="description" content="Careers in Pensacola." /><meta property="og:title" content="Cleaning Careers | Sparkling Standard" /><meta property="og:description" content="Careers in Pensacola." /></head><body>
+<div class="careers-hero__cards"><div class="careers-hero__card" data-careers-pensacola-only><h2>Pensacola</h2></div><div class="careers-hero__card" data-careers-tampa-public="" hidden><h2>Pensacola and Tampa Bay</h2></div></div>
+<section data-careers-tampa-public="" hidden><h3>Tampa Bay</h3><ul><li>Tampa opportunity</li></ul></section>
+<select><option value="pensacola">Pensacola</option><option value="tampa" data-careers-tampa-public="" hidden>Tampa Bay</option></select>
+</body></html>`;
+
+test('Careers renders the Pensacola-only presentation while Tampa is off', () => {
+  const output = applyCareersBranchVisibility(careersHtml, false);
+  assert.match(output, /Pensacola/);
+  assert.doesNotMatch(output, /Tampa/);
+  assert.doesNotMatch(output, /data-careers-tampa-public/);
+  assert.match(output, /Careers in Pensacola\./);
+});
+
+test('Careers switches to the two-branch presentation and metadata when Tampa is live', () => {
+  const output = applyCareersBranchVisibility(careersHtml, true);
+  assert.doesNotMatch(output, /data-careers-pensacola-only/);
+  assert.doesNotMatch(output, /<h2>Pensacola<\/h2>/);
+  assert.match(output, /Pensacola and Tampa Bay/);
+  assert.match(output, /Tampa opportunity/);
+  assert.doesNotMatch(output, /hidden>Tampa Bay/);
+  assert.match(output, /Cleaning Careers in Pensacola and Tampa Bay/);
+  assert.match(output, /Pensacola, Tampa Bay and surrounding communities/);
 });

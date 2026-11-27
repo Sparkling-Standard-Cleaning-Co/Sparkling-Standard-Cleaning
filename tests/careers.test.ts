@@ -6,6 +6,7 @@ import path from 'node:path';
 import type { D1Database, D1PreparedStatement, D1Result } from '../src/lib/admin/d1.ts';
 import { resumeFormat, sanitizeResumeName, careerValue, CAREER_ROLES } from '../src/lib/careers.ts';
 import { onRequestPost } from '../functions/api/careers-application.ts';
+import { onRequestGet as onCareersOptionsGet } from '../functions/api/careers-options.ts';
 
 class SqlStatement implements D1PreparedStatement {
   private values: unknown[] = [];
@@ -28,7 +29,7 @@ function db(): TestD1 {
   for (const file of fs.readdirSync(directory).filter((name) => name.endsWith('.sql')).sort()) database.raw.exec(fs.readFileSync(path.join(directory, file), 'utf8'));
   return database;
 }
-function applicationForm(resume?: File): FormData {
+function applicationForm(resume?: File, branch = 'pensacola'): FormData {
   const form = new FormData();
   form.set('first_name', 'Synthetic');
   form.set('last_name', 'Applicant');
@@ -39,7 +40,7 @@ function applicationForm(resume?: File): FormData {
   form.set('postal_code', '32502');
   form.set('experience_level', 'entry');
   form.set('desired_role', 'residential');
-  form.set('branch_preference', 'pensacola');
+  form.set('branch_preference', branch);
   form.set('availability', 'Weekdays and Saturday mornings');
   form.append('available_days', 'mon');
   form.append('available_days', 'wed');
@@ -89,6 +90,64 @@ test('a valid application is stored privately with an optional resume and no liv
   assert.equal(row.available_days_json, '["mon","wed"]');
   assert.ok(row.privacy_ack_at);
   assert.match(String(row.resume_key), /^careers\//);
+});
+
+test('Tampa applications are rejected until the branch is publicly live', async () => {
+  const database = db();
+  const request = new Request('https://sparkling-standard.test/api/careers-application', {
+    method: 'POST',
+    headers: { Origin: 'https://sparkling-standard.test', 'CF-Connecting-IP': '203.0.113.10' },
+    body: applicationForm(undefined, 'tampa'),
+  });
+  const response = await onRequestPost({ request, env: { DB: database } });
+  const body = await response.json() as { error?: string };
+  assert.equal(response.status, 409);
+  assert.equal(body.error, 'branch_unavailable');
+  const before = database.raw.prepare('SELECT COUNT(*) AS count FROM career_applications').get() as { count: number };
+  assert.equal(Number(before.count), 0);
+
+  database.raw.exec("UPDATE branches SET lifecycle_status = 'live', status = 'active' WHERE id = 'branch_tampa'");
+  const acceptedRequest = new Request('https://sparkling-standard.test/api/careers-application', {
+    method: 'POST',
+    headers: { Origin: 'https://sparkling-standard.test', 'CF-Connecting-IP': '203.0.113.11' },
+    body: applicationForm(undefined, 'tampa'),
+  });
+  const accepted = await onRequestPost({ request: acceptedRequest, env: { DB: database } });
+  assert.equal(accepted.status, 201);
+  const row = database.raw.prepare('SELECT branch_id, branch_preference FROM career_applications LIMIT 1').get() as Record<string, unknown>;
+  assert.equal(row.branch_id, 'branch_tampa');
+  assert.equal(row.branch_preference, 'tampa');
+});
+
+test('public careers options withhold Tampa data until the branch is live', async () => {
+  const database = db();
+  const inactive = await onCareersOptionsGet({
+    request: new Request('https://sparkling-standard.test/api/careers-options'),
+    env: { DB: database },
+  });
+  const inactiveBody = await inactive.json() as {
+    branches?: Record<string, boolean>;
+    payByBranch?: Record<string, Record<string, number>>;
+    opportunities?: Array<Record<string, unknown>>;
+  };
+  assert.equal(inactiveBody.branches?.tampa, false);
+  assert.ok(inactiveBody.payByBranch?.branch_pensacola);
+  assert.equal(inactiveBody.payByBranch?.branch_tampa, undefined);
+  assert.ok((inactiveBody.opportunities ?? []).every((entry) => entry.branch_id === 'branch_pensacola'));
+
+  database.raw.exec("UPDATE branches SET lifecycle_status = 'live', status = 'active' WHERE id = 'branch_tampa'");
+  const active = await onCareersOptionsGet({
+    request: new Request('https://sparkling-standard.test/api/careers-options'),
+    env: { DB: database },
+  });
+  const activeBody = await active.json() as {
+    branches?: Record<string, boolean>;
+    payByBranch?: Record<string, Record<string, number>>;
+    opportunities?: Array<Record<string, unknown>>;
+  };
+  assert.equal(activeBody.branches?.tampa, true);
+  assert.ok(activeBody.payByBranch?.branch_tampa);
+  assert.ok((activeBody.opportunities ?? []).some((entry) => entry.branch_id === 'branch_tampa'));
 });
 
 test('an invalid resume is rejected before any application record is stored', async () => {

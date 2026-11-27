@@ -2,21 +2,25 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
 import CareersForm from '../components/CareersForm.astro';
+import CareersOpportunityGroup from '../components/CareersOpportunityGroup.astro';
+import CareersPayRates from '../components/CareersPayRates.astro';
+import CareersRecruitingCard from '../components/CareersRecruitingCard.astro';
 import { business } from '../config/business.ts';
 import Icon from '../components/Icon.astro';
 import {
   CAREER_BENEFITS,
-  CAREER_DEFAULT_PAY,
   CAREER_OPPORTUNITIES,
 } from '../lib/careers.ts';
 
 const title = 'Cleaning Careers | Sparkling Standard';
 const description =
-  'Build your future with Sparkling Standard. Apply for residential, commercial, vacation rental or lead cleaning work in Pensacola.';
-const money = (cents: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(
-    cents / 100,
-  );
+  'Build your future with Sparkling Standard. Apply for residential, commercial, vacation rental or lead cleaning work in Pensacola and surrounding communities.';
+const pensacolaOpportunities = CAREER_OPPORTUNITIES.filter(
+  (opportunity) => opportunity.branchId === 'branch_pensacola',
+);
+const tampaOpportunities = CAREER_OPPORTUNITIES.filter(
+  (opportunity) => opportunity.branchId === 'branch_tampa',
+);
 ---
 
 <BaseLayout title={title} description={description}>
@@ -36,14 +40,19 @@ const money = (cents: number) =>
             <a class="btn btn--ghost" href="#opportunities">Explore opportunities</a>
           </div>
         </div>
-        <div class="careers-hero__card">
-          <p class="eyebrow mb-0">Now recruiting</p>
-          <h2>Pensacola</h2>
-          <p>
-            Pensacola is our active recruiting market. Tampa Bay applications are accepted as
-            expressions of future interest while that branch remains prelaunch.
-          </p>
-          <p class="careers-hero__note">Role availability is confirmed during the hiring process.</p>
+        <div class="careers-hero__cards">
+          <CareersRecruitingCard
+            heading="Pensacola"
+            copy="Sparkling Standard is recruiting in Pensacola and the surrounding communities for careful, reliable cleaning professionals."
+            note="Role availability is confirmed during the hiring process."
+            pensacolaOnly
+          />
+          <CareersRecruitingCard
+            heading="Pensacola and Tampa Bay"
+            copy="Sparkling Standard is recruiting in Pensacola and Tampa Bay for careful, reliable cleaning professionals."
+            note="Role availability is confirmed during the hiring process."
+            tampaPublic
+          />
         </div>
       </div>
     </div>
@@ -78,19 +87,9 @@ const money = (cents: number) =>
             additional responsibility and their own approved rates.
           </p>
         </div>
-        <div class="career-pay__cards">
-          <div class="career-pay__card">
-            <p class="career-pay__label">Regular cleaner</p>
-            <p class="career-pay__rate" data-career-pay="regular">{money(CAREER_DEFAULT_PAY.regular)}<span>/hour</span></p>
-          </div>
-          <div class="career-pay__card">
-            <p class="career-pay__label">Lead cleaner</p>
-            <p class="career-pay__rate" data-career-pay="lead">{money(CAREER_DEFAULT_PAY.lead)}<span>/hour</span></p>
-          </div>
-          <div class="career-pay__card">
-            <p class="career-pay__label">Solo-cleaner assignment</p>
-            <p class="career-pay__rate" data-career-pay="solo">{money(CAREER_DEFAULT_PAY.solo)}<span>/hour</span></p>
-          </div>
+        <div class="career-pay__groups">
+          <CareersPayRates branchId="branch_pensacola" label="Pensacola" />
+          <CareersPayRates branchId="branch_tampa" label="Tampa Bay" tampaPublic />
         </div>
       </div>
     </div>
@@ -106,21 +105,21 @@ const money = (cents: number) =>
           moment; the current status is shown below.
         </p>
       </div>
-      <div class="career-opportunities">
-        {CAREER_OPPORTUNITIES.map((opportunity) => (
-          <div class="career-opportunity" data-opportunity-code={opportunity.code}>
-            <div>
-              <h3>{opportunity.title}</h3>
-              <p>{opportunity.description}</p>
-            </div>
-            <span class="career-opportunity__status" data-opportunity-status>Checking availability</span>
-          </div>
-        ))}
+      <div class="career-opportunity-groups">
+        <CareersOpportunityGroup
+          branchId="branch_pensacola"
+          label="Pensacola"
+          headingId="opportunities-pensacola"
+          opportunities={pensacolaOpportunities}
+        />
+        <CareersOpportunityGroup
+          branchId="branch_tampa"
+          label="Tampa Bay"
+          headingId="opportunities-tampa"
+          opportunities={tampaOpportunities}
+          tampaPublic
+        />
       </div>
-      <p class="small text-muted mt-4">
-        Tampa Bay is preparing for a future launch. Applications for Tampa Bay are expressions of
-        interest only and do not indicate that the branch is currently operational.
-      </p>
     </div>
   </section>
 
@@ -193,33 +192,46 @@ const money = (cents: number) =>
 <script>
   // Public recruiting status is managed in Admin -> Employees & Payroll ->
   // Applicants. The page defaults are the approved rates; the API refreshes
-  // them so management changes never require a source edit.
+  // them so management changes never require a source edit. The branch
+  // presentation itself is switched by the Pages middleware from the
+  // authoritative branches table, so activating Tampa Bay needs no rebuild.
   const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   const labels: Record<string, string> = {
     open: 'Applications accepted',
     future: 'Future interest',
     closed: 'Not currently available',
   };
+  type CareersOptions = {
+    pay?: Record<string, number>;
+    payByBranch?: Record<string, Record<string, number>>;
+    opportunities?: Array<Record<string, unknown>>;
+  };
   void fetch('/api/careers-options', { headers: { Accept: 'application/json' } })
     .then((response) => (response.ok ? response.json() : null))
-    .then((data: { pay?: Record<string, number>; opportunities?: Array<Record<string, unknown>> } | null) => {
+    .then((data: CareersOptions | null) => {
       if (!data) return;
-      if (data.pay) {
-        for (const [key, cents] of Object.entries(data.pay)) {
-          const target = document.querySelector<HTMLElement>(`[data-career-pay="${key}"]`);
+      const payByBranch = data.payByBranch ?? (data.pay ? { branch_pensacola: data.pay } : {});
+      for (const group of document.querySelectorAll<HTMLElement>('[data-career-pay-branch]')) {
+        const pay = payByBranch[group.dataset.careerPayBranch ?? ''];
+        if (!pay) continue;
+        for (const [key, cents] of Object.entries(pay)) {
+          const target = group.querySelector<HTMLElement>(`[data-career-pay="${key}"]`);
           if (target) target.innerHTML = `${money.format(Number(cents) / 100)}<span>/hour</span>`;
         }
       }
+      const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-opportunity-code]'));
       for (const opportunity of data.opportunities ?? []) {
-        if (String(opportunity.branch_id ?? '') !== 'branch_pensacola') continue;
-        const card = document.querySelector<HTMLElement>(`[data-opportunity-code="${String(opportunity.code)}"]`);
-        const status = card?.querySelector<HTMLElement>('[data-opportunity-status]');
-        if (!status) continue;
-        const value = String(opportunity.status ?? 'future');
-        status.textContent = labels[value] ?? 'Future interest';
-        status.dataset.state = value;
+        const branchId = String(opportunity.branch_id ?? '');
+        const code = String(opportunity.code ?? '');
+        for (const card of cards) {
+          if (card.dataset.opportunityBranch !== branchId || card.dataset.opportunityCode !== code) continue;
+          const status = card.querySelector<HTMLElement>('[data-opportunity-status]');
+          if (!status) continue;
+          const value = String(opportunity.status ?? 'future');
+          status.textContent = labels[value] ?? 'Future interest';
+          status.dataset.state = value;
+        }
       }
     })
     .catch(() => undefined);
 </script>
-

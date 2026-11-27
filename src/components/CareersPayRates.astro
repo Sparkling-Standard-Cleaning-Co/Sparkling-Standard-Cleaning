@@ -1,0 +1,39 @@
+---
+import { CAREER_DEFAULT_PAY } from '../lib/careers.ts';
+
+interface Props {
+  branchId: string;
+  label: string;
+  tampaPublic?: boolean;
+}
+
+const { branchId, label, tampaPublic = false } = Astro.props;
+const money = (cents: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(
+    cents / 100,
+  );
+---
+
+<section
+  class="career-pay__group"
+  aria-label={`${label} approved pay rates`}
+  data-career-pay-branch={branchId}
+  data-careers-tampa-public={tampaPublic ? '' : undefined}
+  hidden={tampaPublic ? true : undefined}
+>
+  <p class="career-pay__branch">{label}</p>
+  <div class="career-pay__cards">
+    <div class="career-pay__card">
+      <p class="career-pay__label">Regular cleaner</p>
+      <p class="career-pay__rate" data-career-pay="regular">{money(CAREER_DEFAULT_PAY.regular)}<span>/hour</span></p>
+    </div>
+    <div class="career-pay__card">
+      <p class="career-pay__label">Lead cleaner</p>
+      <p class="career-pay__rate" data-career-pay="lead">{money(CAREER_DEFAULT_PAY.lead)}<span>/hour</span></p>
+    </div>
+    <div class="career-pay__card">
+      <p class="career-pay__label">Solo-cleaner assignment</p>
+      <p class="career-pay__rate" data-career-pay="solo">{money(CAREER_DEFAULT_PAY.solo)}<span>/hour</span></p>
+    </div>
+  </div>
+</section>

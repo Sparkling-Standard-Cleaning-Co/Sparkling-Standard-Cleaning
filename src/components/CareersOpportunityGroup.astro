@@ -1,0 +1,41 @@
+---
+interface Opportunity {
+  code: string;
+  title: string;
+  description: string;
+}
+
+interface Props {
+  branchId: string;
+  label: string;
+  headingId: string;
+  opportunities: ReadonlyArray<Opportunity>;
+  tampaPublic?: boolean;
+}
+
+const { branchId, label, headingId, opportunities, tampaPublic = false } = Astro.props;
+---
+
+<section
+  class="career-opportunity-group"
+  aria-labelledby={headingId}
+  data-careers-tampa-public={tampaPublic ? '' : undefined}
+  hidden={tampaPublic ? true : undefined}
+>
+  <h3 id={headingId}>{label}</h3>
+  <ul class="career-opportunities">
+    {opportunities.map((opportunity) => (
+      <li
+        class="career-opportunity"
+        data-opportunity-code={opportunity.code}
+        data-opportunity-branch={branchId}
+      >
+        <div>
+          <h4>{opportunity.title}</h4>
+          <p>{opportunity.description}</p>
+        </div>
+        <span class="career-opportunity__status" data-opportunity-status>Checking availability</span>
+      </li>
+    ))}
+  </ul>
+</section>

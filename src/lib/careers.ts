@@ -17,10 +17,14 @@ export const CAREER_ROLES = [
 ] as const;
 
 export const CAREER_BRANCHES = [
-  { value: 'pensacola', label: 'Pensacola (active recruiting market)' },
-  { value: 'tampa', label: 'Tampa Bay (future interest only)' },
-  { value: 'either', label: 'Either branch' },
+  { value: 'pensacola', label: 'Pensacola', branchId: 'branch_pensacola' },
+  { value: 'tampa', label: 'Tampa Bay', branchId: 'branch_tampa' },
+  { value: 'either', label: 'Either branch', branchId: null },
 ] as const;
+
+export function careerBranchId(value: string): string | null {
+  return CAREER_BRANCHES.find((branch) => branch.value === value)?.branchId ?? null;
+}
 
 export const CAREER_TRANSPORT = [
   { value: 'own_vehicle', label: 'I have my own vehicle' },
@@ -76,30 +80,70 @@ export const CAREER_OPPORTUNITIES = [
     title: 'Residential Cleaning Specialist',
     description: 'Care for homes, recurring customers and detailed deep cleans.',
     branch: 'Pensacola',
+    branchId: 'branch_pensacola',
   },
   {
     code: 'commercial',
     title: 'Commercial Cleaning Specialist',
     description: 'Serve offices, facilities and scheduled commercial accounts.',
     branch: 'Pensacola',
+    branchId: 'branch_pensacola',
   },
   {
     code: 'str',
     title: 'Vacation Rental Cleaning Specialist',
     description: 'Prepare short-term rental turnovers with reliable timing.',
     branch: 'Pensacola',
+    branchId: 'branch_pensacola',
   },
   {
     code: 'lead',
     title: 'Lead Cleaner',
     description: 'Guide a crew, protect quality and communicate with customers.',
     branch: 'Pensacola',
+    branchId: 'branch_pensacola',
   },
   {
     code: 'management',
     title: 'Future Management Opportunities',
     description: 'Grow into operations and team leadership as the company expands.',
     branch: 'Pensacola',
+    branchId: 'branch_pensacola',
+  },
+  {
+    code: 'residential',
+    title: 'Residential Cleaning Specialist',
+    description: 'Care for Tampa Bay homes, recurring customers and detailed deep cleans.',
+    branch: 'Tampa Bay',
+    branchId: 'branch_tampa',
+  },
+  {
+    code: 'commercial',
+    title: 'Commercial Cleaning Specialist',
+    description: 'Serve Tampa Bay offices, facilities and scheduled commercial accounts.',
+    branch: 'Tampa Bay',
+    branchId: 'branch_tampa',
+  },
+  {
+    code: 'str',
+    title: 'Vacation Rental Cleaning Specialist',
+    description: 'Prepare Tampa Bay short-term rental turnovers with reliable timing.',
+    branch: 'Tampa Bay',
+    branchId: 'branch_tampa',
+  },
+  {
+    code: 'lead',
+    title: 'Lead Cleaner',
+    description: 'Guide a Tampa Bay crew, protect quality and communicate with customers.',
+    branch: 'Tampa Bay',
+    branchId: 'branch_tampa',
+  },
+  {
+    code: 'management',
+    title: 'Future Management Opportunities',
+    description: 'Grow into Tampa Bay operations and team leadership as the branch expands.',
+    branch: 'Tampa Bay',
+    branchId: 'branch_tampa',
   },
 ] as const;
 

@@ -35,7 +35,8 @@ test('the careers page supports experienced and entry-level applications', async
   const { context, page } = await open();
   try {
     assert.match(await page.textContent('body') ?? '', /Build Your Future With Sparkling Standard/);
-    assert.match(await page.textContent('body') ?? '', /Tampa Bay applications are/);
+    assert.match(await page.textContent('body') ?? '', /recruiting in Pensacola and the surrounding communities/);
+    assert.equal(await page.locator('[data-careers-tampa-public]:visible').count(), 0);
     assert.equal(await page.locator('[data-careers-form] select[name="experience_level"] option').count(), 5);
     assert.equal(await page.locator('[data-careers-form] select[name="desired_role"] option').count(), 9);
     assert.equal(await page.locator('[data-careers-form] input[name="available_days"]').count(), 7);

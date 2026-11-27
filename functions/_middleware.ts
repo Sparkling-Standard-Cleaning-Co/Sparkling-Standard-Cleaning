@@ -5,10 +5,12 @@ import {
   e2eConfigured,
 } from '../src/lib/env/preview-e2e.ts';
 import {
+  applyCareersBranchVisibility,
   applyTampaVisibility,
+  isCareersPublicPath,
   isProductionPublicHost,
   isTampaPublicPath,
-  tampaEnabledFromRow,
+  tampaPubliclyEnabled,
 } from '../src/lib/branches/public-visibility.ts';
 import type { D1Database } from '../src/lib/admin/d1.ts';
 
@@ -38,23 +40,10 @@ function previewResponse(status: number, body: string): Response {
   });
 }
 
-async function tampaPubliclyEnabled(context: PagesContext): Promise<boolean> {
-  if (!context.env.DB) return false;
-  try {
-    const row = await context.env.DB
-      .prepare('SELECT lifecycle_status, status FROM branches WHERE id = ? LIMIT 1')
-      .bind('branch_tampa')
-      .first<{ lifecycle_status?: string; status?: string }>();
-    return tampaEnabledFromRow(row ?? null);
-  } catch {
-    return false;
-  }
-}
-
 export async function onRequest(context: PagesContext): Promise<Response> {
   const url = new URL(context.request.url);
   if (isProductionPublicHost(url.hostname)) {
-    const tampaEnabled = await tampaPubliclyEnabled(context);
+    const tampaEnabled = await tampaPubliclyEnabled(context.env.DB);
     if (isTampaPublicPath(url.pathname) && !tampaEnabled) {
       return new Response('<!doctype html><title>Page not available</title><h1>Page not available</h1><p>This service area is not currently published.</p>', {
         status: 404,
@@ -65,6 +54,14 @@ export async function onRequest(context: PagesContext): Promise<Response> {
       const response = await context.next();
       const html = await response.text();
       return new Response(applyTampaVisibility(html, tampaEnabled), {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), 'Cache-Control': 'no-store' },
+      });
+    }
+    if (isCareersPublicPath(url.pathname)) {
+      const response = await context.next();
+      const html = await response.text();
+      return new Response(applyCareersBranchVisibility(html, tampaEnabled), {
         status: response.status,
         headers: { ...Object.fromEntries(response.headers), 'Cache-Control': 'no-store' },
       });

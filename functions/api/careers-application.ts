@@ -1,4 +1,6 @@
 ﻿import { adminDb, type AdminDbEnv } from '../../src/lib/admin/d1.ts';
+import { tampaPubliclyEnabled } from '../../src/lib/branches/public-visibility.ts';
+import { BRANCH_TAMPA } from '../../src/config/branches.ts';
 import { checkPublicRateLimit, clientIp, consumePublicRateLimit, PUBLIC_RATE_LIMITS } from '../../src/lib/public-rate-limit.ts';
 import { EMAIL_ROUTING } from '../../src/config/email-routing.ts';
 import {
@@ -14,6 +16,7 @@ import {
   CAREER_ROLES,
   CAREER_TRANSPORT,
   CAREER_RESUME_MAX_BYTES,
+  careerBranchId,
   careerValue,
   resumeFormat,
   sanitizeResumeName,
@@ -146,7 +149,7 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
       availabilityEvening ? 'Evenings' : '',
       availabilityWeekend ? 'Weekends' : '',
     ].filter(Boolean).join('; ');
-  const branchId = branchPreference === 'pensacola' ? 'branch_pensacola' : branchPreference === 'tampa' ? 'branch_tampa' : null;
+  const branchId = careerBranchId(branchPreference);
   const now = new Date().toISOString();
   const privacyAck = form.get('privacy_ack') === 'yes';
   const contactConsent = form.get('consent') === 'yes';
@@ -160,6 +163,9 @@ export async function onRequestPost(context: { request: Request; env: Env }): Pr
   }
   if (!privacyAck || !contactConsent || !accuracyAck || !essentialDutiesAck) {
     return json({ ok: false, error: 'application_acknowledgements_required' }, 400);
+  }
+  if (branchId === BRANCH_TAMPA && !(await tampaPubliclyEnabled(db))) {
+    return json({ ok: false, error: 'branch_unavailable' }, 409);
   }
   if (earliestStartDate && !/^\d{4}-\d{2}-\d{2}$/.test(earliestStartDate)) {
     return json({ ok: false, error: 'start_date_invalid' }, 400);

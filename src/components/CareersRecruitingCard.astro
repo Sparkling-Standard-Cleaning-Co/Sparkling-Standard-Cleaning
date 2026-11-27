@@ -1,0 +1,23 @@
+---
+interface Props {
+  heading: string;
+  copy: string;
+  note?: string;
+  tampaPublic?: boolean;
+  pensacolaOnly?: boolean;
+}
+
+const { heading, copy, note, tampaPublic = false, pensacolaOnly = false } = Astro.props;
+---
+
+<div
+  class="careers-hero__card"
+  data-careers-tampa-public={tampaPublic ? '' : undefined}
+  data-careers-pensacola-only={pensacolaOnly ? '' : undefined}
+  hidden={tampaPublic ? true : undefined}
+>
+  <p class="eyebrow mb-0">Now recruiting</p>
+  <h2>{heading}</h2>
+  <p>{copy}</p>
+  {note && <p class="careers-hero__note">{note}</p>}
+</div>
