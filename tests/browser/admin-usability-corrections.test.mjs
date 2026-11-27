@@ -353,6 +353,7 @@ test('notification bell, jobs views and recurring presentation are usable', asyn
 
     await page.click('[data-admin-nav="branches"]');
     await page.locator('[data-admin-view="branches"]:not([hidden])').waitFor();
+    await page.locator('[data-branch-area-inventory]').getByText('Cross-county ZIP codes').waitFor({ state: 'visible' });
     const branch = (await page.textContent('[data-admin-view="branches"]')) ?? '';
     assert.match(branch, /Cross-county ZIP codes/);
     assert.match(branch, /GOOGLE_CALENDAR_ID_PENSACOLA/);
