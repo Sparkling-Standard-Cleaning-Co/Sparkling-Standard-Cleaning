@@ -1,5 +1,5 @@
 ---
-metaTitle: Community Support Cleaning | Sparkling Standard
+metaTitle: Community Support Cleaning in Pensacola | Sparkling Standard
 metaDescription: Residential cleaning with a {{communityDiscount}} appreciation discount for eligible community members in Pensacola and Cantonment. No documentation required.
 hero:
   headline: 'A Cleaner Home.'

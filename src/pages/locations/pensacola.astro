@@ -3,31 +3,34 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import CtaBand from '../../components/CtaBand.astro';
 import { branchConfig, BRANCH_PENSACOLA } from '../../config/branches';
-import { breadcrumbNode } from '../../lib/schema';
+import { business } from '../../config/business';
+import { breadcrumbNode, businessEntityId } from '../../lib/schema';
 
 const branch = branchConfig(BRANCH_PENSACOLA)!;
 const site = Astro.site ?? new URL('https://sparkling-standard.com');
 const schema = [
   breadcrumbNode(site, [
     { name: 'Home', path: '/' },
-    { name: 'Locations', path: '/locations/pensacola/' },
     { name: 'Pensacola', path: '/locations/pensacola/' },
   ]),
   {
     '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: 'Sparkling Standard Cleaning Co.',
+    '@type': 'Service',
+    name: 'Pensacola cleaning services',
+    serviceType: 'Residential and commercial cleaning',
+    description: business.serviceArea.summary,
     url: new URL('/locations/pensacola/', site).toString(),
-    telephone: branch.publicPhone,
-    email: branch.publicEmail,
-    areaServed: branch.serviceAreaZips.map((zip) => ({ '@type': 'PostalAddress', postalCode: zip, addressCountry: 'US' })),
-    parentOrganization: { '@type': 'Organization', name: 'Sparkling Standard LLC' },
+    provider: { '@id': businessEntityId(site) },
+    areaServed: [
+      { '@type': 'City', name: 'Pensacola' },
+      { '@type': 'City', name: 'Cantonment' },
+    ],
   },
 ];
 ---
 
 <BaseLayout
-  title="Pensacola Cleaning Service | Sparkling Standard Cleaning Co."
+  title="Pensacola Cleaning Services | Sparkling Standard"
   description="Owner-operated residential, commercial and church cleaning based in Cantonment and serving Pensacola and surrounding communities. Request a verified estimate."
   schema={schema}
 >

@@ -2,8 +2,13 @@
 
 Prepared 2026-10-01. The owner has approved public indexing; the site is already indexable and
 verified. These are the owner-side account steps that make the site discoverable. Nothing here
-changes DNS records except the single verification TXT record described — never touch MX, SPF or
+changes DNS records except the single verification TXT record described - never touch MX, SPF or
 DKIM (Google Workspace email).
+
+**Status 2026-11-27:** the owner reports Google Search Console established with the sitemap
+processed (23 discovered URLs; 23 indexed, 12 excluded) and Bing Webmaster Tools established. The
+remaining setup items are Bing Places, review of the intentional exclusions and GA4 internal-traffic
+definition. Treat the steps below as a rebuild reference, not unfinished setup.
 
 ## 1. Google Search Console (about 10 minutes)
 
@@ -47,7 +52,7 @@ This is the single highest-value local visibility step for a cleaning company.
      drive; add nearby Alabama communities you will serve. Do not list fake locations.
    - Phone: `(850) 426-8479`; Website: use the tracked Google Business Profile link from
      `docs/marketing/UTM-MASTER-LINKS.md` (the `gbp_*` entries) so GBP visits are attributed.
-   - Hours: Seven days a week, 8:00 AM – 6:00 PM.
+   - Hours: Seven days a week, 7:00 AM – 7:00 PM (the central site config is authoritative).
 3. Verify the business with Google's chosen method (video or postcard — for service-area
    businesses, video verification is common; have the cleaning supplies and vehicle ready).
 4. Now that verification is complete:
@@ -69,14 +74,20 @@ substitute them):
 Follow `docs/marketing/REVIEW-GROWTH-SYSTEM.md` for the request workflow (ask after satisfaction,
 one reminder, then stop). Reviews display automatically once genuine entries exist.
 
-## 4. Bing and other channels (optional, after Google)
+## 4. Bing and other channels (required for Bing visibility)
 
-- `https://www.bing.com/webmasters` → add the site → it can import verification from Google
-  Search Console in one click.
-- Bing Places (`https://www.bingplaces.com`) → sync the local listing from Google Business
-  Profile.
-- IndexNow (site freshness): optional; requires an `INDEXNOW_KEY` and running
-  `node scripts/indexnow.mjs` after content changes (no workflow configured yet).
+- `https://www.bing.com/webmasters` - owner-established. Confirm the sitemap
+  (`https://sparkling-standard.com/sitemap-index.xml`) and indexed URL count in the dashboard; no
+  new verification is needed.
+- Bing Places (`https://www.bingplaces.com`) - **required for Bing Maps.** Create or claim the
+  listing, sync the Google Business Profile data, and keep the name, phone, website, service
+  area and hours (7:00 AM - 7:00 PM, seven days) identical. The site records Bing Places as
+  PENDING until the owner supplies the public listing URL.
+- IndexNow (site freshness): the public key file and `scripts/indexnow.mjs` exist. Run
+  `npm run indexnow` after content changes are live. The duplicate-suppression state is local
+  (`indexnow-out/`, git-ignored); no workflow is configured.
+- Apple Business Connect and Yelp: create/claim only if a genuine listing exists, and keep NAP
+  consistent.
 
 ## 5. Verifying indexing behavior after any change
 

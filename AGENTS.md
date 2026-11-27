@@ -84,7 +84,26 @@ Passing tests is a requirement, not proof of quality. UI changes need visual bro
   three inquiry key events verified; new church/promotion event receipt pending); SMS enabled (`business.flags.smsEnabled: true`, owner-verified); Stripe Pay Now live-mode readiness true with no live charge test performed; twelve active profiles rendering (Google Business Profile, Facebook, Nextdoor, Instagram, TikTok,
   YouTube, Pinterest, Rumble, Gab, Parler, Locals, X);
   owner-approved circular logo and regenerated favicon/PWA/social assets installed (2026-10-19).
-- **Current release (2026-11-26 booking and Pay Now recovery):** application code `79929b4` on `main`
+- **Current release (2026-11-27 careers branch presentation and payment-cost review):** application
+  code `4206a28` on `main` and `production-safe` (identical), live on 2026-11-27. Public `/careers/`
+  is Pensacola-only while Tampa is `setup`; activating Tampa through Branches & Launch switches the
+  same page to the shared two-branch presentation without a rebuild, and deactivation reverts it.
+  Tampa applications are rejected server-side with `branch_unavailable` until the branch is `live`
+  and `active`; historical applications and admin recruitment records are untouched. Payment
+  processing cost recovery remains unimplemented and inactive; the verified investigation and
+  owner-approval alternative (advertised-price incorporation preserving full gift value) are in
+  `docs/operations/PAYMENT-COST-RECOVERY.md`. Verified: unit **1,218** (1,217 pass, 1 pre-existing
+  skip), browser **293/293**, `astro check` 0 errors, 41 pages, 2,676 links, smoke 21 pages; CI
+  `46042742975` and `46042730795` green. No migration; production remains at 70 migrations. No live
+  charge, booking, customer email or career application was created. Evidence:
+  `docs/verification/2026-11-27-CAREERS-BRANCH-PRESENTATION.md`. The authorized SEO release that
+  followed corrected the Pensacola location page's duplicate old-brand schema, added its sitewide
+  internal link and added accurate Pensacola wording to high-intent titles; evidence and the
+  read-only tracking/mobile audit are in `docs/seo/SEARCH-VISIBILITY-AUDIT-2026-11-27.md` and
+  `docs/analytics/TRACKING-AUDIT-2026-11-27.md`. The owner reports GSC established (23 indexed,
+  12 excluded, sitemap processed) and Bing Webmaster Tools established; Bing Places remains
+  PENDING. Current owner-side search figures are recorded in `docs/operations/PLATFORM-STATUS.md`.
+- **Prior release (2026-11-26 booking and Pay Now recovery):** application code `79929b4` on `main`
   and `production-safe`; migration `0068_booking_service_area_repair.sql` applied before deployment
   (68 production migrations, 124 live tables, 0 foreign-key violations). Restores ZIP `32534`
   serviceability, uses the customer-selected Google geocoding authority for server verification so a

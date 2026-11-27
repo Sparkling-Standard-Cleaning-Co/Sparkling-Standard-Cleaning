@@ -1,5 +1,5 @@
 ---
-metaTitle: Church Cleaning Estimate | Sparkling Standard
+metaTitle: Church Cleaning Estimate in Pensacola | Sparkling Standard
 metaDescription: A respectful church cleaning estimate for Pensacola-area congregations, with {{churchDiscount}} off eligible church cleaning.
 hero:
   headline: Care for your church home,

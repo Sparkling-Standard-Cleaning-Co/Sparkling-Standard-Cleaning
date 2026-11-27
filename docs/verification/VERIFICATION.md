@@ -1,5 +1,26 @@
 # Verification status
 
+## Careers branch presentation and payment-cost review - 2026-11-27
+
+Application code **`4206a28`** is live on `main` and `production-safe` (identical). Public
+`/careers/` presents Pensacola only while Tampa is `setup`; the same static page switches to the
+shared Pensacola/Tampa Bay presentation from the authoritative `branches` row when Tampa is
+activated, without a rebuild, and reverts on deactivation. Tampa applications are rejected with
+`branch_unavailable` until the branch is `live` + `active`; historical applications and admin
+records are unchanged. Payment processing cost recovery is not active; the investigation and the
+owner-approval advertised-price alternative are in
+[`docs/operations/PAYMENT-COST-RECOVERY.md`](../operations/PAYMENT-COST-RECOVERY.md). Verified:
+unit **1,218** (1,217 pass, 1 pre-existing skip), browser **293/293**, `astro check` 0 errors, 41
+pages, 2,676 links, smoke 21 pages; CI `46042742975` and `46042730795` green. Live `/careers/`
+returns Pensacola-only content with no visible Tampa elements, live options report
+`branches.tampa:false`, and the live form asset contains the new branch guard. No migration; no
+live charge, booking, customer email or career application. Evidence:
+[`2026-11-27-CAREERS-BRANCH-PRESENTATION.md`](2026-11-27-CAREERS-BRANCH-PRESENTATION.md). The
+authorized SEO release that followed is recorded in
+[`docs/seo/SEARCH-VISIBILITY-AUDIT-2026-11-27.md`](../seo/SEARCH-VISIBILITY-AUDIT-2026-11-27.md);
+the read-only tracking audit is in
+[`docs/analytics/TRACKING-AUDIT-2026-11-27.md`](../analytics/TRACKING-AUDIT-2026-11-27.md).
+
 ## Platform completion, change orders and backup correction - 2026-11-24/25
 
 Application code **`aaa4c83`** is live on `production-safe` in Cloudflare Pages deployment **`9cea2813-c777-4dd6-97ab-f8e62c2ea845`**, verified on 2026-11-25 with served admin asset `/_astro/index.astro_astro_type_script_index_0_lang.DLPf6bre.js`. Migrations `0059` and `0060` add one-primary-invoice enforcement and signed change orders. The Customer File gains jobs, payments, communications and one chronological activity timeline; the Job File adds crew, finance, photos, communications, change orders and timeline. Signed change orders use the approved Additional Service and Add-On Authorization template, require owner approval, preserve the original agreement/invoice, and create one explicit supplemental invoice. Signing requests can be revoked, default to active, and no longer crash when a packet is missing or renamed. The master workspace was reconciled: the stale unspaced Downloads workspace is a dated legacy archive, two duplicate scheduled tasks are disabled, the start page/README are corrected, and a retained-path duplicate manifest exists; no files were deleted. Backup status was corrected: the local Windows daily and weekly encrypted backups are verified (latest weekly: 2,595 files, D1 60 migrations/104 tables, independent OneDrive download hash matched, isolated restore passed, `backup_runs` heartbeat recorded and stale incident resolved); the GitHub workflow is visible on `main` but remains blocked by zero repository secrets. Verified: unit **1,118** (1,117 pass, 1 pre-existing skip), browser **279/279**, `astro check` 0 errors, 41 pages, 2,631 links, smoke 21 pages, CI `45518441282` green; 60 production migrations and 0 foreign-key violations. No customer email, charge, review invitation, production record or branch was mutated. Evidence: [`2026-11-24-PLATFORM-COMPLETION.md`](2026-11-24-PLATFORM-COMPLETION.md) and `docs/audit/2026-11-24/`.

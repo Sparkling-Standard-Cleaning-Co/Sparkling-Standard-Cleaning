@@ -26,6 +26,19 @@ Google Search Console evidence is still required (see the audit §1.4–1.5 and
 `docs/operations/SEARCH-CONSOLE-SETUP.md`). Do not claim Google indexing or rankings without
 authenticated evidence.
 
+## 2026-11-27 targeted local SEO audit
+
+Owner reported weak broader-Pensacola visibility and no Bing Maps presence. The current audit is
+`docs/seo/SEARCH-VISIBILITY-AUDIT-2026-11-27.md`. Verified: 23/23 sitemap URLs return 200;
+robots/canonicals/noindex are correct; titles and structured data are valid. Corrected and
+deployed: a duplicate old-brand `LocalBusiness` on `/locations/pensacola/` was replaced with a
+`Service` node referencing the one global business entity; public old-brand uses were removed;
+the location page is now linked sitewide; and high-intent estimate/FAQ/About/Careers titles gained
+accurate Pensacola wording. The owner reports Google Search Console established (sitemap processed,
+23 indexed, 12 excluded) and Bing Webmaster Tools established; GA4 recorded six Bing organic
+sessions. Bing Maps still needs a Bing Places listing (`bingPlaces` remains PENDING). Do not create
+thin city pages, fake reviews or artificial links to close the authority/review gap.
+
 ## Owning pages (one per query cluster)
 
 | Query cluster | Owning page | Primary intent |

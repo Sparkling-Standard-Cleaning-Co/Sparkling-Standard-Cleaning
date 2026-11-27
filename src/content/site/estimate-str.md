@@ -1,5 +1,5 @@
 ---
-metaTitle: STR Turnover Estimate | Sparkling Standard
+metaTitle: STR Turnover Estimate in Pensacola | Sparkling Standard
 metaDescription: A per-turnover estimate for your Airbnb, Vrbo or vacation rental — size, beds, linen handling and travel, confirmed personally.
 hero:
   headline: A guest-ready reset,

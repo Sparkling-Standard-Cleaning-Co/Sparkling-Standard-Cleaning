@@ -90,6 +90,15 @@ Baseline: `eda4c49` on `production-safe`, `main` and `origin/main` (identical, c
 
 ## Release identity
 
-- Application commit: filled after commit.
-- `main` / `production-safe`: filled after synchronization.
-- Production deployment and live Careers check: filled after deployment.
+- Application commit: `4206a2836e0db40aff5d6c7b4ee422efa3251dcb`.
+- `main` / `production-safe`: both at `4206a28` (identical); pushed after the verified local build.
+- CI `validate`: main run `46042742975` success and production-safe run `46042730795` success.
+  The first main browser run hit one unrelated flaky admin-usability assertion under parallel
+  load; the identical production-safe run passed and the failed job was rerun to green.
+- Production: Cloudflare Pages served the release; the live `/careers/` page returns 200 with the
+  Pensacola-only copy, no visible Tampa content, one pay group, five opportunity cards and the
+  correct title. The live `CareersForm` asset `BVsymzj0` contains the new `branch_unavailable`
+  guard. Live `/api/careers-options` returns `branches.tampa:false` and Pensacola-only
+  opportunities. Live visual checks at 390 px and 1440 px show no horizontal overflow.
+- The Cloudflare deployment ID was not retrieved; live asset identity and response behavior were
+  used instead. No migration was applied and no checkout/payment code changed.

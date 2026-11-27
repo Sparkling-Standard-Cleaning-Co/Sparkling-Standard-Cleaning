@@ -208,7 +208,7 @@ test('Tampa ON preview: the page automatically renders both regions and all thre
     const text = await page.locator('main').innerText();
     assert.match(text, /Serving Northwest Florida and Tampa Bay/);
     assert.doesNotMatch(text, /Serving Pensacola, Cantonment, and beyond/);
-    assert.match(text, /Sparkling Standard Cleaning Co\. .* Our Service Areas/);
+    assert.match(text, /Sparkling Standard .* Our Service Areas/);
     assert.match(text, /Pensacola \/ Northwest Florida/);
     assert.match(text, /Tampa Bay \/ Central Florida/);
     assert.match(text, /Pasco, Pinellas and Hillsborough/);

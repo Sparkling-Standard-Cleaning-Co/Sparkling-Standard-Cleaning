@@ -4,7 +4,32 @@ The **single authoritative place for current external-platform status**. Update 
 owner confirmation or direct external verification, and date every change. Never convert an
 owner-reported setting into a code-verified fact. Historical records stay historical.
 
-Last reviewed: **2026-11-20** (bookings/careers release and closeout implementation pass).
+Last reviewed: **2026-11-27** (careers branch presentation, payment-cost review and targeted local
+SEO audit).
+
+**2026-11-27 corrections - these supersede any conflicting row below:**
+
+- Production application code is **`4206a28`** on `main` and `production-safe` (identical), live on
+  2026-11-27. Public `/careers/` is Pensacola-only while Tampa is `setup`; the same page switches to
+  the two-branch presentation from the `branches` table when Tampa is activated, without a rebuild.
+  Tampa applications are rejected with `branch_unavailable` until the branch is `live` + `active`.
+- Payment processing cost recovery is **not active** and no price/checkout behavior changed. The
+  investigation and the owner-approval advertised-price alternative are in
+  `docs/operations/PAYMENT-COST-RECOVERY.md`.
+- A targeted local SEO audit is in `docs/seo/SEARCH-VISIBILITY-AUDIT-2026-11-27.md`. The Pensacola
+  location page's duplicate old-brand schema was corrected, the page gained a sitewide footer link
+  and high-intent titles gained accurate Pensacola wording. The authorized SEO release followed
+  `4206a28` and is deployed with live verification recorded in the final closeout.
+- Verified for the deployed release: unit **1,218** (1,217 pass, 1 pre-existing skip), browser
+  **293/293**, `astro check` 0 errors, 41 pages, 2,676 links, smoke 21 pages; CI `46042742975` and
+  `46042730795` green. Production remains at 70 migrations. No live charge, booking, customer email
+  or career application was created.
+- Tampa remains publicly OFF. Bing Places remains PENDING and is the direct owner-side blocker for
+  Bing Maps visibility. The owner reports Google Search Console established with the sitemap
+  processed (23 discovered URLs; 23 indexed, 12 excluded) and Bing Webmaster Tools established;
+  GA4 recorded six Bing organic sessions. Query/coverage detail remains owner-side.
+
+**2026-11-20 review:** bookings/careers release and closeout implementation pass.
 
 **2026-11-21 corrections - these supersede any conflicting row below:**
 
@@ -146,7 +171,7 @@ Status vocabulary:
 | Umami | **deferred by owner (2026-10-21)** | Not adding Umami; GA4/GTM remains the analytics stack. | None | `docs/analytics/ANALYTICS-SETUP.md` |
 | Google Business Profile | **verified — profile + review links captured (owner-supplied 2026-10-08)** | The profile is verified by Google and publicly visible. The exact public profile URL is configured in `business.socials.googleProfile` / `business.reviews.profileUrl`; the exact "Ask for reviews" link is configured in `business.reviews.submissionUrl` (`https://g.page/r/CXAcv1Pp7OI2ECE/review`). Never modify, shorten or substitute them; the `/leave-review/` page is live | Paste the four tracked GBP links (`gbp_home`, `gbp_estimate`, `gbp_deep_clean`, `gbp_gift_post`); begin the weekly GBP rhythm and review requests (`docs/marketing/WEEKLY-EXECUTION-PLAYBOOK.md`) | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/LOCAL-AUTHORITY.md`, `docs/marketing/REVIEW-GROWTH-SYSTEM.md` |
 | Bing Places | **pending owner** | No listing yet; imports from Google Business — **GBP is verified, so creation is unblocked** | Create/import from Google Business; use the tracked Bing Places link | `docs/marketing/PLATFORM-REGISTER.md` |
-| Search Console / Bing | **owner-confirmed** | Property set up; `sitemap-index.xml` (21 canonical URLs) + `robots.txt` verified reachable and correct from production. The payment-success utility page is excluded. | Re-submit the existing sitemap in Search Console | `docs/operations/SEARCH-CONSOLE-SETUP.md` |
+| Search Console / Bing | **owner-confirmed** | Google Search Console established; sitemap processed with 23 discovered URLs (23 indexed, 12 excluded). Bing Webmaster Tools established; GA4 recorded six Bing organic sessions. `sitemap-index.xml` (23 public URLs) + `robots.txt` verified reachable and correct from production. | Review the 12 intentional exclusions and the one discovered-not-indexed URL; confirm Bing sitemap/indexed count; create/claim Bing Places | `docs/operations/SEARCH-CONSOLE-SETUP.md`, `docs/seo/SEARCH-VISIBILITY-AUDIT-2026-11-27.md` |
 | Social profiles (complete inventory) | **live - twelve profiles (owner-confirmed 2026-10-27)** | Twelve profiles render in Follow Us as logo-only circular buttons: Google Business Profile (verified) plus Facebook, Nextdoor, Instagram (`instagram.com/sparkling_standard_cleaning/`), TikTok, YouTube (`youtube.com/@sparklingstandardcleaning`), Pinterest, Rumble, Gab, Parler, Locals and X (`x.com/SparklnStandard`). The owner confirms the tracked UTM links are placed on the original eight; Instagram, YouTube and X account URLs are live but their UTM placements remain **prepared, not placement-confirmed**. Bing Places, Yelp, Threads, LinkedIn, Alignable and Reddit remain pending and never render | Confirm UTM placement on Instagram, YouTube and X; paste the tracked GBP links | `docs/marketing/PLATFORM-REGISTER.md`, `docs/marketing/SOCIAL-ACCOUNT-SETUP.md` |
 | SMS (text messaging) | **live (owner-confirmed)** | `business.flags.smsEnabled=true`; owner confirmed the business number receives SMS and authorized text contact (2026-10-01) | Maintain; keep the CTAs behind the flag | `docs/launch/OWNER-INPUT-REQUIRED.md` #12 |
 | Cloudflare Turnstile | **not started (optional)** | Forms rely on honeypot + timing until configured | Optional | `docs/deployment/DEPLOYMENT.md` §4 |
